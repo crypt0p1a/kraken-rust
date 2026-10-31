@@ -1,0 +1,38 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/kraken-crypto",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/crypt0p1a/kraken-api"
+
+[workspace.dependencies]
+# crates of the workspace
+kraken-api = { path = "crates/kraken-api" }
+kraken-crypto = { path = "crates/kraken-crypto" }
+kraken-network = { path = "crates/kraken-network" }
+
+# same versions as cex-spot-trading, to merge the providers later
+base64 = "0.22.1"
+hmac = "0.12.1"
+# rustls on ring: cross-compiles for Android and iOS without the cmake of aws-lc-rs
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+serde_urlencoded = "0.7.1"
+sha2 = "0.10.9"
+thiserror = "2.0.18"
+tokio = { version = "1", default-features = false }
+uniffi = "=0.32.0"
+
+# tests only
+wiremock = "0.6.5"
+
+[profile.release]
+# rustc strips the macOS dylibs with its rust-objcopy (LLVM), whose output is rejected by dlopen:
+# "mis-aligned LINKEDIT string pool". Apple's strip doesn't have the issue
+strip = false

@@ -1,0 +1,13 @@
+[package]
+name = "kraken-crypto"
+description = "Cryptography of the Kraken private REST calls: API secret and API-Sign signature"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+base64.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
