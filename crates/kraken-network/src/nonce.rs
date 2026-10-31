@@ -14,13 +14,15 @@ fn now_millis() -> u64 {
 /// lower or equal to the previous one of the same API key ("EAPI:Invalid nonce")
 pub(crate) fn next_nonce() -> u64 {
     let now = now_millis();
-    let previous = LAST_NONCE
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |last| {
-            Some(now.max(last + 1))
-        })
-        .unwrap_or_default();
+    let mut last = LAST_NONCE.load(Ordering::SeqCst);
 
-    now.max(previous + 1)
+    loop {
+        let next = now.max(last + 1);
+        match LAST_NONCE.compare_exchange_weak(last, next, Ordering::SeqCst, Ordering::SeqCst) {
+            Ok(_) => return next,
+            Err(current) => last = current,
+        }
+    }
 }
 
 #[cfg(test)]
