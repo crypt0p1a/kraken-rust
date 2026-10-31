@@ -12,3 +12,9 @@
 
 # libraries built by scripts/build.sh
 /dist
+
+# the managers and the database of the bot, local to each installation
+/managers.yaml
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
