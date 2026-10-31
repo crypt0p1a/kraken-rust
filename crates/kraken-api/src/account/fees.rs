@@ -22,6 +22,21 @@ pub struct FeeInfo {
     pub nextvolume: Option<f64>,
     #[serde(default, deserialize_with = "lenient::opt_number")]
     pub tiervolume: Option<f64>,
+    /// Futures volume required by the next tier, None at the last tier
+    #[serde(default, deserialize_with = "lenient::opt_number")]
+    pub nextfuturesvolume: Option<f64>,
+}
+
+/// What the volume of the account is computed from
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct VolumeInputs {
+    #[serde(default, deserialize_with = "lenient::opt_number")]
+    pub domain_spot_volume_30d: Option<f64>,
+    #[serde(default, deserialize_with = "lenient::opt_number")]
+    pub domain_futures_volume_30d: Option<f64>,
+    #[serde(default, deserialize_with = "lenient::opt_number")]
+    pub domain_assets_on_platform: Option<f64>,
 }
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-trade-volume>
@@ -30,6 +45,11 @@ pub struct FeeInfo {
 pub struct TradeVolume {
     /// Currency of the volume, e.g. "ZUSD"
     pub currency: String,
+    /// Asset class of the volume, e.g. "currency"
+    #[serde(default)]
+    pub asset_class: Option<String>,
+    #[serde(default)]
+    pub inputs: Option<VolumeInputs>,
     /// 30 days volume
     #[serde(deserialize_with = "lenient::number")]
     pub volume: f64,
@@ -70,5 +90,31 @@ mod tests {
         assert_eq!(volume.fees["XXBTZUSD"].fee, 0.1);
         assert_eq!(volume.fees_maker["XXBTZUSD"].maxfee, Some(0.16));
         assert_eq!(volume.fees["XXBTZUSD"].nextfee, None);
+        assert_eq!(volume.inputs, None);
+    }
+
+    #[test]
+    fn decodes_the_fields_added_by_kraken() {
+        // shape of the answers of 2026
+        let volume: TradeVolume = serde_json::from_str(
+            r#"{"currency":"ZUSD","asset_class":"currency","volume":"1234.5",
+                "inputs":{"domain_spot_volume_30d":"1234.5","domain_assets_on_platform":"42.1",
+                    "domain_futures_volume_30d":"0"},
+                "fees":{"XXBTZUSD":{"fee":"0.4000","minfee":"0.0800","maxfee":"0.4000",
+                    "nextfee":"0.3500","tiervolume":"0.0000","nextvolume":"10000.0000",
+                    "nextfuturesvolume":"100000.0000"}},
+                "fees_maker":{"XXBTZUSD":{"fee":"0.2500","minfee":"0.0000","maxfee":"0.2500",
+                    "nextfee":"0.2000","tiervolume":"0.0000","nextvolume":"10000.0000",
+                    "nextfuturesvolume":"100000.0000"}}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(volume.asset_class.as_deref(), Some("currency"));
+        let inputs = volume.inputs.unwrap();
+        assert_eq!(inputs.domain_spot_volume_30d, Some(1234.5));
+        assert_eq!(inputs.domain_assets_on_platform, Some(42.1));
+        assert_eq!(inputs.domain_futures_volume_30d, Some(0.0));
+        assert_eq!(volume.fees["XXBTZUSD"].nextfuturesvolume, Some(100000.0));
+        assert_eq!(volume.fees_maker["XXBTZUSD"].nextfee, Some(0.2));
     }
 }

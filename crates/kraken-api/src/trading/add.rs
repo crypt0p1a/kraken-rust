@@ -77,22 +77,38 @@ pub struct NewOrderAnswer {
     pub txids: Vec<String>,
 }
 
+/// The checks Kraken would fail on, done before calling it
+pub(crate) fn check(request: &NewOrder) -> Result<(), KrakenError> {
+    let invalid = |reason: &str| {
+        Err(KrakenError::InvalidArgument {
+            reason: reason.into(),
+        })
+    };
+
+    if request.order_type == OrderType::Unknown {
+        return invalid("OrderType::Unknown can't be sent");
+    }
+
+    if request.time_in_force == Some(TimeInForce::Unknown) {
+        return invalid("TimeInForce::Unknown can't be sent");
+    }
+
+    if request.cl_ord_id.is_some() && request.userref.is_some() {
+        return invalid("cl_ord_id and userref can't be both given");
+    }
+
+    if request.time_in_force == Some(TimeInForce::Gtd) && request.expire_time.is_none() {
+        return invalid("a GTD order requires an expire_time");
+    }
+
+    Ok(())
+}
+
 pub(crate) async fn add_order(
     client: &PrivateClient,
     request: &NewOrder,
 ) -> Result<NewOrderAnswer, KrakenError> {
-    if request.cl_ord_id.is_some() && request.userref.is_some() {
-        return Err(KrakenError::InvalidArgument {
-            reason: "cl_ord_id and userref can't be both given".into(),
-        });
-    }
-
-    if request.time_in_force == Some(TimeInForce::Gtd) && request.expire_time.is_none() {
-        return Err(KrakenError::InvalidArgument {
-            reason: "a GTD order requires an expire_time".into(),
-        });
-    }
-
+    check(request)?;
     client.call_with("AddOrder", Some(request)).await
 }
 
@@ -126,6 +142,44 @@ mod tests {
             "pair=XBTUSD&type=buy&ordertype=limit&volume=1.25&price=27500.0&oflags=post%2Cfciq\
              &timeinforce=GTD&expiretm=%2B43200&cl_ord_id=mgr1_buy_1"
         );
+    }
+
+    #[test]
+    fn checks_the_requests_before_sending_them() {
+        assert_eq!(check(&limit_buy()), Ok(()));
+
+        let invalid = [
+            NewOrder {
+                order_type: OrderType::Unknown,
+                ..limit_buy()
+            },
+            NewOrder {
+                time_in_force: Some(TimeInForce::Unknown),
+                ..limit_buy()
+            },
+            NewOrder {
+                userref: Some(1),
+                ..limit_buy()
+            },
+            NewOrder {
+                expire_time: None,
+                ..limit_buy()
+            },
+        ];
+        for request in invalid {
+            assert!(
+                matches!(check(&request), Err(KrakenError::InvalidArgument { .. })),
+                "{request:?}"
+            );
+        }
+
+        // without time in force, no expiry is required
+        let gtc = NewOrder {
+            time_in_force: None,
+            expire_time: None,
+            ..limit_buy()
+        };
+        assert_eq!(check(&gtc), Ok(()));
     }
 
     #[test]

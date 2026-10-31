@@ -1,4 +1,4 @@
-use super::{OrderSide, OrderStatus, OrderType};
+use super::{OrderSide, OrderStatus, OrderType, TimeInForce};
 use crate::lenient;
 use serde::Deserialize;
 
@@ -8,6 +8,9 @@ use serde::Deserialize;
 pub struct OrderDescription {
     /// Alternate name of the pair, e.g. "XBTUSD"
     pub pair: String,
+    /// Asset class of the pair, e.g. "currency"
+    #[serde(default)]
+    pub aclass: Option<String>,
     #[serde(rename = "type")]
     pub side: OrderSide,
     #[serde(rename = "ordertype")]
@@ -83,6 +86,20 @@ pub struct Order {
         deserialize_with = "lenient::opt_number"
     )]
     pub limit_price: Option<f64>,
+    /// Price the stop / take profit orders are triggered by: "last" or "index"
+    #[serde(default)]
+    pub trigger: Option<String>,
+    /// The order is funded on margin
+    #[serde(default)]
+    pub margin: Option<bool>,
+    /// The order was amended
+    #[serde(default)]
+    pub amended: Option<bool>,
+    /// Sub-account of the trader who placed the order (institutional accounts)
+    #[serde(default)]
+    pub sender_sub_id: Option<String>,
+    #[serde(default)]
+    pub time_in_force: Option<TimeInForce>,
     /// Comma separated: stopped, touched, liquidated, partial
     #[serde(default)]
     pub misc: String,
@@ -146,5 +163,53 @@ mod tests {
         assert!(closed.status.is_final());
         assert_eq!(closed.description.order_type, OrderType::Market);
         assert_eq!(closed.close_time, Some(1688665499.1922));
+    }
+
+    #[test]
+    fn decodes_the_closed_orders_of_2026() {
+        // shape of the answers of ClosedOrders in 2026: time_in_force in lower case, aclass
+        let orders = with_txids(
+            serde_json::from_str::<HashMap<String, Order>>(
+                r#"{"O2FFEU-CVWWB-CX2255":{"refid":null,"userref":null,"status":"closed",
+                    "opentm":1515391432.96142,"starttm":0,"expiretm":0,"closetm":1515391481.968431,
+                    "descr":{"pair":"ETHEUR","aclass":"forex","type":"buy","ordertype":"limit",
+                        "price":"936.91","price2":"0","leverage":"none",
+                        "order":"buy 0.16000000 ETHEUR @ limit 936.91","close":""},
+                    "vol":"0.16000000","vol_exec":"0.16000000","cost":"149.90560",
+                    "fee":"0.17989","price":"936.91","oflags":"fciq","time_in_force":"gtc",
+                    "reason":null,"misc":"","trades":["TQ4XKY-QR5ZE-JXGOGJ"]}}"#,
+            )
+            .unwrap(),
+        );
+
+        let order = &orders[0];
+        assert_eq!(order.description.aclass.as_deref(), Some("forex"));
+        assert_eq!(order.time_in_force, Some(TimeInForce::Gtc));
+        assert_eq!(order.userref, None);
+        assert_eq!(order.stop_price, None);
+        assert_eq!(order.cost, 149.9056);
+    }
+
+    #[test]
+    fn decodes_the_optional_fields_of_the_documentation() {
+        let order: Order = serde_json::from_str(
+            r#"{"status":"open","opentm":1688666559.8974,"descr":{"pair":"XBTUSD","type":"sell",
+                "ordertype":"stop-loss-limit","price":"25000","price2":"24900","order":"sell"},
+                "vol":"1","vol_exec":"0","cost":"0","fee":"0","price":"0","stopprice":"25000",
+                "limitprice":"24900","trigger":"index","margin":false,"amended":true,
+                "sender_sub_id":"desk-1","cl_ord_id":"6d1b345e-2821-40e2-ad83-4ecb18a06876",
+                "time_in_force":"GTD","expiretm":1688670000,"misc":"","oflags":"fcib"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(order.trigger.as_deref(), Some("index"));
+        assert_eq!(order.margin, Some(false));
+        assert_eq!(order.amended, Some(true));
+        assert_eq!(order.sender_sub_id.as_deref(), Some("desk-1"));
+        assert_eq!(order.time_in_force, Some(TimeInForce::Gtd));
+        assert_eq!(order.stop_price, Some(25000.0));
+        assert_eq!(order.description.order_type, OrderType::StopLossLimit);
+        assert_eq!(order.description.price2, Some(24900.0));
+        assert_eq!(order.expire_time, Some(1688670000.0));
     }
 }

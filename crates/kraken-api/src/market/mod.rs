@@ -9,6 +9,6 @@ pub(crate) mod ticker;
 pub(crate) mod time;
 
 pub use ohlc::{Candle, CandleInterval, Candles, CandlesRequest};
-pub use pairs::{AssetPair, FeeTier};
+pub use pairs::{AssetPair, AssetPairStatus, FeeTier};
 pub use ticker::{PriceLevel, Ticker, TradeLevel, Window, WindowCount};
 pub use time::ServerTime;

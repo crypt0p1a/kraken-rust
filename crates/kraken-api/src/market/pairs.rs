@@ -32,6 +32,9 @@ pub struct AssetPair {
     pub aclass_quote: Option<String>,
     /// Asset of the quote, e.g. "ZUSD"
     pub quote: String,
+    /// Unit of the volume, e.g. "unit"
+    #[serde(default)]
+    pub lot: Option<String>,
     /// Decimals of the price
     #[serde(deserialize_with = "lenient::number")]
     pub pair_decimals: i32,
@@ -67,9 +70,32 @@ pub struct AssetPair {
     /// Minimum increment of the price
     #[serde(default, deserialize_with = "lenient::opt_number")]
     pub tick_size: Option<f64>,
-    /// online, cancel_only, post_only, limit_only, reduce_only
     #[serde(default)]
-    pub status: Option<String>,
+    pub status: Option<AssetPairStatus>,
+    /// Where the orders are executed, e.g. "international"
+    #[serde(default)]
+    pub execution_venue: Option<String>,
+    /// Maximum long margin position, in the base. Only for the pairs with margin
+    #[serde(default, deserialize_with = "lenient::opt_number")]
+    pub long_position_limit: Option<i64>,
+    /// Maximum short margin position, in the base. Only for the pairs with margin
+    #[serde(default, deserialize_with = "lenient::opt_number")]
+    pub short_position_limit: Option<i64>,
+}
+
+/// Trading status of a pair
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[serde(rename_all = "snake_case")]
+pub enum AssetPairStatus {
+    Online,
+    CancelOnly,
+    PostOnly,
+    LimitOnly,
+    ReduceOnly,
+    /// Sent by Kraken but unknown to this version of the library
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Deserialize)]
@@ -125,5 +151,54 @@ mod tests {
         );
         assert_eq!(pair.ordermin, Some(0.00005));
         assert_eq!(pair.tick_size, Some(0.1));
+    }
+
+    #[test]
+    fn decodes_the_fields_added_by_kraken() {
+        // shape of the answers of 2026, with and without margin
+        let pairs: HashMap<String, AssetPair> = serde_json::from_str(
+            r#"{"XXBTZUSD":{"altname":"XBTUSD","wsname":"XBT/USD","aclass_base":"currency",
+                "base":"XXBT","aclass_quote":"currency","quote":"ZUSD","lot":"unit",
+                "cost_decimals":5,"pair_decimals":1,"lot_decimals":8,"lot_multiplier":1,
+                "leverage_buy":[2,3],"leverage_sell":[2,3],"fees":[],"fees_maker":[],
+                "fee_volume_currency":"ZUSD","margin_call":80,"margin_stop":40,
+                "ordermin":"0.00006","costmin":"0.5","tick_size":"0.1","status":"online",
+                "execution_venue":"international","long_position_limit":350,
+                "short_position_limit":250},
+            "0GEUR":{"altname":"0GEUR","wsname":"0G/EUR","aclass_base":"currency","base":"0G",
+                "aclass_quote":"currency","quote":"ZEUR","lot":"unit5","cost_decimals":5,
+                "pair_decimals":4,"lot_decimals":8,"lot_multiplier":1,"leverage_buy":[],
+                "leverage_sell":[],"fees":[],"fees_maker":[],"fee_volume_currency":"ZUSD",
+                "margin_call":80,"margin_stop":40,"ordermin":"1","costmin":"0.45",
+                "tick_size":"0.0001","status":"cancel_only","execution_venue":"international"}}"#,
+        )
+        .unwrap();
+
+        let btc = &pairs["XXBTZUSD"];
+        assert_eq!(btc.lot.as_deref(), Some("unit"));
+        assert_eq!(btc.status, Some(AssetPairStatus::Online));
+        assert_eq!(btc.execution_venue.as_deref(), Some("international"));
+        assert_eq!(btc.long_position_limit, Some(350));
+        assert_eq!(btc.short_position_limit, Some(250));
+        assert!(btc.fees.is_empty());
+
+        let other = &pairs["0GEUR"];
+        assert_eq!(other.status, Some(AssetPairStatus::CancelOnly));
+        assert_eq!(other.long_position_limit, None);
+    }
+
+    #[test]
+    fn decodes_every_status() {
+        for (text, expected) in [
+            ("online", AssetPairStatus::Online),
+            ("cancel_only", AssetPairStatus::CancelOnly),
+            ("post_only", AssetPairStatus::PostOnly),
+            ("limit_only", AssetPairStatus::LimitOnly),
+            ("reduce_only", AssetPairStatus::ReduceOnly),
+            ("delisted", AssetPairStatus::Unknown),
+        ] {
+            let decoded: AssetPairStatus = serde_json::from_str(&format!("\"{text}\"")).unwrap();
+            assert_eq!(decoded, expected, "{text}");
+        }
     }
 }

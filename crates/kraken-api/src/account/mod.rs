@@ -6,4 +6,4 @@ pub(crate) mod balance;
 pub(crate) mod fees;
 
 pub use balance::ExtendedBalance;
-pub use fees::{FeeInfo, TradeVolume};
+pub use fees::{FeeInfo, TradeVolume, VolumeInputs};

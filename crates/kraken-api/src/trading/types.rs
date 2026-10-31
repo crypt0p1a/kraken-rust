@@ -50,16 +50,23 @@ impl OrderStatus {
     }
 }
 
+/// Sent in upper case, answered in lower case by ClosedOrders
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TimeInForce {
     /// Good 'til cancelled, the default
+    #[serde(alias = "gtc")]
     Gtc,
     /// Immediate or cancel
+    #[serde(alias = "ioc")]
     Ioc,
     /// Good 'til date: requires `expire_time`
+    #[serde(alias = "gtd")]
     Gtd,
+    /// Sent by Kraken but unknown to this version of the library. Never send it
+    #[serde(other)]
+    Unknown,
 }
 
 /// Flags of a new order
@@ -112,6 +119,27 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<OrderStatus>(r#""something-new""#).unwrap(),
             OrderStatus::Unknown
+        );
+    }
+
+    #[test]
+    fn reads_the_time_in_force_in_both_cases() {
+        // upper case in the requests, lower case in the answers of ClosedOrders
+        for (text, expected) in [
+            ("GTC", TimeInForce::Gtc),
+            ("gtc", TimeInForce::Gtc),
+            ("IOC", TimeInForce::Ioc),
+            ("ioc", TimeInForce::Ioc),
+            ("GTD", TimeInForce::Gtd),
+            ("gtd", TimeInForce::Gtd),
+            ("FOK", TimeInForce::Unknown),
+        ] {
+            let decoded: TimeInForce = serde_json::from_str(&format!("\"{text}\"")).unwrap();
+            assert_eq!(decoded, expected, "{text}");
+        }
+        assert_eq!(
+            serde_json::to_string(&TimeInForce::Gtc).unwrap(),
+            r#""GTC""#
         );
     }
 }
