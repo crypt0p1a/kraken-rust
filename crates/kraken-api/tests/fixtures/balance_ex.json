@@ -1,0 +1,6 @@
+{"error":[],"result":{
+ "ZEUR":{"balance":"1250.4200","hold_trade":"300.0000"},
+ "XXBT":{"balance":"0.0123456700","hold_trade":"0.0000000000"},
+ "XETH":{"balance":"0.0000000000","hold_trade":"0.0000000000"},
+ "USDC":{"balance":"25.00000000","hold_trade":"0.00000000","credit":"10.00000000","credit_used":"2.50000000"}
+}}

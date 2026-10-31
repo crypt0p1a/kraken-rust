@@ -1,0 +1,11 @@
+{"error":[],"result":{"closed":{
+ "OAAAAA-BBBBB-CCCCC1":{"refid":null,"userref":null,"status":"closed","opentm":1761900000.1234,"starttm":0,"expiretm":0,"closetm":1761900060.5678,
+  "descr":{"pair":"ETHEUR","aclass":"forex","type":"buy","ordertype":"limit","price":"2500.00","price2":"0","leverage":"none","order":"buy 0.10000000 ETHEUR @ limit 2500.00","close":""},
+  "vol":"0.10000000","vol_exec":"0.10000000","cost":"250.00000","fee":"0.40000","price":"2500.00","oflags":"fciq","time_in_force":"gtc","reason":null,"misc":"","trades":["TAAAAA-BBBBB-CCCCC1"]},
+ "OAAAAA-BBBBB-CCCCC2":{"refid":null,"userref":null,"status":"canceled","opentm":1761800000.5,"starttm":0,"expiretm":0,"closetm":1761800100.25,
+  "descr":{"pair":"XBTEUR","aclass":"forex","type":"sell","ordertype":"limit","price":"90000.0","price2":"0","leverage":"none","order":"sell 0.01000000 XBTEUR @ limit 90000.0","close":""},
+  "vol":"0.01000000","vol_exec":"0.00400000","cost":"360.00000","fee":"0.57600","price":"90000.0","oflags":"fciq","time_in_force":"gtc","reason":"User requested","misc":"partial","trades":["TAAAAA-BBBBB-CCCCC2"]},
+ "OAAAAA-BBBBB-CCCCC3":{"refid":null,"userref":null,"status":"closed","opentm":1761700000.0,"starttm":0,"expiretm":0,"closetm":1761700000.75,
+  "descr":{"pair":"XBTEUR","aclass":"forex","type":"buy","ordertype":"market","price":"0","price2":"0","leverage":"none","order":"buy 50.00000000 XBTEUR @ market","close":""},
+  "vol":"50.00000000","vol_exec":"0.00058823","cost":"50.00000","fee":"0.13000","price":"85000.0","stopprice":"0.00000","limitprice":"0.00000","oflags":"viqc,fciq","time_in_force":"gtc","reason":null,"misc":"","trades":["TAAAAA-BBBBB-CCCCC3"]}
+},"count":3}}

@@ -33,6 +33,7 @@ tokio = { version = "1", default-features = false }
 uniffi = "=0.32.0"
 
 # tests only
+serde_ignored = "0.1.14"
 wiremock = "0.6.5"
 
 [profile.release]
