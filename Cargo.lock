@@ -806,7 +806,10 @@ version = "0.1.0"
 dependencies = [
  "kraken-api",
  "kraken-network",
+ "serde_json",
+ "tokio",
  "uniffi",
+ "wiremock",
 ]
 
 [[package]]
