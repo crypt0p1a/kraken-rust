@@ -1,0 +1,40 @@
+# Secret scanning of the repository and of its whole history: `gitleaks git` (see the CI).
+# The default rules of gitleaks, plus entropy based rules for the Kraken credentials.
+
+title = "kraken-rust"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "kraken-private-key"
+description = "Kraken API private key: 64 bytes in base64"
+regex = '''(?:^|[^A-Za-z0-9+/])([A-Za-z0-9+/]{86}==)(?:[^A-Za-z0-9+/=]|$)'''
+secretGroup = 1
+entropy = 4.5
+
+[[rules]]
+id = "kraken-api-key"
+description = "Kraken API key: 56 base64 characters"
+regex = '''(?:^|[^A-Za-z0-9+/=])([A-Za-z0-9+/]{56})(?:[^A-Za-z0-9+/=]|$)'''
+secretGroup = 1
+entropy = 4.5
+
+[[rules]]
+id = "high-entropy-base64"
+description = "Long base64 string with a high entropy"
+regex = '''(?:^|[^A-Za-z0-9+/])([A-Za-z0-9+/]{40,}={0,2})(?:[^A-Za-z0-9+/=]|$)'''
+secretGroup = 1
+entropy = 5.0
+
+[[allowlists]]
+description = "Public values of the tests: the example of the Kraken documentation and its signature"
+regexTarget = "secret"
+regexes = [
+  '''^kQH5HW/8p1uGOVjbgWA7FunAmGO8lsSUXNsu3eow76sz84Q18fWxnyRzBHCd3pd5nE9qa99HAZtuZuj6F1huXg==$''',
+  '''^4/dpxb3iT4tp/ZCVEwSnEsLxx0bqyhLpdfOpc6fn7OR8\+UClSV5n9E6aSS8MPtnRfp32bAb0nmbRn6H8ndwLUQ==$''',
+]
+
+[[allowlists]]
+description = "Checksums of the dependencies"
+paths = ['''Cargo\.lock$''']

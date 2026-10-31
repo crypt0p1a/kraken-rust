@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # every day: the live contract tests detect the changes of the Kraken API
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  secrets:
+    name: Secrets (gitleaks + trufflehog)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks, whole history (default rules + entropy rules of .gitleaks.toml)
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo ghcr.io/gitleaks/gitleaks:v8.28.0 \
+            git /repo --config /repo/.gitleaks.toml --redact --no-banner --exit-code 1
+      - name: gitleaks, working tree (files ignored by git included)
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo ghcr.io/gitleaks/gitleaks:v8.28.0 \
+            dir /repo --config /repo/.gitleaks.toml --redact --no-banner --exit-code 1
+      - name: trufflehog, whole history (verified and unverified secrets)
+        uses: trufflesecurity/trufflehog@v3.90.8
+        with:
+          extra_args: --results=verified,unknown,unverified
+      - name: no credentials file committed
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo "::error::.env must not be committed"; exit 1
+          fi
+
+  lint:
+    name: Format and clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked
+
+  test:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Unit, mocked and fixture tests (offline)
+        run: cargo test --workspace --locked
+
+  crates:
+    name: Each crate alone (no uniffi feature)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: |
+          for crate in kraken-crypto kraken-network kraken-api; do
+            cargo test -p "$crate" --locked
+            if cargo tree -p "$crate" -e normal | grep -q uniffi; then
+              echo "::error::$crate depends on uniffi without its feature"; exit 1
+            fi
+          done
+
+  audit:
+    name: Vulnerabilities of the dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: cargo audit
+
+  live-public:
+    name: Contract of the public API (real Kraken)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p kraken-api --locked --test live_market -- --ignored --test-threads=1
+
+  live-private:
+    name: Contract of the private API (real Kraken, read only)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      KRAKEN_API_KEY: ${{ secrets.KRAKEN_API_KEY }}
+      KRAKEN_API_SECRET: ${{ secrets.KRAKEN_API_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Account and trading (orders validated only, never placed)
+        if: env.KRAKEN_API_KEY != ''
+        run: |
+          cargo test -p kraken-api --locked --test live_account -- --ignored --test-threads=1
+          cargo test -p kraken-api --locked --test live_trading -- --ignored --test-threads=1
+      - name: Without credentials
+        if: env.KRAKEN_API_KEY == ''
+        run: echo "::warning::KRAKEN_API_KEY / KRAKEN_API_SECRET secrets not set, private contract skipped"
