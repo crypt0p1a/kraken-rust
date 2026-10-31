@@ -1,0 +1,129 @@
+use super::{OrderFlag, OrderSide, OrderType, TimeInForce};
+use crate::KrakenError;
+use kraken_network::PrivateClient;
+use kraken_network::params::opt_comma_separated;
+use serde::{Deserialize, Serialize};
+
+/// <https://docs.kraken.com/api/docs/rest-api/add-order>
+///
+/// The amounts and prices are strings, to keep the precision given by the caller
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct NewOrder {
+    /// Alternate name of the pair, e.g. "XBTUSD"
+    pub pair: String,
+    #[serde(rename = "type")]
+    pub side: OrderSide,
+    #[serde(rename = "ordertype")]
+    pub order_type: OrderType,
+    /// Volume, in the base currency (in the quote currency with [`OrderFlag::Viqc`])
+    pub volume: String,
+    /// Limit price, or trigger price of the stop / take profit orders
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub price: Option<String>,
+    /// Limit price of the stop-loss-limit / take-profit-limit orders
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub price2: Option<String>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "opt_comma_separated"
+    )]
+    pub oflags: Option<Vec<OrderFlag>>,
+    /// GTC when missing
+    #[serde(rename = "timeinforce", skip_serializing_if = "Option::is_none")]
+    pub time_in_force: Option<TimeInForce>,
+    /// "0" (now), "<UTC timestamp in seconds>" or "+<seconds from now>"
+    #[serde(rename = "starttm", skip_serializing_if = "Option::is_none")]
+    pub start_time: Option<String>,
+    /// Required by GTD: "<UTC timestamp in seconds>" or "+<seconds from now>"
+    #[serde(rename = "expiretm", skip_serializing_if = "Option::is_none")]
+    pub expire_time: Option<String>,
+    /// Client identifier: a UUID, or up to 18 ASCII characters. Exclusive with `userref`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cl_ord_id: Option<String>,
+    /// Numeric client identifier, shared by a group of orders
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub userref: Option<i32>,
+    /// Validates the parameters without placing the order
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validate: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct NewOrderDescription {
+    /// e.g. "buy 1.25000000 XBTUSD @ limit 27500.0"
+    pub order: String,
+    #[serde(default)]
+    pub close: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct NewOrderAnswer {
+    #[serde(rename = "descr")]
+    pub description: NewOrderDescription,
+    /// Identifiers of the orders placed, empty when only validated
+    #[serde(rename = "txid", default)]
+    pub txids: Vec<String>,
+}
+
+pub(crate) async fn add_order(
+    client: &PrivateClient,
+    request: &NewOrder,
+) -> Result<NewOrderAnswer, KrakenError> {
+    if request.cl_ord_id.is_some() && request.userref.is_some() {
+        return Err(KrakenError::InvalidArgument {
+            reason: "cl_ord_id and userref can't be both given".into(),
+        });
+    }
+
+    if request.time_in_force == Some(TimeInForce::Gtd) && request.expire_time.is_none() {
+        return Err(KrakenError::InvalidArgument {
+            reason: "a GTD order requires an expire_time".into(),
+        });
+    }
+
+    client.call_with("AddOrder", Some(request)).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kraken_network::params::encode;
+
+    fn limit_buy() -> NewOrder {
+        NewOrder {
+            pair: "XBTUSD".into(),
+            side: OrderSide::Buy,
+            order_type: OrderType::Limit,
+            volume: "1.25".into(),
+            price: Some("27500.0".into()),
+            price2: None,
+            oflags: Some(vec![OrderFlag::Post, OrderFlag::Fciq]),
+            time_in_force: Some(TimeInForce::Gtd),
+            start_time: None,
+            expire_time: Some("+43200".into()),
+            cl_ord_id: Some("mgr1_buy_1".into()),
+            userref: None,
+            validate: None,
+        }
+    }
+
+    #[test]
+    fn encodes_the_new_order() {
+        assert_eq!(
+            encode(&limit_buy()).unwrap(),
+            "pair=XBTUSD&type=buy&ordertype=limit&volume=1.25&price=27500.0&oflags=post%2Cfciq\
+             &timeinforce=GTD&expiretm=%2B43200&cl_ord_id=mgr1_buy_1"
+        );
+    }
+
+    #[test]
+    fn decodes_the_answer() {
+        let answer: NewOrderAnswer = serde_json::from_str(
+            r#"{"descr":{"order":"buy 1.25000000 XBTUSD @ limit 27500.0"},
+                "txid":["OU22CG-KLAF2-FWUDD7"]}"#,
+        )
+        .unwrap();
+        assert_eq!(answer.txids, vec!["OU22CG-KLAF2-FWUDD7"]);
+        assert_eq!(answer.description.close, None);
+    }
+}

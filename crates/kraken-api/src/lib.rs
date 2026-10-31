@@ -4,6 +4,7 @@
 //! |---------------|---------------------------------------------------|
 //! | [`market`]    | public: Time, Ticker, AssetPairs, OHLC            |
 //! | [`account`]   | private: BalanceEx, TradeVolume                   |
+//! | [`trading`]   | private: OpenOrders, ClosedOrders, QueryOrders, AddOrder |
 //!
 //! Each domain holds its models and its calls, [`PublicApi`] and [`PrivateApi`] being the facades
 //! composing them over the clients of `kraken-network`.
@@ -27,6 +28,7 @@ pub mod market;
 mod params;
 mod private_api;
 mod public_api;
+pub mod trading;
 
 pub use kraken_network::{KrakenError, Logger, RateLimiter, RestOptions};
 pub use private_api::PrivateApi;
