@@ -6,10 +6,15 @@
 //! - [`RateLimiter`]: token bucket shared by the clients, which also sends the calls in order
 //! - [`KrakenError`]: every failure of a call, the `{"error": [...]}` answers included
 
+mod client;
+mod envelope;
 mod error;
+mod nonce;
 mod options;
+pub mod params;
 mod rate_limit;
 
+pub use client::{PrivateClient, PublicClient};
 pub use error::KrakenError;
 pub use options::RestOptions;
 pub use rate_limit::{Logger, RateLimiter};
