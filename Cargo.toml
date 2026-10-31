@@ -5,6 +5,7 @@ members = [
   "crates/kraken-network",
   "crates/kraken-api",
   "crates/kraken-ffi",
+  "crates/kraken-trading-bot",
 ]
 
 [workspace.package]
@@ -18,6 +19,14 @@ repository = "https://github.com/crypt0p1a/kraken-rust"
 kraken-api = { path = "crates/kraken-api" }
 kraken-crypto = { path = "crates/kraken-crypto" }
 kraken-network = { path = "crates/kraken-network" }
+
+# trading bot
+humantime-serde = "1.1.1"
+rusqlite = { version = "0.41.1", features = ["bundled"] }
+rust_decimal = { version = "1.43.0", features = ["serde-str"] }
+serde_norway = "0.9.42"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 # same versions as cex-spot-trading, to merge the providers later
 base64 = "0.22.1"
