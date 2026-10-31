@@ -126,3 +126,134 @@ fn the_private_api_refuses_an_invalid_secret() {
     );
     assert!(matches!(api, Err(KrakenError::InvalidArgument { .. })));
 }
+
+/// Serves the fixtures of kraken-api: the real shapes of the answers
+async fn serve_fixtures(server: &MockServer) {
+    let fixtures =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../kraken-api/tests/fixtures");
+    for (endpoint, file) in [
+        ("/0/public/Time", "time.json"),
+        ("/0/public/Ticker", "ticker.json"),
+        ("/0/public/AssetPairs", "asset_pairs.json"),
+        ("/0/public/OHLC", "ohlc.json"),
+        ("/0/private/BalanceEx", "balance_ex.json"),
+        ("/0/private/TradeVolume", "trade_volume.json"),
+        ("/0/private/OpenOrders", "open_orders.json"),
+        ("/0/private/ClosedOrders", "closed_orders.json"),
+        ("/0/private/QueryOrders", "query_orders.json"),
+        ("/0/private/AddOrder", "add_order_validate.json"),
+    ] {
+        let body: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(fixtures.join(file)).unwrap()).unwrap();
+        Mock::given(path(endpoint))
+            .respond_with(ResponseTemplate::new(200).set_body_json(body))
+            .mount(server)
+            .await;
+    }
+}
+
+#[tokio::test]
+async fn every_public_method_is_exported() {
+    let server = MockServer::start().await;
+    serve_fixtures(&server).await;
+    let api = KrakenPublicApi::new(options(&server), KrakenRateLimiter::new(100, 1, None)).unwrap();
+
+    assert!(api.server_time().await.unwrap().unix_time > 0);
+    assert_eq!(api.tickers(vec![]).await.unwrap().len(), 4);
+    assert_eq!(
+        api.asset_pairs(vec!["XBTUSD".into()]).await.unwrap().len(),
+        5
+    );
+    let candles = api
+        .candles(kraken_api::market::CandlesRequest {
+            pair: "XBTUSD".into(),
+            interval: kraken_api::market::CandleInterval::Res1d,
+            since: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(candles.candles.len(), 4);
+}
+
+#[tokio::test]
+async fn every_private_method_is_exported() {
+    use kraken_api::trading::{
+        ClosedOrdersRequest, NewOrder, OpenOrdersRequest, OrderSide, OrderType, QueryOrdersRequest,
+    };
+
+    let server = MockServer::start().await;
+    serve_fixtures(&server).await;
+    let api = KrakenPrivateApi::new(
+        "key".into(),
+        "c2VjcmV0".into(),
+        options(&server),
+        KrakenRateLimiter::new(100, 1, None),
+    )
+    .unwrap();
+
+    assert_eq!(api.extended_balance().await.unwrap().len(), 4);
+    assert_eq!(
+        api.trade_volume(vec!["XBTUSD".into()])
+            .await
+            .unwrap()
+            .fees
+            .len(),
+        2
+    );
+    assert_eq!(
+        api.open_orders(OpenOrdersRequest::default())
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        api.open_orders_for_pair("XBTUSD".into())
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        api.closed_orders(ClosedOrdersRequest::default())
+            .await
+            .unwrap()
+            .count,
+        3
+    );
+    let queried = api
+        .query_orders(QueryOrdersRequest {
+            txids: vec!["OAAAAA-BBBBB-CCCCC1".into()],
+            trades: None,
+            userref: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(queried.len(), 2);
+    assert!(
+        api.order("OAAAAA-BBBBB-CCCCC1".into())
+            .await
+            .unwrap()
+            .is_some()
+    );
+
+    let answer = api
+        .new_order(NewOrder {
+            pair: "XBTUSD".into(),
+            side: OrderSide::Buy,
+            order_type: OrderType::Limit,
+            volume: "0.0001".into(),
+            price: Some("38000.0".into()),
+            price2: None,
+            oflags: None,
+            time_in_force: None,
+            start_time: None,
+            expire_time: None,
+            cl_ord_id: None,
+            userref: None,
+            validate: Some(true),
+        })
+        .await
+        .unwrap();
+    assert!(answer.txids.is_empty());
+}
