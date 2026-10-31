@@ -27,4 +27,10 @@ mod tests {
         );
         assert_eq!(encode(&Pairs { pair: &[] }).unwrap(), "");
     }
+
+    #[test]
+    fn sends_a_single_pair_as_is() {
+        let pairs = ["XBT/USD".to_string()];
+        assert_eq!(encode(&Pairs { pair: &pairs }).unwrap(), "pair=XBT%2FUSD");
+    }
 }

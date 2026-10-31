@@ -122,4 +122,59 @@ mod tests {
         assert_eq!(sample.percentage, 0.0);
         assert_eq!(sample.text, "abc");
     }
+
+    #[derive(Deserialize, Debug, PartialEq)]
+    struct Optionals {
+        #[serde(default, deserialize_with = "super::opt_number")]
+        number: Option<f64>,
+        #[serde(default, deserialize_with = "super::opt_string")]
+        text: Option<String>,
+    }
+
+    #[test]
+    fn reads_null_and_empty_strings_as_none() {
+        for json in [
+            r#"{}"#,
+            r#"{"number":null,"text":null}"#,
+            r#"{"number":"","text":null}"#,
+            r#"{"number":"   "}"#,
+        ] {
+            let decoded: Optionals = serde_json::from_str(json).unwrap();
+            assert_eq!(decoded.number, None, "{json}");
+            assert_eq!(decoded.text, None, "{json}");
+        }
+    }
+
+    #[test]
+    fn trims_the_numbers_and_converts_the_primitives_to_strings() {
+        let decoded: Optionals =
+            serde_json::from_str(r#"{"number":" 12.5 ","text":true}"#).unwrap();
+        assert_eq!(decoded.number, Some(12.5));
+        assert_eq!(decoded.text.as_deref(), Some("true"));
+
+        let decoded: Optionals = serde_json::from_str(r#"{"number":-3,"text":1.5}"#).unwrap();
+        assert_eq!(decoded.number, Some(-3.0));
+        assert_eq!(decoded.text.as_deref(), Some("1.5"));
+    }
+
+    #[test]
+    fn rejects_what_is_not_a_number_or_a_primitive() {
+        assert!(serde_json::from_str::<Optionals>(r#"{"number":"abc"}"#).is_err());
+        assert!(serde_json::from_str::<Optionals>(r#"{"number":[1]}"#).is_err());
+        assert!(serde_json::from_str::<Optionals>(r#"{"text":{"a":1}}"#).is_err());
+        assert!(serde_json::from_str::<Optionals>(r#"{"text":[1]}"#).is_err());
+        assert!(
+            serde_json::from_str::<Sample>(r#"{"number":"1","percentage":1,"text":null}"#).is_err()
+        );
+    }
+
+    #[test]
+    fn reads_the_integers() {
+        #[derive(Deserialize)]
+        struct Integer(#[serde(deserialize_with = "super::number")] i64);
+
+        assert_eq!(serde_json::from_str::<Integer>(r#""42""#).unwrap().0, 42);
+        assert_eq!(serde_json::from_str::<Integer>("42").unwrap().0, 42);
+        assert!(serde_json::from_str::<Integer>(r#""4.2""#).is_err());
+    }
 }

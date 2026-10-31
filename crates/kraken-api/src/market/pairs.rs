@@ -201,4 +201,42 @@ mod tests {
             assert_eq!(decoded, expected, "{text}");
         }
     }
+
+    #[test]
+    fn decodes_a_pair_with_only_the_required_fields() {
+        let pair: AssetPair = serde_json::from_str(
+            r#"{"altname":"XBTUSD","base":"XXBT","quote":"ZUSD","pair_decimals":"1",
+                "lot_decimals":8}"#,
+        )
+        .unwrap();
+        assert_eq!(pair.pair_decimals, 1);
+        assert!(pair.fees.is_empty() && pair.leverage_buy.is_empty());
+        assert_eq!(pair.status, None);
+        assert_eq!(pair.ordermin, None);
+    }
+
+    #[test]
+    fn requires_the_identity_and_the_decimals() {
+        for field in ["altname", "base", "quote", "pair_decimals", "lot_decimals"] {
+            let mut value: serde_json::Value = serde_json::from_str(
+                r#"{"altname":"XBTUSD","base":"XXBT","quote":"ZUSD","pair_decimals":1,
+                    "lot_decimals":8}"#,
+            )
+            .unwrap();
+            value.as_object_mut().unwrap().remove(field);
+            assert!(
+                serde_json::from_value::<AssetPair>(value).is_err(),
+                "{field}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_the_fee_tiers_of_another_size() {
+        let pair = serde_json::from_str::<AssetPair>(
+            r#"{"altname":"XBTUSD","base":"XXBT","quote":"ZUSD","pair_decimals":1,
+                "lot_decimals":8,"fees":[[0,0.26,1]]}"#,
+        );
+        assert!(pair.is_err());
+    }
 }

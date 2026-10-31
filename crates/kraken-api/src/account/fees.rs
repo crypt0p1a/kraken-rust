@@ -117,4 +117,19 @@ mod tests {
         assert_eq!(volume.fees["XXBTZUSD"].nextfuturesvolume, Some(100000.0));
         assert_eq!(volume.fees_maker["XXBTZUSD"].nextfee, Some(0.2));
     }
+
+    #[test]
+    fn decodes_the_volume_without_fees() {
+        let volume: TradeVolume =
+            serde_json::from_str(r#"{"currency":"ZUSD","volume":"0.0000"}"#).unwrap();
+        assert!(volume.fees.is_empty() && volume.fees_maker.is_empty());
+        assert_eq!(volume.volume, 0.0);
+    }
+
+    #[test]
+    fn requires_the_currency_the_volume_and_the_fee() {
+        assert!(serde_json::from_str::<TradeVolume>(r#"{"volume":"1"}"#).is_err());
+        assert!(serde_json::from_str::<TradeVolume>(r#"{"currency":"ZUSD"}"#).is_err());
+        assert!(serde_json::from_str::<FeeInfo>(r#"{"minfee":"0.1"}"#).is_err());
+    }
 }

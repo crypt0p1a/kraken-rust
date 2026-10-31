@@ -140,4 +140,84 @@ mod tests {
         assert_eq!(ticker.trades.today, 34619);
         assert_eq!(ticker.open, 30502.8);
     }
+
+    const TICKER: &str = r#"{"a":["1","2","3"],"b":["0.5","1","1"],"c":["0.75","0.1"],
+        "v":["10","20"],"p":["0.7","0.8"],"t":[1,2],"l":["0.4","0.3"],"h":["1.1","1.2"],
+        "o":"0.6"}"#;
+
+    #[test]
+    fn names_every_value_of_the_arrays() {
+        let ticker: Ticker = serde_json::from_str(TICKER).unwrap();
+        assert_eq!(
+            ticker.ask,
+            PriceLevel {
+                price: 1.0,
+                whole_lot_volume: 2.0,
+                lot_volume: 3.0
+            }
+        );
+        assert_eq!(
+            ticker.last_trade,
+            TradeLevel {
+                price: 0.75,
+                lot_volume: 0.1
+            }
+        );
+        assert_eq!(
+            ticker.volume,
+            Window {
+                today: 10.0,
+                last_24h: 20.0
+            }
+        );
+        assert_eq!(
+            ticker.vwap,
+            Window {
+                today: 0.7,
+                last_24h: 0.8
+            }
+        );
+        assert_eq!(
+            ticker.trades,
+            WindowCount {
+                today: 1,
+                last_24h: 2
+            }
+        );
+        assert_eq!(
+            ticker.low,
+            Window {
+                today: 0.4,
+                last_24h: 0.3
+            }
+        );
+        assert_eq!(
+            ticker.high,
+            Window {
+                today: 1.1,
+                last_24h: 1.2
+            }
+        );
+        assert_eq!(ticker.open, 0.6);
+    }
+
+    #[test]
+    fn rejects_the_arrays_of_another_size() {
+        for (from, to) in [
+            (r#""a":["1","2","3"]"#, r#""a":["1","2"]"#),
+            (r#""c":["0.75","0.1"]"#, r#""c":["0.75","0.1","9"]"#),
+            (r#""t":[1,2]"#, r#""t":[1]"#),
+            (r#""o":"0.6""#, r#""o":["0.6"]"#),
+        ] {
+            let changed = TICKER.replace(from, to);
+            assert!(serde_json::from_str::<Ticker>(&changed).is_err(), "{to}");
+        }
+    }
+
+    #[test]
+    fn requires_every_value() {
+        let without_open = TICKER.replace(r#""o":"0.6""#, r#""x":"0.6""#);
+        assert_ne!(without_open, TICKER);
+        assert!(serde_json::from_str::<Ticker>(&without_open).is_err());
+    }
 }

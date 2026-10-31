@@ -166,4 +166,67 @@ mod tests {
         assert_eq!(answer.closed.len(), 2);
         assert_eq!(answer.count, 2);
     }
+
+    #[test]
+    fn encodes_every_parameter_of_the_open_orders() {
+        assert_eq!(
+            encode(&OpenOrdersRequest {
+                trades: Some(false),
+                userref: Some(-12),
+                cl_ord_id: Some("a b&c".into()),
+            })
+            .unwrap(),
+            "trades=false&userref=-12&cl_ord_id=a+b%26c"
+        );
+    }
+
+    #[test]
+    fn encodes_every_parameter_of_the_closed_orders() {
+        assert_eq!(
+            encode(&ClosedOrdersRequest {
+                trades: Some(true),
+                userref: Some(7),
+                cl_ord_id: None,
+                start: Some(1),
+                end: Some(2),
+                offset: Some(100),
+                close_time: Some(CloseTime::Both),
+            })
+            .unwrap(),
+            "trades=true&userref=7&start=1&end=2&ofs=100&closetime=both"
+        );
+        assert_eq!(encode(&ClosedOrdersRequest::default()).unwrap(), "");
+        for (close_time, text) in [
+            (CloseTime::Open, "open"),
+            (CloseTime::Close, "close"),
+            (CloseTime::Both, "both"),
+        ] {
+            assert_eq!(
+                serde_json::to_string(&close_time).unwrap(),
+                format!("\"{text}\"")
+            );
+        }
+    }
+
+    #[test]
+    fn encodes_a_single_txid() {
+        assert_eq!(
+            encode(&QueryOrdersRequest {
+                txids: vec!["OQCLML-BW3P3-BUCMWZ".into()],
+                trades: None,
+                userref: Some(3),
+            })
+            .unwrap(),
+            "txid=OQCLML-BW3P3-BUCMWZ&userref=3"
+        );
+    }
+
+    #[test]
+    fn decodes_empty_answers() {
+        let open: OpenAnswer = serde_json::from_str(r#"{"open":{}}"#).unwrap();
+        assert!(with_txids(open.open).is_empty());
+        let closed: ClosedAnswer = serde_json::from_str(r#"{"closed":{}}"#).unwrap();
+        assert_eq!(closed.count, 0);
+        assert!(serde_json::from_str::<OpenAnswer>(r#"{}"#).is_err());
+    }
 }

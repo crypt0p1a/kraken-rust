@@ -142,4 +142,76 @@ mod tests {
             r#""GTC""#
         );
     }
+
+    #[test]
+    fn encodes_every_order_type_like_the_api() {
+        for (order_type, text) in [
+            (OrderType::Market, "market"),
+            (OrderType::Limit, "limit"),
+            (OrderType::Iceberg, "iceberg"),
+            (OrderType::StopLoss, "stop-loss"),
+            (OrderType::TakeProfit, "take-profit"),
+            (OrderType::StopLossLimit, "stop-loss-limit"),
+            (OrderType::TakeProfitLimit, "take-profit-limit"),
+            (OrderType::TrailingStop, "trailing-stop"),
+            (OrderType::TrailingStopLimit, "trailing-stop-limit"),
+            (OrderType::SettlePosition, "settle-position"),
+        ] {
+            let json = format!("\"{text}\"");
+            assert_eq!(serde_json::to_string(&order_type).unwrap(), json);
+            assert_eq!(
+                serde_json::from_str::<OrderType>(&json).unwrap(),
+                order_type
+            );
+        }
+        assert_eq!(
+            serde_json::from_str::<OrderType>(r#""brand-new""#).unwrap(),
+            OrderType::Unknown
+        );
+    }
+
+    #[test]
+    fn decodes_every_status_and_tells_the_final_ones() {
+        for (text, status, is_final) in [
+            ("pending", OrderStatus::Pending, false),
+            ("open", OrderStatus::Open, false),
+            ("closed", OrderStatus::Closed, true),
+            ("canceled", OrderStatus::Canceled, true),
+            ("expired", OrderStatus::Expired, true),
+            ("unknown-status", OrderStatus::Unknown, false),
+        ] {
+            let decoded: OrderStatus = serde_json::from_str(&format!("\"{text}\"")).unwrap();
+            assert_eq!(decoded, status, "{text}");
+            assert_eq!(decoded.is_final(), is_final, "{text}");
+        }
+    }
+
+    #[test]
+    fn decodes_both_sides_only() {
+        assert_eq!(
+            serde_json::from_str::<OrderSide>(r#""buy""#).unwrap(),
+            OrderSide::Buy
+        );
+        assert_eq!(
+            serde_json::from_str::<OrderSide>(r#""sell""#).unwrap(),
+            OrderSide::Sell
+        );
+        assert!(serde_json::from_str::<OrderSide>(r#""BUY""#).is_err());
+    }
+
+    #[test]
+    fn names_the_flags_like_their_serialization() {
+        for flag in [
+            OrderFlag::Post,
+            OrderFlag::Fcib,
+            OrderFlag::Fciq,
+            OrderFlag::Nompp,
+            OrderFlag::Viqc,
+        ] {
+            assert_eq!(
+                serde_json::to_string(&flag).unwrap(),
+                format!("\"{}\"", flag.as_ref())
+            );
+        }
+    }
 }

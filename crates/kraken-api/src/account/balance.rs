@@ -50,4 +50,20 @@ mod tests {
         assert!((balances["ZUSD"].available() - 17185.45).abs() < 1e-9);
         assert_eq!(balances["XXBT"].available(), 1.2);
     }
+
+    #[test]
+    fn counts_the_credit_in_the_available_balance() {
+        let balance: ExtendedBalance = serde_json::from_str(
+            r#"{"balance":"100","hold_trade":"30","credit":"50","credit_used":"20"}"#,
+        )
+        .unwrap();
+        assert_eq!(balance.available(), 100.0);
+    }
+
+    #[test]
+    fn requires_the_balance() {
+        assert!(serde_json::from_str::<ExtendedBalance>(r#"{"hold_trade":"1"}"#).is_err());
+        assert!(serde_json::from_str::<ExtendedBalance>(r#"{"balance":null}"#).is_err());
+        assert!(serde_json::from_str::<ExtendedBalance>(r#"{"balance":"abc"}"#).is_err());
+    }
 }

@@ -183,4 +183,85 @@ mod tests {
         assert!(candles.candles[0].is_closed);
         assert!(!candles.candles[1].is_closed);
     }
+
+    #[test]
+    fn sends_every_interval_in_minutes() {
+        for (interval, minutes) in [
+            (CandleInterval::Res1m, 1),
+            (CandleInterval::Res5m, 5),
+            (CandleInterval::Res15m, 15),
+            (CandleInterval::Res30m, 30),
+            (CandleInterval::Res1h, 60),
+            (CandleInterval::Res4h, 240),
+            (CandleInterval::Res1d, 1440),
+            (CandleInterval::Res1w, 10080),
+            (CandleInterval::Res15d, 21600),
+        ] {
+            assert_eq!(interval.minutes(), minutes);
+            assert_eq!(
+                serde_json::to_string(&interval).unwrap(),
+                minutes.to_string()
+            );
+        }
+    }
+
+    #[test]
+    fn omits_the_missing_since() {
+        let request = CandlesRequest {
+            pair: "XBTUSD".into(),
+            interval: CandleInterval::Res1m,
+            since: None,
+        };
+        assert_eq!(encode(&request).unwrap(), "pair=XBTUSD&interval=1");
+    }
+
+    #[test]
+    fn the_only_candle_is_open() {
+        let candles = decode(
+            serde_json::from_str(r#"{"XXBTZUSD":[[1,"1","2","0.5","1.5","1.2","3",4]],"last":0}"#)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(candles.candles.len(), 1);
+        assert!(!candles.candles[0].is_closed);
+        assert_eq!(candles.candles[0].low, 0.5);
+        assert_eq!(candles.candles[0].count, 4);
+    }
+
+    #[test]
+    fn decodes_the_empty_answers() {
+        let candles =
+            decode(serde_json::from_str(r#"{"XXBTZUSD":[],"last":12}"#).unwrap()).unwrap();
+        assert!(candles.candles.is_empty());
+        assert_eq!(candles.last, 12);
+
+        // `last` missing, numbers instead of strings
+        let candles =
+            decode(serde_json::from_str(r#"{"XXBTZUSD":[[1,1,2,0.5,1.5,1.2,3,4]]}"#).unwrap())
+                .unwrap();
+        assert_eq!(candles.last, 0);
+        assert_eq!(candles.candles[0].high, 2.0);
+    }
+
+    #[test]
+    fn rejects_the_incomplete_answers() {
+        let no_pair = decode(serde_json::from_str(r#"{"last":12}"#).unwrap());
+        assert!(matches!(no_pair, Err(KrakenError::Decode { .. })));
+
+        let short_row = decode(
+            serde_json::from_str(r#"{"XXBTZUSD":[[1,"1","2","0.5","1.5","1.2","3"]]}"#).unwrap(),
+        );
+        assert!(matches!(short_row, Err(KrakenError::Decode { .. })));
+
+        let long_row = decode(
+            serde_json::from_str(r#"{"XXBTZUSD":[[1,"1","2","0.5","1.5","1.2","3",4,5]]}"#)
+                .unwrap(),
+        );
+        assert!(matches!(long_row, Err(KrakenError::Decode { .. })));
+
+        let not_a_number = decode(
+            serde_json::from_str(r#"{"XXBTZUSD":[[1,"x","2","0.5","1.5","1.2","3",4]]}"#).unwrap(),
+        );
+        assert!(matches!(not_a_number, Err(KrakenError::Decode { .. })));
+    }
 }

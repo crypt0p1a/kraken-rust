@@ -192,4 +192,68 @@ mod tests {
         assert_eq!(answer.txids, vec!["OU22CG-KLAF2-FWUDD7"]);
         assert_eq!(answer.description.close, None);
     }
+
+    #[test]
+    fn encodes_every_parameter_of_a_new_order() {
+        let order = NewOrder {
+            pair: "XBTUSD".into(),
+            side: OrderSide::Sell,
+            order_type: OrderType::StopLossLimit,
+            volume: "0.5".into(),
+            price: Some("25000".into()),
+            price2: Some("24900".into()),
+            oflags: Some(vec![OrderFlag::Fcib, OrderFlag::Nompp]),
+            time_in_force: Some(TimeInForce::Ioc),
+            start_time: Some("0".into()),
+            expire_time: Some("1700000000".into()),
+            cl_ord_id: None,
+            userref: Some(42),
+            validate: Some(true),
+        };
+        assert_eq!(
+            encode(&order).unwrap(),
+            "pair=XBTUSD&type=sell&ordertype=stop-loss-limit&volume=0.5&price=25000\
+             &price2=24900&oflags=fcib%2Cnompp&timeinforce=IOC&starttm=0\
+             &expiretm=1700000000&userref=42&validate=true"
+        );
+    }
+
+    #[test]
+    fn encodes_the_minimal_market_order() {
+        let order = NewOrder {
+            order_type: OrderType::Market,
+            price: None,
+            oflags: Some(vec![OrderFlag::Viqc]),
+            time_in_force: None,
+            expire_time: None,
+            cl_ord_id: None,
+            ..limit_buy()
+        };
+        assert_eq!(
+            encode(&order).unwrap(),
+            "pair=XBTUSD&type=buy&ordertype=market&volume=1.25&oflags=viqc"
+        );
+    }
+
+    #[test]
+    fn escapes_the_client_order_ids() {
+        let order = NewOrder {
+            cl_ord_id: Some("a=b&c d/é".into()),
+            ..limit_buy()
+        };
+        assert!(
+            encode(&order)
+                .unwrap()
+                .contains("cl_ord_id=a%3Db%26c+d%2F%C3%A9")
+        );
+    }
+
+    #[test]
+    fn decodes_the_answer_of_a_validated_order() {
+        let answer: NewOrderAnswer =
+            serde_json::from_str(r#"{"descr":{"order":"buy 0.00010 XBTUSD @ limit 38000.0"}}"#)
+                .unwrap();
+        assert!(answer.txids.is_empty());
+        assert!(serde_json::from_str::<NewOrderAnswer>(r#"{"txid":[]}"#).is_err());
+    }
 }
