@@ -103,27 +103,70 @@ let balances = private_api.extended_balance().await?;
 
 ## Tests
 
-| Level        | Where                                         | What                                                  |
-|--------------|-----------------------------------------------|-------------------------------------------------------|
-| unit         | `#[cfg(test)]` of each module                 | signature (example of the Kraken documentation), nonce, rate limiter, encoding and decoding of every model |
-| network      | `kraken-network/tests/clients.rs`             | the clients against a mocked server ([wiremock](https://docs.rs/wiremock)): GET / POST, body, `API-Sign` recomputed independently, increasing nonces, error mapping |
-| endpoints    | `kraken-api/tests/mock_{market,account,trading}.rs` | **every call** against a mocked Kraken: path, exact parameters, signature, answer decoded |
-| live public  | `kraken-api/tests/live_public.rs`             | the public calls against the real Kraken API          |
-| live private | `kraken-api/tests/live_private.rs`            | the private calls against the real Kraken API, read only: the new order is sent with `validate=true`, never placed |
+| Level | Where | What |
+|-------|-------|------|
+| unit | `#[cfg(test)]` of each module | every value of the enums, the encoding of every parameter, the arrays of an unexpected size, the required fields missing / null / unreadable, lenient numbers, signature, nonces across threads, rate limiter under concurrency |
+| network | `kraken-network/tests/clients.rs` | the clients against a mocked server ([wiremock](https://docs.rs/wiremock)): GET / POST, body, `API-Sign` recomputed independently, increasing nonces, error mapping |
+| endpoints | `kraken-api/tests/mock_{market,account,trading}.rs` | every call against a mocked Kraken: path, exact parameters, signature, answer decoded |
+| fixtures | `kraken-api/tests/fixtures.rs` | the real shapes of the answers (`tests/fixtures`), decoded **strictly** and served end to end |
+| facade | `kraken-ffi/tests/facade.rs` | the UniFFI objects, with a foreign logger |
+| live contracts | `kraken-api/tests/live_{market,account,trading}.rs` | the real Kraken API, see below |
+
+### Strict decoding
+
+`tests/strict/mod.rs` decodes an answer with the model through
+[serde_ignored](https://docs.rs/serde_ignored): a field sent by Kraken but ignored by a model fails
+the test, like a required field missing or null, or a value that can't be read. The live contracts
+apply it to every pair (~1 500), every asset, every interval and the first pages of closed orders,
+then check the consistency of the values (books not crossed, OHLC bounds, candle spacing, `since`
+/ `start` / `end` filters, pagination, fee tiers, cost = executed volume × average price…). With
+`--nocapture`, they print which optional fields Kraken actually sends.
+
+The new orders of the live tests are only validated by Kraken (`validate=true` is forced): no order
+is ever placed.
 
 ```sh
-cargo test --workspace                                    # everything offline
-cargo test -p kraken-api --test live_public -- --ignored  # real public API
-cp .env.example .env                                      # then fill the key and secret
-cargo test -p kraken-api --test live_private -- --ignored --test-threads=1
+cargo test --workspace                                                    # offline
+cargo test -p kraken-api --test live_market -- --ignored --test-threads=1   # real public API
+cp .env.example .env                                                      # then fill the key and secret
+cargo test -p kraken-api --test live_account -- --ignored --test-threads=1
+cargo test -p kraken-api --test live_trading -- --ignored --test-threads=1
 ```
 
 The credentials are read from the environment, or else from a `.env` file at the root of the
-repository, ignored by git: copy [`.env.example`](.env.example). The libraries never read them:
-an application gives them to `PrivateApi::new` from its own secure storage.
+repository, ignored by git: copy [`.env.example`](.env.example). The key needs the Query Funds,
+Query Open Orders & Trades, Query Closed Orders & Trades and Create & Modify Orders permissions,
+never Withdraw Funds. The libraries never read the credentials: an application gives them to
+`PrivateApi::new` from its own secure storage.
 
-`live_private::rejects_an_unknown_key` needs no credentials: it checks that a signed request
-reaches Kraken and that its error is mapped.
+### Models
+
+The amounts are `f64`, like in `cex-spot-trading`: compare them with a tolerance, and give the
+prices and volumes of the new orders as strings, formatted with the decimals of the pair
+(`AssetPair.pair_decimals`, `lot_decimals`).
+
+## CI
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml), on every push and pull request:
+
+- **secrets**: [gitleaks](https://github.com/gitleaks/gitleaks) on the whole history and on the
+  working tree, with its default rules plus the entropy rules of [`.gitleaks.toml`](.gitleaks.toml)
+  (Kraken private keys and API keys, long high-entropy base64 strings),
+  [trufflehog](https://github.com/trufflesecurity/trufflehog) on the history, and no `.env`
+  committed
+- **lint**: `cargo fmt --check`, clippy with the warnings as errors
+- **tests**: the offline suite on Linux and macOS, each crate alone without the `uniffi` feature
+- **audit**: `cargo audit` of the dependencies
+
+Daily and on demand, the live contracts run against the real Kraken API, the private ones with the
+`KRAKEN_API_KEY` / `KRAKEN_API_SECRET` secrets of the repository (Settings → Secrets and variables
+→ Actions).
+
+Locally, `.githooks/pre-commit` refuses a commit holding a secret:
+
+```sh
+git config core.hooksPath .githooks
+```
 
 ## Author
 
