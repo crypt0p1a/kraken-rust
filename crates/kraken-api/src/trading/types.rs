@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "lowercase")]
 pub enum OrderSide {
     Buy,
@@ -8,6 +9,7 @@ pub enum OrderSide {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "kebab-case")]
 pub enum OrderType {
     Market,
@@ -26,6 +28,7 @@ pub enum OrderType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "lowercase")]
 pub enum OrderStatus {
     Pending,
@@ -48,6 +51,7 @@ impl OrderStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TimeInForce {
     /// Good 'til cancelled, the default
@@ -60,6 +64,7 @@ pub enum TimeInForce {
 
 /// Flags of a new order
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "lowercase")]
 pub enum OrderFlag {
     /// Post-only: maker only, cancelled if it would match

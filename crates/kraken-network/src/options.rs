@@ -1,5 +1,6 @@
 /// Options of the HTTP client
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct RestOptions {
     /// Timeout of the connection, of the socket and of the whole request, in milliseconds
     pub timeout_ms: u64,

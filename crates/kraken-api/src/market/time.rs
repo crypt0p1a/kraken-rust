@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-server-time>
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct ServerTime {
     /// UTC timestamp, in seconds
     #[serde(rename = "unixtime")]

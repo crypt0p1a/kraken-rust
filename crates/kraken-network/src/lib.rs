@@ -6,6 +6,9 @@
 //! - [`RateLimiter`]: token bucket shared by the clients, which also sends the calls in order
 //! - [`KrakenError`]: every failure of a call, the `{"error": [...]}` answers included
 
+#[cfg(feature = "uniffi")]
+uniffi::setup_scaffolding!("kraken_network");
+
 mod client;
 mod envelope;
 mod error;

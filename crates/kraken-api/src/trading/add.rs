@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// The amounts and prices are strings, to keep the precision given by the caller
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct NewOrder {
     /// Alternate name of the pair, e.g. "XBTUSD"
     pub pair: String,
@@ -19,36 +20,46 @@ pub struct NewOrder {
     pub volume: String,
     /// Limit price, or trigger price of the stop / take profit orders
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub price: Option<String>,
     /// Limit price of the stop-loss-limit / take-profit-limit orders
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub price2: Option<String>,
     #[serde(
         skip_serializing_if = "Option::is_none",
         serialize_with = "opt_comma_separated"
     )]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub oflags: Option<Vec<OrderFlag>>,
     /// GTC when missing
     #[serde(rename = "timeinforce", skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub time_in_force: Option<TimeInForce>,
     /// "0" (now), "<UTC timestamp in seconds>" or "+<seconds from now>"
     #[serde(rename = "starttm", skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub start_time: Option<String>,
     /// Required by GTD: "<UTC timestamp in seconds>" or "+<seconds from now>"
     #[serde(rename = "expiretm", skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub expire_time: Option<String>,
     /// Client identifier: a UUID, or up to 18 ASCII characters. Exclusive with `userref`
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub cl_ord_id: Option<String>,
     /// Numeric client identifier, shared by a group of orders
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub userref: Option<i32>,
     /// Validates the parameters without placing the order
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub validate: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct NewOrderDescription {
     /// e.g. "buy 1.25000000 XBTUSD @ limit 27500.0"
     pub order: String,
@@ -57,6 +68,7 @@ pub struct NewOrderDescription {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct NewOrderAnswer {
     #[serde(rename = "descr")]
     pub description: NewOrderDescription,

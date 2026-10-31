@@ -4,6 +4,7 @@ members = [
   "crates/kraken-crypto",
   "crates/kraken-network",
   "crates/kraken-api",
+  "crates/kraken-ffi",
 ]
 
 [workspace.package]

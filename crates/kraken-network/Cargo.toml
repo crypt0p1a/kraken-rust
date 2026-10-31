@@ -6,6 +6,10 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+# Derives the UniFFI traits of KrakenError and RestOptions
+uniffi = ["dep:uniffi"]
+
 [dependencies]
 kraken-crypto.workspace = true
 reqwest.workspace = true
@@ -14,6 +18,7 @@ serde_json.workspace = true
 serde_urlencoded.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }
+uniffi = { workspace = true, optional = true }
 
 [dev-dependencies]
 base64.workspace = true

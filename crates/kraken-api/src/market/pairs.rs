@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 /// Fee applied from a 30 days volume
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct FeeTier {
     /// 30 days volume, in `fee_volume_currency`
     pub volume: f64,
@@ -16,6 +17,7 @@ pub struct FeeTier {
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-tradable-asset-pairs>
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct AssetPair {
     /// Alternate name, e.g. "XBTUSD": the name to give to the other calls
     pub altname: String,

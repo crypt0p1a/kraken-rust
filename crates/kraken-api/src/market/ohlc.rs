@@ -6,6 +6,7 @@ use serde_json::{Map, Value};
 
 /// Duration of a candle, sent in minutes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 pub enum CandleInterval {
     Res1m,
     Res5m,
@@ -42,6 +43,7 @@ impl Serialize for CandleInterval {
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-ohlc-data>
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct CandlesRequest {
     /// e.g. "XBTUSD"
     pub pair: String,
@@ -49,11 +51,13 @@ pub struct CandlesRequest {
     /// Only the candles after this UTC timestamp, in seconds. At most the last 720 candles are
     /// returned, whatever this value
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub since: Option<i64>,
 }
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-ohlc-data>
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Candle {
     /// Start of the candle, UTC timestamp in seconds
     pub time: i64,
@@ -70,6 +74,7 @@ pub struct Candle {
 
 /// Candles of a pair, oldest first
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Candles {
     /// Kraken name of the pair, e.g. "XXBTZUSD"
     pub pair: String,

@@ -6,10 +6,15 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+# Derives the UniFFI traits of the models
+uniffi = ["dep:uniffi", "kraken-network/uniffi"]
+
 [dependencies]
 kraken-network.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+uniffi = { workspace = true, optional = true }
 
 [dev-dependencies]
 base64.workspace = true

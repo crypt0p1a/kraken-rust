@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 /// Fee of a pair for the current 30 days volume, in percents
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct FeeInfo {
     #[serde(deserialize_with = "lenient::number")]
     pub fee: f64,
@@ -25,6 +26,7 @@ pub struct FeeInfo {
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-trade-volume>
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct TradeVolume {
     /// Currency of the volume, e.g. "ZUSD"
     pub currency: String,

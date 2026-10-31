@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-open-orders>
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct OrderDescription {
     /// Alternate name of the pair, e.g. "XBTUSD"
     pub pair: String,
@@ -30,6 +31,7 @@ pub struct OrderDescription {
 ///
 /// <https://docs.kraken.com/api/docs/rest-api/get-open-orders>
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Order {
     /// Kraken identifier of the order: the key of the answers, copied here
     #[serde(skip)]

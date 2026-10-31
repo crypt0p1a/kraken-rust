@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-extended-balance>
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct ExtendedBalance {
     #[serde(deserialize_with = "lenient::number")]
     pub balance: f64,

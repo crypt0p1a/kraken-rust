@@ -22,6 +22,9 @@
 //! # }
 //! ```
 
+#[cfg(feature = "uniffi")]
+uniffi::setup_scaffolding!("kraken_api");
+
 pub mod account;
 mod lenient;
 pub mod market;

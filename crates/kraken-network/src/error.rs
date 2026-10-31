@@ -5,6 +5,7 @@ use kraken_crypto::SecretError;
 /// Same variants as the `CexError` of `cex-spot-trading`, plus [`KrakenError::InvalidArgument`],
 /// so that both providers can share a single error type once merged.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 pub enum KrakenError {
     /// The server answered with an HTTP status other than 200
     #[error("HTTP {status}: {body}")]

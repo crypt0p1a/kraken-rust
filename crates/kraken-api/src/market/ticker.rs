@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 /// Best ask or bid
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct PriceLevel {
     pub price: f64,
     pub whole_lot_volume: f64,
@@ -15,6 +16,7 @@ pub struct PriceLevel {
 
 /// Last trade closed
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct TradeLevel {
     pub price: f64,
     pub lot_volume: f64,
@@ -22,6 +24,7 @@ pub struct TradeLevel {
 
 /// Value of today (since 00:00 UTC) and of the last 24 hours
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Window {
     pub today: f64,
     pub last_24h: f64,
@@ -29,6 +32,7 @@ pub struct Window {
 
 /// Count of today (since 00:00 UTC) and of the last 24 hours
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct WindowCount {
     pub today: i64,
     pub last_24h: i64,
@@ -38,6 +42,7 @@ pub struct WindowCount {
 ///
 /// Kraken sends the values as arrays (`"a": ["35000.1", "1", "1.000"]`), named here
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Ticker {
     #[serde(rename = "a", deserialize_with = "price_level")]
     pub ask: PriceLevel,

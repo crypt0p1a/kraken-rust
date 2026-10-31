@@ -8,18 +8,23 @@ use std::collections::HashMap;
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-open-orders>
 #[derive(Debug, Clone, PartialEq, Default, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct OpenOrdersRequest {
     /// Includes the identifiers of the trades of each order
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub trades: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub userref: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub cl_ord_id: Option<String>,
 }
 
 /// Which time `start` and `end` are compared to
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "lowercase")]
 pub enum CloseTime {
     Open,
@@ -29,41 +34,53 @@ pub enum CloseTime {
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-closed-orders>
 #[derive(Debug, Clone, PartialEq, Default, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct ClosedOrdersRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub trades: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub userref: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub cl_ord_id: Option<String>,
     /// UTC timestamp in seconds (exclusive)
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub start: Option<i64>,
     /// UTC timestamp in seconds (inclusive)
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub end: Option<i64>,
     /// Offset of the page: 50 orders are returned at most
     #[serde(rename = "ofs", skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub offset: Option<i32>,
     /// Both when missing
     #[serde(rename = "closetime", skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub close_time: Option<CloseTime>,
 }
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-orders-info>
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct QueryOrdersRequest {
     /// Up to 50 identifiers of orders
     #[serde(rename = "txid", serialize_with = "comma_separated")]
     pub txids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub trades: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub userref: Option<i32>,
 }
 
 /// A page of closed orders
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct ClosedOrders {
     /// Most recent first
     pub orders: Vec<Order>,
