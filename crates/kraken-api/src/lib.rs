@@ -3,8 +3,9 @@
 //! | Module        | Endpoints                                         |
 //! |---------------|---------------------------------------------------|
 //! | [`market`]    | public: Time, Ticker, AssetPairs, OHLC            |
+//! | [`account`]   | private: BalanceEx, TradeVolume                   |
 //!
-//! Each domain holds its models and its calls, [`PublicApi`] being the facade
+//! Each domain holds its models and its calls, [`PublicApi`] and [`PrivateApi`] being the facades
 //! composing them over the clients of `kraken-network`.
 //!
 //! ```no_run
@@ -20,10 +21,13 @@
 //! # }
 //! ```
 
+pub mod account;
 mod lenient;
 pub mod market;
 mod params;
+mod private_api;
 mod public_api;
 
 pub use kraken_network::{KrakenError, Logger, RateLimiter, RestOptions};
+pub use private_api::PrivateApi;
 pub use public_api::PublicApi;

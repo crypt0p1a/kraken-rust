@@ -5,7 +5,7 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use hmac::{Hmac, Mac};
-use kraken_api::{PublicApi, RateLimiter, RestOptions};
+use kraken_api::{PrivateApi, PublicApi, RateLimiter, RestOptions};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256, Sha512};
 use std::sync::Arc;
@@ -32,6 +32,16 @@ fn rate_limiter() -> Arc<RateLimiter> {
 
 pub fn public_api(server: &MockServer) -> PublicApi {
     PublicApi::new(options(server), rate_limiter()).unwrap()
+}
+
+pub fn private_api(server: &MockServer) -> PrivateApi {
+    PrivateApi::new(
+        API_KEY.into(),
+        API_SECRET.into(),
+        options(server),
+        rate_limiter(),
+    )
+    .unwrap()
 }
 
 /// `{"error": [], "result": result}`
