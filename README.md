@@ -49,6 +49,58 @@ src/
 A new endpoint goes in its domain (models + `pub(crate) async fn`), then in its facade, then in
 `kraken-ffi`.
 
+## Platforms
+
+`scripts/build.sh` builds the libraries of `kraken-ffi` (cdylib and staticlib) in release and
+gathers them in `dist/<target>/`:
+
+| Platform | Targets | Libraries |
+|----------|---------|-----------|
+| `android` | `aarch64-linux-android`, `armv7-linux-androideabi`, `i686-linux-android`, `x86_64-linux-android` | `.so`, `.a` |
+| `ios` | `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `x86_64-apple-ios` | `.a`, `.dylib` |
+| `macos` | `aarch64-apple-darwin`, `x86_64-apple-darwin` | `.dylib`, `.a` |
+| `linux` | `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` | `.so`, `.a` |
+| `windows` | `x86_64-pc-windows-msvc`, `aarch64-pc-windows-msvc` (`x86_64-pc-windows-gnu` with mingw-w64) | `.dll`, `.lib` |
+
+```sh
+scripts/build.sh android ios macos      # platforms
+scripts/build.sh x86_64-pc-windows-gnu  # or targets
+PROFILE=debug scripts/build.sh linux    # release by default
+```
+
+- **Android**: [cargo-ndk](https://github.com/bbqsrc/cargo-ndk) (`cargo install cargo-ndk`) and
+  an NDK (`ANDROID_NDK_HOME`, else the latest of `$ANDROID_HOME/ndk`); API level 24 by default
+  (`ANDROID_API`)
+- **iOS / macOS**: macOS with Xcode
+- **Linux / Windows from macOS**: the C cross compilers used by `ring`, declared in
+  `~/.cargo/config.toml`:
+
+  ```sh
+  brew tap messense/macos-cross-toolchains
+  brew install aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu mingw-w64
+  ```
+
+  ```toml
+  [target.aarch64-unknown-linux-gnu]
+  linker = "aarch64-unknown-linux-gnu-gcc"
+  [target.x86_64-unknown-linux-gnu]
+  linker = "x86_64-unknown-linux-gnu-gcc"
+  [target.x86_64-pc-windows-gnu]
+  linker = "x86_64-w64-mingw32-gcc"
+
+  [env]
+  CC_aarch64_unknown_linux_gnu = "aarch64-unknown-linux-gnu-gcc"
+  AR_aarch64_unknown_linux_gnu = "aarch64-unknown-linux-gnu-ar"
+  CC_x86_64_unknown_linux_gnu = "x86_64-unknown-linux-gnu-gcc"
+  AR_x86_64_unknown_linux_gnu = "x86_64-unknown-linux-gnu-ar"
+  CC_x86_64_pc_windows_gnu = "x86_64-w64-mingw32-gcc"
+  AR_x86_64_pc_windows_gnu = "x86_64-w64-mingw32-ar"
+  ```
+
+- **Windows (MSVC)**: on Windows, with the Visual Studio build tools (and clang for `aarch64`)
+
+The CI builds every platform on its native runner and publishes the libraries as artifacts.
+
 ## Usage
 
 ```rust
@@ -127,6 +179,8 @@ is ever placed.
 
 ```sh
 cargo test --workspace                                                    # offline
+cargo nextest run --workspace --profile ci                                # + JUnit report
+cargo llvm-cov nextest --workspace --open                                 # coverage
 cargo test -p kraken-api --test live_market -- --ignored --test-threads=1   # real public API
 cp .env.example .env                                                      # then fill the key and secret
 cargo test -p kraken-api --test live_account -- --ignored --test-threads=1
@@ -155,7 +209,14 @@ prices and volumes of the new orders as strings, formatted with the decimals of 
   [trufflehog](https://github.com/trufflesecurity/trufflehog) on the history, and no `.env`
   committed
 - **lint**: `cargo fmt --check`, clippy with the warnings as errors
-- **tests**: the offline suite on Linux and macOS, each crate alone without the `uniffi` feature
+- **tests**: the offline suite with [cargo-nextest](https://nexte.st) on Linux x86_64 and
+  aarch64, macOS and Windows, each crate alone without the `uniffi` feature
+- **test report**: the JUnit reports of every platform (`.config/nextest.toml`, profile `ci`)
+  published in a *Test results* check
+- **coverage**: [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov), summary in the job,
+  HTML and lcov reports as artifacts, at least 95% of the lines; sent to Codecov when the
+  `CODECOV_TOKEN` secret is set
+- **build**: the libraries of every platform (see [Platforms](#platforms)), as artifacts
 - **audit**: `cargo audit` of the dependencies
 
 Daily and on demand, the live contracts run against the real Kraken API, the private ones with the
