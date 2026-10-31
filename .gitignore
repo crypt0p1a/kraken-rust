@@ -9,3 +9,6 @@
 
 # Secrets
 .env
+
+# libraries built by scripts/build.sh
+/dist
