@@ -1,0 +1,20 @@
+[package]
+name = "kraken-api"
+description = "Calls of the Kraken Spot REST API: market data, account and trading"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+kraken-network.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+base64.workspace = true
+hmac.workspace = true
+serde_urlencoded.workspace = true
+sha2.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
+wiremock.workspace = true

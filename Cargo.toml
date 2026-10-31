@@ -3,6 +3,7 @@ resolver = "3"
 members = [
   "crates/kraken-crypto",
   "crates/kraken-network",
+  "crates/kraken-api",
 ]
 
 [workspace.package]

@@ -604,6 +604,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "kraken-api"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "hmac",
+ "kraken-network",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "sha2",
+ "tokio",
+ "wiremock",
+]
+
+[[package]]
 name = "kraken-crypto"
 version = "0.1.0"
 dependencies = [
