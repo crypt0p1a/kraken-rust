@@ -2,7 +2,7 @@
 ![Version](https://img.shields.io/badge/version-0.1.0-blue.svg?cacheSeconds=2592000)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Kraken Spot REST client in Rust, exported through UniFFI
+> Kraken Spot REST client in Rust, exported through UniFFI, and a trading bot running on it
 
 Kraken counterpart of the Rust crate of
 [kotlin-cex-spot-trading](https://github.com/crypt0p1a/kotlin-cex-spot-trading) (CEX.IO): same
@@ -19,7 +19,8 @@ crates/
 ├── kraken-crypto    API secret, API-Sign signature (HMAC-SHA512)         pure, synchronous
 ├── kraken-network   HTTP clients, rate limiter, nonce, answers, errors   ← kraken-crypto
 ├── kraken-api       the endpoints, grouped by domain, and their models   ← kraken-network
-└── kraken-ffi       UniFFI export: objects with async methods            ← kraken-api, kraken-network
+├── kraken-ffi       UniFFI export: objects with async methods            ← kraken-api, kraken-network
+└── kraken-trading-bot  the trading bot (executable, Docker)             ← kraken-api
 ```
 
 | Crate            | Content                                                                                   |
@@ -28,6 +29,7 @@ crates/
 | `kraken-network` | `PublicClient` (`GET /0/public`), `PrivateClient` (signed `POST /0/private`), `RateLimiter`, `RestOptions`, `KrakenError`, form encoding helpers |
 | `kraken-api`     | `market`, `account`, `trading` (models + calls), `PublicApi` and `PrivateApi` facades     |
 | `kraken-ffi`     | `KrakenPublicApi`, `KrakenPrivateApi`, `KrakenRateLimiter`, `KrakenLogger`                |
+| `kraken-trading-bot` | the managers of [the trading bot](#trading-bot), port of `cex-trading-bot`            |
 
 `kraken-crypto`, `kraken-network` and `kraken-api` don't depend on UniFFI: their `uniffi` feature,
 enabled by `kraken-ffi` only, derives the UniFFI traits of their models and errors.
@@ -48,6 +50,102 @@ src/
 
 A new endpoint goes in its domain (models + `pub(crate) async fn`), then in its facade, then in
 `kraken-ffi`.
+
+## Trading bot
+
+`kraken-trading-bot` is the port of `cex-trading-bot` on Kraken. Each **manager** trades its own
+budget on one pair, with **limit orders only**, in a loop:
+
+1. buys with everything it has at **-`buy_below`%** of the last price (GTD order: not filled
+   after `buy_order_timeout`, it expires and is placed again from the new price)
+2. sells everything it bought for **what it cost + `sell_above`%**, fees included (GTC order)
+3. starts again with what the sale brought: every cycle ends with more than it started with
+
+Its orders carry its id as Kraken **`userref`**: Kraken knows which order belongs to which
+manager, whatever happens to the database. The fees are taken in the quote currency (`fciq`). A
+manager only spends its own money, and only what the account has.
+
+### Configuration
+
+The managers are in a YAML file ([example](crates/kraken-trading-bot/managers.example.yaml)),
+the credentials in the environment:
+
+```yaml
+dry_run: true              # orders only validated by Kraken, never placed: false to trade
+tick_interval: 5m
+buy_order_timeout: 12h
+managers:
+  - id: 1                  # userref of its orders: 1 to 2147483647, unique, never reused
+    pair: XBTUSD           # or XBT/USD, XXBTZUSD
+    budget: 30             # in the quote currency (USD)
+    buy_below: 1.0         # buys at -1% of the last price
+    sell_above: 1.5        # sells for its cost + 1.5%, fees included
+  - id: 2
+    pair: ETHUSD
+    budget: 30
+    buy_below: 0.8
+    sell_above: 1.2
+    mode: closing          # active (default) | closing: sells what it holds, then stops
+```
+
+- To stop a manager, set `mode: closing`, and remove it once it holds nothing: the open orders of
+  a userref no manager has are reported in the logs and left untouched.
+- Changing the budget or the percentages of a manager applies from its next order.
+- The configuration is checked at start: unique ids, known pairs, valid percentages.
+
+| Variable | Default | |
+|----------|---------|-|
+| `KRAKEN_API_KEY`, `KRAKEN_API_SECRET` | | Query Funds, Query Open/Closed Orders, Create & Modify Orders; never Withdraw Funds |
+| `KRAKEN_BOT_CONFIG` | `managers.yaml` | the YAML file |
+| `KRAKEN_BOT_DATABASE` | `kraken-bot.sqlite` | the SQLite database |
+| `RUST_LOG` | `info` | |
+
+### Running it
+
+```sh
+cp crates/kraken-trading-bot/managers.example.yaml managers.yaml   # then edit it
+cp .env.example .env                                               # then fill the key and secret
+docker compose up -d --build
+docker compose logs -f
+```
+
+The image holds only the binary (distroless, non-root, ~70 MB): `managers.yaml` is mounted
+read-only in `/config`, the database lives in the `kraken-bot-data` volume (`/data`). `docker
+compose stop` lets the tick in progress end.
+
+Without Docker: `cargo run --release -p kraken-trading-bot` (or `-- --once` for a single tick,
+`-- --check` to only check the configuration and the pairs).
+
+### Database
+
+The SQLite database (`/data/kraken-bot.sqlite`) is there to work with what the bot did:
+
+| Table | Content |
+|-------|---------|
+| `orders` | the orders of the managers, synchronized from Kraken (status, volumes, cost, fees, prices, times) |
+| `managers` | the current state of each manager: configuration, balances, entry price, value |
+| `manager_snapshots` | the state of each manager at each tick |
+| `actions` | the decisions: orders placed or validated (dry run), idle reasons, errors |
+| `tickers` | the prices of the pairs of the managers, at each tick |
+| `sync_state` | where the synchronization of the orders is |
+
+The amounts are stored as text, to stay exact.
+
+```sh
+docker run --rm -v kraken-rust_kraken-bot-data:/data -it keinos/sqlite3 sqlite3 /data/kraken-bot.sqlite \
+  "SELECT id, pair, budget, value, quote_available, base_available FROM managers"
+```
+
+### Tests of the bot
+
+- the decisions (planner, ledger, strategy) with the values of the tests of `cex-trading-bot`,
+  including 500 random cycles which must all make money
+- the database, the configuration, the synchronization
+- `scenarios.rs`: the bot tick after tick on a simulated Kraken (fills, expiry, partial fills,
+  closing managers, missing funds, orphans, restart without database, refused orders, dry run,
+  600 ticks of a random market where every cycle makes money, only limit orders)
+- `kraken_wiring.rs`: the requests sent to a mocked Kraken
+- `live_dry_run.rs`: one tick on the real Kraken, as a dry run
 
 ## Platforms
 
