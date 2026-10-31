@@ -165,4 +165,78 @@ mod tests {
         limiter.enqueue("test", async { Ok(()) }).await.unwrap();
         assert_eq!(start.elapsed(), Duration::from_secs(5));
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn executes_the_concurrent_calls_one_after_the_other() {
+        let limiter = Arc::new(RateLimiter::new(1, Duration::from_secs(1), None));
+        let running = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let start = Instant::now();
+
+        let tasks: Vec<_> = (0..3)
+            .map(|_| {
+                let limiter = limiter.clone();
+                let running = running.clone();
+                tokio::spawn(async move {
+                    limiter
+                        .enqueue("test", async {
+                            let others = running.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                            assert_eq!(others, 0, "two calls at once");
+                            tokio::time::sleep(Duration::from_millis(10)).await;
+                            running.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+                            Ok(Instant::now())
+                        })
+                        .await
+                        .unwrap()
+                })
+            })
+            .collect();
+
+        let mut ends = Vec::new();
+        for task in tasks {
+            ends.push(task.await.unwrap() - start);
+        }
+        ends.sort();
+        // one token at first, then one per second
+        assert!(ends[0] < Duration::from_secs(1));
+        assert!(ends[1] >= Duration::from_secs(1) && ends[2] >= Duration::from_secs(2));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn logs_the_waits_and_the_failures() {
+        let logs = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink = logs.clone();
+        let logger: Logger = Arc::new(move |tag: &str, message: &str| {
+            sink.lock().unwrap().push(format!("{tag} {message}"));
+        });
+        let limiter = RateLimiter::new(1, Duration::from_secs(1), Some(logger));
+
+        limiter
+            .enqueue("/0/public/Time", async { Ok(()) })
+            .await
+            .unwrap();
+        let _ = limiter
+            .enqueue::<(), _>("/0/public/Time", async {
+                Err(KrakenError::Transport {
+                    reason: "offline".into(),
+                })
+            })
+            .await;
+
+        let logs = logs.lock().unwrap();
+        assert!(
+            logs.iter().any(|it| it.contains("No token available")),
+            "{logs:?}"
+        );
+        assert!(logs.iter().any(|it| it.contains("offline")), "{logs:?}");
+        assert!(
+            logs.iter().all(|it| it.starts_with("[RateLimitQueue]")),
+            "{logs:?}"
+        );
+    }
+
+    #[test]
+    fn a_zero_interval_still_refills() {
+        let limiter = RateLimiter::new(1, Duration::ZERO, None);
+        assert_eq!(limiter.token_interval, Duration::from_millis(1));
+    }
 }

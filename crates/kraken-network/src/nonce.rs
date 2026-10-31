@@ -32,4 +32,34 @@ mod tests {
         let nonces: Vec<u64> = (0..100).map(|_| next_nonce()).collect();
         assert!(nonces.windows(2).all(|pair| pair[0] < pair[1]));
     }
+
+    #[test]
+    fn gives_unique_nonces_to_concurrent_threads() {
+        let threads: Vec<_> = (0..8)
+            .map(|_| std::thread::spawn(|| (0..500).map(|_| next_nonce()).collect::<Vec<_>>()))
+            .collect();
+
+        let mut all = Vec::new();
+        for thread in threads {
+            let nonces = thread.join().unwrap();
+            assert!(nonces.windows(2).all(|pair| pair[0] < pair[1]));
+            all.extend(nonces);
+        }
+
+        let count = all.len();
+        all.sort_unstable();
+        all.dedup();
+        assert_eq!(all.len(), count, "a nonce was given twice");
+    }
+
+    #[test]
+    fn follows_the_clock() {
+        let nonce = next_nonce();
+        let now = now_millis();
+        // ahead of the clock only by the nonces given faster than one per millisecond
+        assert!(
+            nonce >= now - 1_000 && nonce <= now + 100_000,
+            "{nonce} vs {now}"
+        );
+    }
 }

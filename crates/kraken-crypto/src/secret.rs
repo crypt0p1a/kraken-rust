@@ -60,4 +60,25 @@ mod tests {
         let secret = ApiSecret::from_base64("c2VjcmV0").unwrap();
         assert_eq!(format!("{secret:?}"), "ApiSecret(***)");
     }
+
+    #[test]
+    fn ignores_the_surrounding_whitespace() {
+        let padded = ApiSecret::from_base64("  c2VjcmV0\n").unwrap();
+        assert_eq!(padded.bytes, b"secret");
+    }
+
+    #[test]
+    fn decodes_binary_secrets() {
+        let secret = ApiSecret::from_base64("AP8QIA==").unwrap();
+        assert_eq!(secret.bytes, [0x00, 0xff, 0x10, 0x20]);
+    }
+
+    #[test]
+    fn requires_the_padding() {
+        assert!(ApiSecret::from_base64("c2VjcmV0").is_ok());
+        assert!(matches!(
+            ApiSecret::from_base64("c2VjcmV0LQ"),
+            Err(SecretError::NotBase64(_))
+        ));
+    }
 }

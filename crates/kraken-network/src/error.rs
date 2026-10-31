@@ -52,3 +52,57 @@ impl From<SecretError> for KrakenError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn describes_the_errors() {
+        let cases = [
+            (
+                KrakenError::Network {
+                    status: 503,
+                    body: "down".into(),
+                },
+                "HTTP 503: down",
+            ),
+            (
+                KrakenError::Api {
+                    status: 200,
+                    body: "EAPI:Invalid key".into(),
+                },
+                "Kraken error (HTTP 200): EAPI:Invalid key",
+            ),
+            (
+                KrakenError::Transport {
+                    reason: "timeout".into(),
+                },
+                "Transport error: timeout",
+            ),
+            (
+                KrakenError::Decode {
+                    reason: "eof".into(),
+                },
+                "Unexpected answer: eof",
+            ),
+            (
+                KrakenError::InvalidArgument { reason: "x".into() },
+                "Invalid argument: x",
+            ),
+        ];
+        for (error, text) in cases {
+            assert_eq!(error.to_string(), text);
+        }
+    }
+
+    #[test]
+    fn maps_the_secret_errors_to_invalid_arguments() {
+        assert_eq!(
+            KrakenError::from(SecretError::Empty),
+            KrakenError::InvalidArgument {
+                reason: "the API secret is empty".into()
+            }
+        );
+    }
+}

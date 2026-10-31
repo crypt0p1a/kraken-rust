@@ -41,4 +41,44 @@ mod tests {
             "4/dpxb3iT4tp/ZCVEwSnEsLxx0bqyhLpdfOpc6fn7OR8+UClSV5n9E6aSS8MPtnRfp32bAb0nmbRn6H8ndwLUQ=="
         );
     }
+
+    fn secret() -> ApiSecret {
+        ApiSecret::from_base64("c2VjcmV0LWtleS1vZi10aGUtdGVzdHM=").unwrap()
+    }
+
+    #[test]
+    fn signs_deterministically_in_base64_of_64_bytes() {
+        let signature = secret().sign("/0/private/BalanceEx", 1, "nonce=1");
+        assert_eq!(
+            signature,
+            secret().sign("/0/private/BalanceEx", 1, "nonce=1")
+        );
+        assert_eq!(signature.len(), 88);
+        assert!(signature.ends_with("=="));
+    }
+
+    #[test]
+    fn signs_the_path_the_nonce_and_the_body() {
+        let reference = secret().sign("/0/private/BalanceEx", 1, "nonce=1");
+        for other in [
+            secret().sign("/0/private/Balance", 1, "nonce=1"),
+            secret().sign("/0/private/BalanceEx", 2, "nonce=1"),
+            secret().sign("/0/private/BalanceEx", 1, "nonce=1&a=b"),
+            ApiSecret::from_base64("b3RoZXI=")
+                .unwrap()
+                .sign("/0/private/BalanceEx", 1, "nonce=1"),
+        ] {
+            assert_ne!(other, reference);
+        }
+    }
+
+    #[test]
+    fn signs_the_concatenation_of_the_nonce_and_the_body() {
+        // SHA256(nonce + body), as documented by Kraken: the body starts with "nonce=", so two
+        // different requests can't share a signature
+        assert_eq!(
+            secret().sign("/0/private/X", 12, "3"),
+            secret().sign("/0/private/X", 1, "23")
+        );
+    }
 }

@@ -66,4 +66,28 @@ mod tests {
         };
         assert_eq!(encode(&sample).unwrap(), "list=&optional=a");
     }
+
+    #[test]
+    fn escapes_the_special_characters() {
+        let sample = Sample {
+            list: vec!["a b".into(), "c&d=e".into(), "é/+".into()],
+            optional: None,
+        };
+        assert_eq!(
+            encode(&sample).unwrap(),
+            "list=a+b%2Cc%26d%3De%2C%C3%A9%2F%2B"
+        );
+    }
+
+    #[test]
+    fn refuses_the_nested_values() {
+        #[derive(Serialize)]
+        struct Nested {
+            inner: Vec<u8>,
+        }
+        assert!(matches!(
+            encode(&Nested { inner: vec![1] }),
+            Err(KrakenError::InvalidArgument { .. })
+        ));
+    }
 }

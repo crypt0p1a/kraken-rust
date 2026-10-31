@@ -22,7 +22,13 @@ pub(crate) fn decode<O: DeserializeOwned>(status: u16, text: &str) -> Result<O, 
         });
     }
 
-    let envelope: Envelope = serde_json::from_str(text).map_err(KrakenError::decode)?;
+    let value: Value = serde_json::from_str(text).map_err(KrakenError::decode)?;
+    if !value.is_object() {
+        return Err(KrakenError::Decode {
+            reason: format!("expected an object, got {text}"),
+        });
+    }
+    let envelope: Envelope = serde_json::from_value(value).map_err(KrakenError::decode)?;
 
     if !envelope.error.is_empty() {
         return Err(KrakenError::Api {
@@ -81,5 +87,64 @@ mod tests {
             decode::<Value>(200, "not json"),
             Err(KrakenError::Decode { .. })
         ));
+    }
+
+    #[test]
+    fn the_errors_win_over_the_result() {
+        assert_eq!(
+            decode::<Value>(
+                200,
+                r#"{"error":["EOrder:Insufficient funds"],"result":{"a":1}}"#
+            ),
+            Err(KrakenError::Api {
+                status: 200,
+                body: "EOrder:Insufficient funds".into()
+            })
+        );
+    }
+
+    #[test]
+    fn a_null_result_is_an_error() {
+        assert!(matches!(
+            decode::<Value>(200, r#"{"error":[],"result":null}"#),
+            Err(KrakenError::Api { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_the_malformed_envelopes() {
+        for text in [
+            r#"{"error":"EAPI:Invalid key"}"#,
+            r#"{"error":[1]}"#,
+            "[]",
+            "",
+        ] {
+            assert!(
+                matches!(decode::<Value>(200, text), Err(KrakenError::Decode { .. })),
+                "{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn keeps_the_body_of_the_http_errors() {
+        for status in [400, 403, 404, 429, 500, 502] {
+            assert_eq!(
+                decode::<Value>(status, r#"{"error":["EService:Unavailable"]}"#),
+                Err(KrakenError::Network {
+                    status,
+                    body: r#"{"error":["EService:Unavailable"]}"#.into()
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn decodes_the_result_with_the_model() {
+        assert!(matches!(
+            decode::<HashMap<String, i32>>(200, r#"{"error":[],"result":{"a":"x"}}"#),
+            Err(KrakenError::Decode { .. })
+        ));
+        assert_eq!(decode::<i64>(200, r#"{"error":[],"result":42}"#), Ok(42));
     }
 }
