@@ -12,11 +12,13 @@ uniffi = ["dep:uniffi", "kraken-network/uniffi"]
 
 [dependencies]
 kraken-network.workspace = true
+rust_decimal.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uniffi = { workspace = true, optional = true }
 
 [dev-dependencies]
+rust_decimal_macros.workspace = true
 base64.workspace = true
 hmac.workspace = true
 serde_ignored.workspace = true

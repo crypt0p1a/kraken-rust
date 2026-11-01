@@ -1,13 +1,17 @@
 //! Lenient deserializers: like CEX.IO, Kraken sends its decimals as strings ("1234.5") and some
 //! identifiers as numbers. Shared with `cex-spot-trading`.
+//!
+//! The amounts are read with [`decimal`] / [`opt_decimal`]: the string of Kraken is parsed into
+//! an exact [`Decimal`], never through a float, so that "123456789.12345678" stays exact.
 
 // kept identical to the CEX.IO module, to merge both: some deserializers are unused by Kraken
 #![allow(dead_code)]
 
-use serde::de::Error;
+use rust_decimal::Decimal;
+use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
-use std::fmt::Display;
+use std::fmt::{self, Display};
 use std::str::FromStr;
 
 #[derive(Deserialize)]
@@ -42,6 +46,81 @@ where
         Some(Lenient::Text(text)) => text.trim().parse().map(Some).map_err(D::Error::custom),
     }
 }
+
+/// Parses a decimal written by Kraken, e.g. "0.00058823", "-12", "1.5e-7"
+pub(crate) fn parse_decimal(text: &str) -> Result<Decimal, String> {
+    let text = text.trim();
+    Decimal::from_str_exact(text)
+        .or_else(|_| Decimal::from_scientific(text))
+        .map_err(|error| format!("invalid decimal {text:?}: {error}"))
+}
+
+/// A decimal, or None for null and for an empty string
+struct DecimalVisitor;
+
+impl<'de> Visitor<'de> for DecimalVisitor {
+    type Value = Option<Decimal>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a decimal, as a string or a number")
+    }
+
+    fn visit_str<E: Error>(self, text: &str) -> Result<Self::Value, E> {
+        if text.trim().is_empty() {
+            return Ok(None);
+        }
+        parse_decimal(text).map(Some).map_err(E::custom)
+    }
+
+    fn visit_i64<E: Error>(self, value: i64) -> Result<Self::Value, E> {
+        Ok(Some(Decimal::from(value)))
+    }
+
+    fn visit_u64<E: Error>(self, value: u64) -> Result<Self::Value, E> {
+        Ok(Some(Decimal::from(value)))
+    }
+
+    /// Kraken sends its amounts as strings: only small numbers like the fee tiers ([0, 0.26])
+    /// are JSON numbers, whose shortest representation is the text sent by Kraken
+    fn visit_f64<E: Error>(self, value: f64) -> Result<Self::Value, E> {
+        if !value.is_finite() {
+            return Err(E::custom(format!("invalid decimal {value}")));
+        }
+        parse_decimal(&value.to_string())
+            .map(Some)
+            .map_err(E::custom)
+    }
+
+    fn visit_none<E: Error>(self) -> Result<Self::Value, E> {
+        Ok(None)
+    }
+
+    fn visit_unit<E: Error>(self) -> Result<Self::Value, E> {
+        Ok(None)
+    }
+
+    fn visit_some<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
+        deserializer.deserialize_any(self)
+    }
+}
+
+/// An exact decimal, sent as a string or as a number
+pub(crate) fn decimal<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Decimal, D::Error> {
+    deserializer
+        .deserialize_any(DecimalVisitor)?
+        .ok_or_else(|| D::Error::custom("expected a decimal, got nothing"))
+}
+
+/// An exact decimal: None when missing, null or empty
+pub(crate) fn opt_decimal<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Decimal>, D::Error> {
+    deserializer.deserialize_option(DecimalVisitor)
+}
+
+/// [`decimal`], for the values of the arrays: `<(Lenient, Lenient)>::deserialize`
+#[derive(Deserialize)]
+pub(crate) struct ExactDecimal(#[serde(deserialize_with = "decimal")] pub Decimal);
 
 /// A percentage: 0 when the value isn't a number
 pub(crate) fn percentage<'de, D: Deserializer<'de>>(deserializer: D) -> Result<f32, D::Error> {
@@ -176,5 +255,88 @@ mod tests {
         assert_eq!(serde_json::from_str::<Integer>(r#""42""#).unwrap().0, 42);
         assert_eq!(serde_json::from_str::<Integer>("42").unwrap().0, 42);
         assert!(serde_json::from_str::<Integer>(r#""4.2""#).is_err());
+    }
+
+    #[derive(Deserialize, Debug, PartialEq)]
+    struct Amounts {
+        #[serde(deserialize_with = "super::decimal")]
+        amount: rust_decimal::Decimal,
+        #[serde(default, deserialize_with = "super::opt_decimal")]
+        optional: Option<rust_decimal::Decimal>,
+    }
+
+    fn amounts(json: &str) -> Amounts {
+        serde_json::from_str(json).unwrap()
+    }
+
+    #[test]
+    fn keeps_every_digit_of_the_large_volumes() {
+        // beyond the ~16 significant digits of a f64
+        for text in [
+            "123456789.12345678",
+            "98765432109876.54321",
+            "0.000000000123456789",
+            "1000000000000.00000001",
+        ] {
+            let decoded = amounts(&format!(r#"{{"amount":"{text}"}}"#));
+            assert_eq!(decoded.amount.to_string(), text, "{text}");
+        }
+        let float: f64 = "98765432109876.54321".parse().unwrap();
+        assert_ne!(float.to_string(), "98765432109876.54321");
+    }
+
+    #[test]
+    fn keeps_the_trailing_zeros_of_kraken() {
+        assert_eq!(
+            amounts(r#"{"amount":"1.25000000"}"#).amount.to_string(),
+            "1.25000000"
+        );
+        assert_eq!(amounts(r#"{"amount":" -0.5 "}"#).amount.to_string(), "-0.5");
+    }
+
+    #[test]
+    fn reads_the_decimals_sent_as_numbers() {
+        assert_eq!(amounts(r#"{"amount":42}"#).amount.to_string(), "42");
+        assert_eq!(amounts(r#"{"amount":-42}"#).amount.to_string(), "-42");
+        assert_eq!(amounts(r#"{"amount":0.26}"#).amount.to_string(), "0.26");
+        assert_eq!(
+            amounts(r#"{"amount":"1.5e-7"}"#).amount.to_string(),
+            "0.00000015"
+        );
+    }
+
+    #[test]
+    fn reads_the_missing_decimals_as_none() {
+        for json in [
+            r#"{"amount":"1"}"#,
+            r#"{"amount":"1","optional":null}"#,
+            r#"{"amount":"1","optional":""}"#,
+            r#"{"amount":"1","optional":"  "}"#,
+        ] {
+            assert_eq!(amounts(json).optional, None, "{json}");
+        }
+        assert_eq!(
+            amounts(r#"{"amount":"1","optional":"0.1"}"#)
+                .optional
+                .map(|it| it.to_string()),
+            Some("0.1".into())
+        );
+    }
+
+    #[test]
+    fn rejects_what_is_not_a_decimal() {
+        for json in [
+            r#"{}"#,
+            r#"{"amount":null}"#,
+            r#"{"amount":""}"#,
+            r#"{"amount":"abc"}"#,
+            r#"{"amount":true}"#,
+            r#"{"amount":[1]}"#,
+            r#"{"amount":"1","optional":"x"}"#,
+            // beyond the 28 digits of a Decimal: refused rather than rounded
+            r#"{"amount":"123456789012345678901234567890"}"#,
+        ] {
+            assert!(serde_json::from_str::<Amounts>(json).is_err(), "{json}");
+        }
     }
 }

@@ -28,6 +28,7 @@ humantime-serde = "1.1.1"
 ntfy = { version = "0.9.1", default-features = false, features = ["async-dispatcher", "rustls"] }
 rusqlite = { version = "0.41.1", features = ["bundled"] }
 rust_decimal = { version = "1.43.0", features = ["serde-str"] }
+rust_decimal_macros = "1"
 serde_norway = "0.9.42"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
