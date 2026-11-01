@@ -69,7 +69,7 @@ manager only spends its own money, and only what the account has.
 
 ### Configuration
 
-The managers are in a YAML file ([example](crates/kraken-trading-bot/managers.example.yaml)),
+The managers are in a YAML file ([example](managers.example.yaml)),
 the credentials in the environment:
 
 ```yaml
@@ -106,7 +106,7 @@ managers:
 ### Running it
 
 ```sh
-cp crates/kraken-trading-bot/managers.example.yaml managers.yaml   # then edit it
+cp managers.example.yaml managers.yaml   # then edit it
 cp .env.example .env                                               # then fill the key and secret
 docker compose up -d --build
 docker compose logs -f
