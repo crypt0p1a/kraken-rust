@@ -6,6 +6,7 @@ members = [
   "crates/kraken-api",
   "crates/kraken-ffi",
   "crates/kraken-trading-bot",
+  "crates/trading-notify",
 ]
 
 [workspace.package]
@@ -19,9 +20,12 @@ repository = "https://github.com/crypt0p1a/kraken-rust"
 kraken-api = { path = "crates/kraken-api" }
 kraken-crypto = { path = "crates/kraken-crypto" }
 kraken-network = { path = "crates/kraken-network" }
+trading-notify = { path = "crates/trading-notify" }
 
 # trading bot
 humantime-serde = "1.1.1"
+# notifications: only the async dispatcher, on rustls
+ntfy = { version = "0.9.1", default-features = false, features = ["async-dispatcher", "rustls"] }
 rusqlite = { version = "0.41.1", features = ["bundled"] }
 rust_decimal = { version = "1.43.0", features = ["serde-str"] }
 serde_norway = "0.9.42"
