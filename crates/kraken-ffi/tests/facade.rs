@@ -53,8 +53,9 @@ async fn the_public_api_calls_kraken_through_the_shared_rate_limiter() {
         .await;
 
     let recorder = Arc::new(Recorder::default());
-    // a single token: the 2nd and 3rd calls wait for it, which is logged
-    let limiter = KrakenRateLimiter::new(1, 1, Some(recorder.clone()));
+    // a single token, refilled every 500ms: far longer than a call to the local server, so the
+    // 2nd and 3rd calls wait for it, which is logged (with 1ms, a slow runner refilled it before)
+    let limiter = KrakenRateLimiter::new(1, 500, Some(recorder.clone()));
     let api = KrakenPublicApi::new(options(&server), limiter).unwrap();
 
     for _ in 0..3 {
