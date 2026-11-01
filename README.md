@@ -279,6 +279,8 @@ let balances = private_api.extended_balance().await?;
   Closed orders are paginated by 50 (`offset`) and filtered by seconds, not milliseconds.
 - **Units**: Kraken timestamps are in seconds (with decimals for the orders), CEX.IO in
   milliseconds. Fees are percents (0.26 = 0.26%) on both.
+- **Amounts**: exact `Decimal`s here, `f64` in `cex-spot-trading`: to align on the decimals when
+  merging.
 - **Candles**: `since` instead of from/to, 720 candles at most, the last one is still open
   (`is_closed = false`).
 - **Ticker**: values of today and of the last 24h, no `volumeUSD` / `priceChangePercentage`
@@ -330,9 +332,17 @@ never Withdraw Funds. The libraries never read the credentials: an application g
 
 ### Models
 
-The amounts are `f64`, like in `cex-spot-trading`: compare them with a tolerance, and give the
-prices and volumes of the new orders as strings, formatted with the decimals of the pair
-(`AssetPair.pair_decimals`, `lot_decimals`).
+The amounts, prices, volumes and fees are exact decimals (`kraken_api::Decimal`, from
+`rust_decimal`: base 10, 28 significant digits), parsed from the strings of Kraken without going
+through a float. A `f64` keeps ~16 significant digits: the volume of a small asset
+(`812345678901.12345678` SHIB) would lose its last ones, and `volume × price` would no longer be
+the cost. Compare them exactly; a value beyond 28 digits is refused rather than rounded. Only the
+timestamps stay `f64` (seconds, exact to the microsecond).
+
+Through UniFFI, a `Decimal` crosses as its text and is rebuilt as a `java.math.BigDecimal` in
+Kotlin ([`crates/kraken-api/uniffi.toml`](crates/kraken-api/uniffi.toml)), a `String` in the other
+languages. The prices and volumes of the new orders are strings, formatted with the decimals of
+the pair (`AssetPair.pair_decimals`, `lot_decimals`).
 
 ## CI
 

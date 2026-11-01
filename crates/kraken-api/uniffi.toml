@@ -1,0 +1,8 @@
+# Bindings of the custom types: the exact decimals cross the FFI as their text ("0.00058823")
+# and are rebuilt as the exact decimal type of the language, never as a float
+
+[bindings.kotlin.custom_types.Decimal]
+type_name = "BigDecimal"
+imports = ["java.math.BigDecimal"]
+lift = "BigDecimal({})"
+lower = "{}.toPlainString()"
