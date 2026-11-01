@@ -20,7 +20,8 @@ crates/
 ├── kraken-network   HTTP clients, rate limiter, nonce, answers, errors   ← kraken-crypto
 ├── kraken-api       the endpoints, grouped by domain, and their models   ← kraken-network
 ├── kraken-ffi       UniFFI export: objects with async methods            ← kraken-api, kraken-network
-└── kraken-trading-bot  the trading bot (executable, Docker)             ← kraken-api
+├── kraken-trading-bot  the trading bot (executable, Docker)             ← kraken-api, trading-notify
+└── trading-notify   notifications of a trading bot through ntfy, i18n   ← ntfy
 ```
 
 | Crate            | Content                                                                                   |
@@ -30,6 +31,7 @@ crates/
 | `kraken-api`     | `market`, `account`, `trading` (models + calls), `PublicApi` and `PrivateApi` facades     |
 | `kraken-ffi`     | `KrakenPublicApi`, `KrakenPrivateApi`, `KrakenRateLimiter`, `KrakenLogger`                |
 | `kraken-trading-bot` | the managers of [the trading bot](#trading-bot), port of `cex-trading-bot`            |
+| `trading-notify` | the [notifications](#notifications) of the bot: languages, texts, sending through ntfy |
 
 `kraken-crypto`, `kraken-network` and `kraken-api` don't depend on UniFFI: their `uniffi` feature,
 enabled by `kraken-ffi` only, derives the UniFFI traits of their models and errors.
@@ -98,6 +100,7 @@ managers:
 | `KRAKEN_API_KEY`, `KRAKEN_API_SECRET` | | Query Funds, Query Open/Closed Orders, Create & Modify Orders; never Withdraw Funds |
 | `KRAKEN_BOT_CONFIG` | `managers.yaml` | the YAML file |
 | `KRAKEN_BOT_DATABASE` | `kraken-bot.sqlite` | the SQLite database |
+| `KRAKEN_BOT_NTFY_TOPIC`, `KRAKEN_BOT_NTFY_TOKEN` | | the [notifications](#notifications) |
 | `RUST_LOG` | `info` | |
 
 ### Running it
@@ -115,6 +118,40 @@ compose stop` lets the tick in progress end.
 
 Without Docker: `cargo run --release -p kraken-trading-bot` (or `-- --once` for a single tick,
 `-- --check` to only check the configuration and the pairs).
+
+### Notifications
+
+The bot notifies the phone through [ntfy](https://ntfy.sh) (the `trading-notify` crate, on the
+[`ntfy`](https://crates.io/crates/ntfy) crate):
+
+| Event | Notification |
+|-------|--------------|
+| `started` | the bot started, dry run or live |
+| `placed` | a buy or a sell placed: volume, price, total, expiry |
+| `filled` | a buy or a sell filled, entirely or partially; the gain of each sale, fees included |
+| `expired` | an order expired or canceled, partially filled or not |
+| `failed` | an order refused, a manager or a tick failing: once, until it works again |
+| `daily_summary` | every day after `daily_summary_hour` (UTC): the value of each manager, its gain, its sales |
+
+1. install the ntfy app (Android, iOS) and subscribe to a long random topic
+   (`openssl rand -hex 16`): whoever knows it reads the notifications
+2. put it in `.env`: `KRAKEN_BOT_NTFY_TOPIC=...` (and `KRAKEN_BOT_NTFY_TOKEN` for a protected
+   topic)
+3. add to `managers.yaml`:
+
+```yaml
+notifications:
+  ntfy:
+    server: https://ntfy.sh   # or a self-hosted server
+  language: en                # en (default) or fr
+  events: [started, placed, filled, expired, failed, daily_summary]   # all by default
+  dry_run: false              # true: the orders of a dry run too (one per tick and manager)
+  daily_summary_hour: 20      # UTC
+```
+
+The fills are found when the orders are synchronized: each change of an order is notified once,
+restarts included, and the history found at the first start isn't. A notification which can't be
+sent is logged, the bot goes on. Adding a language: a catalog in `trading-notify/src/i18n.rs`.
 
 ### Database
 
