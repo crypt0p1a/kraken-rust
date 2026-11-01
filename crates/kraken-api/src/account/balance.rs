@@ -1,6 +1,7 @@
 use crate::KrakenError;
 use crate::lenient;
 use kraken_network::PrivateClient;
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -8,20 +9,20 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct ExtendedBalance {
-    #[serde(deserialize_with = "lenient::number")]
-    pub balance: f64,
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub balance: Decimal,
     /// Held by the open orders
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub hold_trade: Option<f64>,
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub credit: Option<f64>,
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub credit_used: Option<f64>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub hold_trade: Option<Decimal>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub credit: Option<Decimal>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub credit_used: Option<Decimal>,
 }
 
 impl ExtendedBalance {
     /// What can be used by a new order: balance + credit - credit_used - hold_trade
-    pub fn available(&self) -> f64 {
+    pub fn available(&self) -> Decimal {
         self.balance + self.credit.unwrap_or_default()
             - self.credit_used.unwrap_or_default()
             - self.hold_trade.unwrap_or_default()
@@ -38,6 +39,7 @@ pub(crate) async fn extended_balance(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn computes_the_available_balance() {
@@ -47,8 +49,8 @@ mod tests {
         )
         .unwrap();
 
-        assert!((balances["ZUSD"].available() - 17185.45).abs() < 1e-9);
-        assert_eq!(balances["XXBT"].available(), 1.2);
+        assert_eq!(balances["ZUSD"].available(), dec!(17185.45));
+        assert_eq!(balances["XXBT"].available(), dec!(1.2));
     }
 
     #[test]
@@ -57,7 +59,7 @@ mod tests {
             r#"{"balance":"100","hold_trade":"30","credit":"50","credit_used":"20"}"#,
         )
         .unwrap();
-        assert_eq!(balance.available(), 100.0);
+        assert_eq!(balance.available(), dec!(100.0));
     }
 
     #[test]

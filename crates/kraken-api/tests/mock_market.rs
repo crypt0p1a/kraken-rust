@@ -4,6 +4,7 @@ mod common;
 
 use common::{QueryIs, ok, public_api};
 use kraken_api::market::{CandleInterval, CandlesRequest};
+use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer};
@@ -46,7 +47,7 @@ async fn tickers() {
         .tickers(&["XBTUSD".into(), "ETHUSD".into()])
         .await
         .unwrap();
-    assert_eq!(tickers["XXBTZUSD"].last_trade.price, 30303.2);
+    assert_eq!(tickers["XXBTZUSD"].last_trade.price, dec!(30303.2));
     assert_eq!(tickers["XXBTZUSD"].trades.last_24h, 38907);
 }
 
@@ -84,8 +85,8 @@ async fn asset_pairs() {
         .asset_pairs(&["XBTUSD".into()])
         .await
         .unwrap();
-    assert_eq!(pairs["XXBTZUSD"].ordermin, Some(0.00005));
-    assert_eq!(pairs["XXBTZUSD"].fees_maker[0].percent, 0.25);
+    assert_eq!(pairs["XXBTZUSD"].ordermin, Some(dec!(0.00005)));
+    assert_eq!(pairs["XXBTZUSD"].fees_maker[0].percent, dec!(0.25));
 }
 
 #[tokio::test]

@@ -1,7 +1,8 @@
 use crate::KrakenError;
-use crate::lenient;
+use crate::lenient::{self, ExactDecimal};
 use crate::params::Pairs;
 use kraken_network::PublicClient;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 
@@ -9,25 +10,25 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct PriceLevel {
-    pub price: f64,
-    pub whole_lot_volume: f64,
-    pub lot_volume: f64,
+    pub price: Decimal,
+    pub whole_lot_volume: Decimal,
+    pub lot_volume: Decimal,
 }
 
 /// Last trade closed
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct TradeLevel {
-    pub price: f64,
-    pub lot_volume: f64,
+    pub price: Decimal,
+    pub lot_volume: Decimal,
 }
 
 /// Value of today (since 00:00 UTC) and of the last 24 hours
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct Window {
-    pub today: f64,
-    pub last_24h: f64,
+    pub today: Decimal,
+    pub last_24h: Decimal,
 }
 
 /// Count of today (since 00:00 UTC) and of the last 24 hours
@@ -62,19 +63,16 @@ pub struct Ticker {
     #[serde(rename = "h", deserialize_with = "window")]
     pub high: Window,
     /// Today's opening price
-    #[serde(rename = "o", deserialize_with = "lenient::number")]
-    pub open: f64,
+    #[serde(rename = "o", deserialize_with = "lenient::decimal")]
+    pub open: Decimal,
 }
-
-#[derive(Deserialize)]
-struct LenientF64(#[serde(deserialize_with = "lenient::number")] f64);
 
 #[derive(Deserialize)]
 struct LenientI64(#[serde(deserialize_with = "lenient::number")] i64);
 
 fn price_level<'de, D: Deserializer<'de>>(deserializer: D) -> Result<PriceLevel, D::Error> {
     let (price, whole_lot_volume, lot_volume) =
-        <(LenientF64, LenientF64, LenientF64)>::deserialize(deserializer)?;
+        <(ExactDecimal, ExactDecimal, ExactDecimal)>::deserialize(deserializer)?;
     Ok(PriceLevel {
         price: price.0,
         whole_lot_volume: whole_lot_volume.0,
@@ -83,7 +81,7 @@ fn price_level<'de, D: Deserializer<'de>>(deserializer: D) -> Result<PriceLevel,
 }
 
 fn trade_level<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TradeLevel, D::Error> {
-    let (price, lot_volume) = <(LenientF64, LenientF64)>::deserialize(deserializer)?;
+    let (price, lot_volume) = <(ExactDecimal, ExactDecimal)>::deserialize(deserializer)?;
     Ok(TradeLevel {
         price: price.0,
         lot_volume: lot_volume.0,
@@ -91,7 +89,7 @@ fn trade_level<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TradeLevel,
 }
 
 fn window<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Window, D::Error> {
-    let (today, last_24h) = <(LenientF64, LenientF64)>::deserialize(deserializer)?;
+    let (today, last_24h) = <(ExactDecimal, ExactDecimal)>::deserialize(deserializer)?;
     Ok(Window {
         today: today.0,
         last_24h: last_24h.0,
@@ -120,6 +118,7 @@ pub(crate) async fn tickers(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn decodes_the_tickers() {
@@ -133,12 +132,12 @@ mod tests {
         .unwrap();
 
         let ticker = &tickers["XXBTZUSD"];
-        assert_eq!(ticker.ask.price, 30300.1);
-        assert_eq!(ticker.bid.lot_volume, 1.0);
-        assert_eq!(ticker.last_trade.lot_volume, 0.00067643);
-        assert_eq!(ticker.volume.last_24h, 4412.73601799);
+        assert_eq!(ticker.ask.price, dec!(30300.1));
+        assert_eq!(ticker.bid.lot_volume, dec!(1.0));
+        assert_eq!(ticker.last_trade.lot_volume, dec!(0.00067643));
+        assert_eq!(ticker.volume.last_24h, dec!(4412.73601799));
         assert_eq!(ticker.trades.today, 34619);
-        assert_eq!(ticker.open, 30502.8);
+        assert_eq!(ticker.open, dec!(30502.8));
     }
 
     const TICKER: &str = r#"{"a":["1","2","3"],"b":["0.5","1","1"],"c":["0.75","0.1"],
@@ -151,30 +150,30 @@ mod tests {
         assert_eq!(
             ticker.ask,
             PriceLevel {
-                price: 1.0,
-                whole_lot_volume: 2.0,
-                lot_volume: 3.0
+                price: dec!(1.0),
+                whole_lot_volume: dec!(2.0),
+                lot_volume: dec!(3.0)
             }
         );
         assert_eq!(
             ticker.last_trade,
             TradeLevel {
-                price: 0.75,
-                lot_volume: 0.1
+                price: dec!(0.75),
+                lot_volume: dec!(0.1)
             }
         );
         assert_eq!(
             ticker.volume,
             Window {
-                today: 10.0,
-                last_24h: 20.0
+                today: dec!(10.0),
+                last_24h: dec!(20.0)
             }
         );
         assert_eq!(
             ticker.vwap,
             Window {
-                today: 0.7,
-                last_24h: 0.8
+                today: dec!(0.7),
+                last_24h: dec!(0.8)
             }
         );
         assert_eq!(
@@ -187,18 +186,18 @@ mod tests {
         assert_eq!(
             ticker.low,
             Window {
-                today: 0.4,
-                last_24h: 0.3
+                today: dec!(0.4),
+                last_24h: dec!(0.3)
             }
         );
         assert_eq!(
             ticker.high,
             Window {
-                today: 1.1,
-                last_24h: 1.2
+                today: dec!(1.1),
+                last_24h: dec!(1.2)
             }
         );
-        assert_eq!(ticker.open, 0.6);
+        assert_eq!(ticker.open, dec!(0.6));
     }
 
     #[test]

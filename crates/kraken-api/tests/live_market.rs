@@ -7,11 +7,13 @@
 mod live;
 mod strict;
 
+use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::{
     AssetPair, AssetPairStatus, CandleInterval, CandlesRequest, ServerTime, Ticker,
 };
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
+use rust_decimal_macros::dec;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -63,7 +65,7 @@ async fn tickers_of_every_pair() {
         presence.record(value);
         let ticker: Ticker = decode_strict(&format!("Ticker {pair}"), value);
 
-        if ticker.ask.price > 0.0 && ticker.bid.price > 0.0 {
+        if ticker.ask.price > Decimal::ZERO && ticker.bid.price > Decimal::ZERO {
             assert!(
                 le(ticker.bid.price, ticker.ask.price),
                 "{pair}: crossed book {ticker:?}"
@@ -71,7 +73,7 @@ async fn tickers_of_every_pair() {
         }
         for window in [ticker.volume, ticker.vwap, ticker.low, ticker.high] {
             assert!(
-                window.today >= 0.0 && window.last_24h >= 0.0,
+                window.today >= Decimal::ZERO && window.last_24h >= Decimal::ZERO,
                 "{pair}: {ticker:?}"
             );
         }
@@ -80,11 +82,11 @@ async fn tickers_of_every_pair() {
             "{pair}"
         );
         assert!(
-            ticker.ask.lot_volume >= 0.0 && ticker.bid.lot_volume >= 0.0,
+            ticker.ask.lot_volume >= Decimal::ZERO && ticker.bid.lot_volume >= Decimal::ZERO,
             "{pair}"
         );
         assert!(
-            ticker.last_trade.price >= 0.0 && ticker.open >= 0.0,
+            ticker.last_trade.price >= Decimal::ZERO && ticker.open >= Decimal::ZERO,
             "{pair}"
         );
 
@@ -94,8 +96,8 @@ async fn tickers_of_every_pair() {
                 "{pair}: {ticker:?}"
             );
             assert!(
-                le(ticker.low.last_24h, ticker.vwap.last_24h * (1.0 + 1e-6))
-                    && le(ticker.vwap.last_24h, ticker.high.last_24h * (1.0 + 1e-6)),
+                le(ticker.low.last_24h, ticker.vwap.last_24h * dec!(1.000001))
+                    && le(ticker.vwap.last_24h, ticker.high.last_24h * dec!(1.000001)),
                 "{pair}: vwap outside of the 24h range {ticker:?}"
             );
         }
@@ -150,13 +152,19 @@ async fn asset_pairs_of_every_pair() {
             pair.cost_decimals.is_some_and(|it| (0..=18).contains(&it)),
             "{key}"
         );
-        assert!(pair.ordermin.is_some_and(|it| it > 0.0), "{key}: {pair:?}");
-        assert!(pair.costmin.is_some_and(|it| it >= 0.0), "{key}: {pair:?}");
+        assert!(
+            pair.ordermin.is_some_and(|it| it > Decimal::ZERO),
+            "{key}: {pair:?}"
+        );
+        assert!(
+            pair.costmin.is_some_and(|it| it >= Decimal::ZERO),
+            "{key}: {pair:?}"
+        );
 
         // the price increment can't be finer than the decimals of the price
         let tick = pair.tick_size.expect("tick_size");
         assert!(
-            le(10f64.powi(-pair.pair_decimals), tick),
+            le(Decimal::new(1, pair.pair_decimals as u32), tick),
             "{key}: tick {tick} too fine"
         );
 
@@ -170,7 +178,9 @@ async fn asset_pairs_of_every_pair() {
                 "{key}"
             );
             assert!(
-                tiers.iter().all(|it| (0.0..=100.0).contains(&it.percent)),
+                tiers
+                    .iter()
+                    .all(|it| (Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(&it.percent)),
                 "{key}"
             );
         }
@@ -313,13 +323,13 @@ async fn candles_of_every_interval() {
                 "{context}: {candle:?}"
             );
             assert!(
-                candle.volume >= 0.0 && candle.count >= 0,
+                candle.volume >= Decimal::ZERO && candle.count >= 0,
                 "{context}: {candle:?}"
             );
-            if candle.volume > 0.0 {
+            if candle.volume > Decimal::ZERO {
                 assert!(
-                    le(candle.low * (1.0 - 1e-6), candle.vwap)
-                        && le(candle.vwap, candle.high * (1.0 + 1e-6)),
+                    le(candle.low * dec!(0.999999), candle.vwap)
+                        && le(candle.vwap, candle.high * dec!(1.000001)),
                     "{context}: vwap outside of the candle {candle:?}"
                 );
             }

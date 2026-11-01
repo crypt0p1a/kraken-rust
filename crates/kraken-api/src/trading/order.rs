@@ -1,5 +1,6 @@
 use super::{OrderSide, OrderStatus, OrderType, TimeInForce};
 use crate::lenient;
+use rust_decimal::Decimal;
 use serde::Deserialize;
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-open-orders>
@@ -16,11 +17,11 @@ pub struct OrderDescription {
     #[serde(rename = "ordertype")]
     pub order_type: OrderType,
     /// Limit price, or trigger price of the stop / take profit orders
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub price: Option<f64>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub price: Option<Decimal>,
     /// Limit price of the stop-loss-limit / take-profit-limit orders
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub price2: Option<f64>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub price2: Option<Decimal>,
     #[serde(default, deserialize_with = "lenient::opt_string")]
     pub leverage: Option<String>,
     /// Human readable description, e.g. "buy 1.25000000 XBTUSD @ limit 27500.0"
@@ -49,7 +50,8 @@ pub struct Order {
     #[serde(default, deserialize_with = "lenient::opt_string")]
     pub cl_ord_id: Option<String>,
     pub status: OrderStatus,
-    /// UTC timestamps, in seconds (with decimals)
+    /// UTC timestamps, in seconds (with decimals): times, not amounts, so f64 (exact to the
+    /// microsecond for the next centuries)
     #[serde(rename = "opentm", deserialize_with = "lenient::number")]
     pub open_time: f64,
     #[serde(rename = "starttm", default, deserialize_with = "lenient::opt_number")]
@@ -61,31 +63,31 @@ pub struct Order {
     #[serde(rename = "descr")]
     pub description: OrderDescription,
     /// Volume, in the base currency
-    #[serde(rename = "vol", deserialize_with = "lenient::number")]
-    pub volume: f64,
-    #[serde(rename = "vol_exec", deserialize_with = "lenient::number")]
-    pub volume_executed: f64,
+    #[serde(rename = "vol", deserialize_with = "lenient::decimal")]
+    pub volume: Decimal,
+    #[serde(rename = "vol_exec", deserialize_with = "lenient::decimal")]
+    pub volume_executed: Decimal,
     /// Total cost, in the quote currency
-    #[serde(deserialize_with = "lenient::number")]
-    pub cost: f64,
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub cost: Decimal,
     /// Total fee, in the quote currency
-    #[serde(deserialize_with = "lenient::number")]
-    pub fee: f64,
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub fee: Decimal,
     /// Average price, in the quote currency
-    #[serde(rename = "price", deserialize_with = "lenient::number")]
-    pub average_price: f64,
+    #[serde(rename = "price", deserialize_with = "lenient::decimal")]
+    pub average_price: Decimal,
     #[serde(
         rename = "stopprice",
         default,
-        deserialize_with = "lenient::opt_number"
+        deserialize_with = "lenient::opt_decimal"
     )]
-    pub stop_price: Option<f64>,
+    pub stop_price: Option<Decimal>,
     #[serde(
         rename = "limitprice",
         default,
-        deserialize_with = "lenient::opt_number"
+        deserialize_with = "lenient::opt_decimal"
     )]
-    pub limit_price: Option<f64>,
+    pub limit_price: Option<Decimal>,
     /// Price the stop / take profit orders are triggered by: "last" or "index"
     #[serde(default)]
     pub trigger: Option<String>,
@@ -142,6 +144,7 @@ pub(crate) const SAMPLE: &str = r#"{"OQCLML-BW3P3-BUCMWZ":{"refid":null,"userref
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
     use std::collections::HashMap;
 
     #[test]
@@ -154,8 +157,8 @@ mod tests {
         assert_eq!(open.cl_ord_id.as_deref(), Some("mgr1_buy_1"));
         assert_eq!(open.status, OrderStatus::Open);
         assert_eq!(open.description.side, OrderSide::Buy);
-        assert_eq!(open.description.price, Some(30010.0));
-        assert_eq!(open.volume_executed, 0.375);
+        assert_eq!(open.description.price, Some(dec!(30010.0)));
+        assert_eq!(open.volume_executed, dec!(0.375));
         assert_eq!(open.trades.as_ref().map(Vec::len), Some(1));
 
         let closed = &orders[1];
@@ -187,7 +190,7 @@ mod tests {
         assert_eq!(order.time_in_force, Some(TimeInForce::Gtc));
         assert_eq!(order.userref, None);
         assert_eq!(order.stop_price, None);
-        assert_eq!(order.cost, 149.9056);
+        assert_eq!(order.cost, dec!(149.9056));
     }
 
     #[test]
@@ -207,9 +210,25 @@ mod tests {
         assert_eq!(order.amended, Some(true));
         assert_eq!(order.sender_sub_id.as_deref(), Some("desk-1"));
         assert_eq!(order.time_in_force, Some(TimeInForce::Gtd));
-        assert_eq!(order.stop_price, Some(25000.0));
+        assert_eq!(order.stop_price, Some(dec!(25000.0)));
         assert_eq!(order.description.order_type, OrderType::StopLossLimit);
-        assert_eq!(order.description.price2, Some(24900.0));
+        assert_eq!(order.description.price2, Some(dec!(24900.0)));
         assert_eq!(order.expire_time, Some(1688670000.0));
+    }
+
+    #[test]
+    fn keeps_the_exact_amounts_of_the_small_assets() {
+        // 20 significant digits: a f64 rounds them, the cost would not be volume × price
+        let order: Order = serde_json::from_str(
+            r#"{"status":"closed","opentm":1688666559.8974,"descr":{"pair":"SHIBEUR",
+                "type":"buy","ordertype":"limit","price":"0.00000123","order":"buy"},
+                "vol":"812345678901.12345678","vol_exec":"812345678901.12345678",
+                "cost":"999185.1850483818518394","fee":"0","price":"0.00000123"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(order.volume.to_string(), "812345678901.12345678");
+        assert_eq!(order.volume_executed * order.average_price, order.cost);
+        assert_eq!(order.description.price, Some(dec!(0.00000123)));
     }
 }

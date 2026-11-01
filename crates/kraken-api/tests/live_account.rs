@@ -5,6 +5,7 @@
 mod live;
 mod strict;
 
+use kraken_api::Decimal;
 use kraken_api::account::{ExtendedBalance, FeeInfo, TradeVolume};
 use kraken_api::{KrakenError, PrivateApi, RestOptions};
 use live::{Presence, decode_strict, entries, le, private_api, private_client};
@@ -45,14 +46,14 @@ async fn extended_balance_of_every_asset() {
         presence.record(value);
         let balance: ExtendedBalance = decode_strict(&format!("BalanceEx {asset}"), value);
 
-        assert!(balance.balance >= 0.0, "{asset}: {balance:?}");
+        assert!(balance.balance >= Decimal::ZERO, "{asset}: {balance:?}");
         let hold = balance.hold_trade.unwrap_or_default();
-        assert!(hold >= 0.0, "{asset}: {balance:?}");
+        assert!(hold >= Decimal::ZERO, "{asset}: {balance:?}");
         assert!(
             le(hold, balance.balance + balance.credit.unwrap_or_default()),
             "{asset}: more held than owned {balance:?}"
         );
-        assert!(balance.available() >= -1e-9, "{asset}: {balance:?}");
+        assert!(balance.available() >= Decimal::ZERO, "{asset}: {balance:?}");
     }
 
     presence.print("BalanceEx");
@@ -63,7 +64,10 @@ async fn extended_balance_of_every_asset() {
 }
 
 fn check_fee(context: &str, fee: &FeeInfo) {
-    assert!((0.0..=100.0).contains(&fee.fee), "{context}: {fee:?}");
+    assert!(
+        (Decimal::ZERO..=Decimal::ONE_HUNDRED).contains(&fee.fee),
+        "{context}: {fee:?}"
+    );
     if let (Some(min), Some(max)) = (fee.minfee, fee.maxfee) {
         assert!(le(min, fee.fee) && le(fee.fee, max), "{context}: {fee:?}");
     }
@@ -96,7 +100,7 @@ async fn trade_volume_and_fees_of_several_pairs() {
         serde_json::to_string_pretty(&raw).unwrap().len()
     );
 
-    assert!(volume.volume >= 0.0);
+    assert!(volume.volume >= Decimal::ZERO);
     assert!(
         volume.currency.starts_with('Z') || volume.currency.len() == 3,
         "{}",
@@ -131,7 +135,7 @@ async fn trade_volume_and_fees_of_several_pairs() {
         .into_iter()
         .flatten()
         {
-            assert!(value >= 0.0, "{inputs:?}");
+            assert!(value >= Decimal::ZERO, "{inputs:?}");
         }
     }
 

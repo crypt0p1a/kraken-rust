@@ -2,6 +2,7 @@ use crate::KrakenError;
 use crate::lenient;
 use crate::params::Pairs;
 use kraken_network::PublicClient;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 
@@ -10,9 +11,9 @@ use std::collections::HashMap;
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct FeeTier {
     /// 30 days volume, in `fee_volume_currency`
-    pub volume: f64,
+    pub volume: Decimal,
     /// Percentage, e.g. 0.26 for 0.26%
-    pub percent: f64,
+    pub percent: Decimal,
 }
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-tradable-asset-pairs>
@@ -62,14 +63,14 @@ pub struct AssetPair {
     #[serde(default, deserialize_with = "lenient::opt_number")]
     pub margin_stop: Option<i32>,
     /// Minimum volume of an order, in the base
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub ordermin: Option<f64>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub ordermin: Option<Decimal>,
     /// Minimum cost of an order, in the quote
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub costmin: Option<f64>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub costmin: Option<Decimal>,
     /// Minimum increment of the price
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub tick_size: Option<f64>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub tick_size: Option<Decimal>,
     #[serde(default)]
     pub status: Option<AssetPairStatus>,
     /// Where the orders are executed, e.g. "international"
@@ -100,8 +101,8 @@ pub enum AssetPairStatus {
 
 #[derive(Deserialize)]
 struct RawFeeTier(
-    #[serde(deserialize_with = "lenient::number")] f64,
-    #[serde(deserialize_with = "lenient::number")] f64,
+    #[serde(deserialize_with = "lenient::decimal")] Decimal,
+    #[serde(deserialize_with = "lenient::decimal")] Decimal,
 );
 
 /// The tiers are sent as [[volume, percent], ...]
@@ -125,6 +126,7 @@ pub(crate) async fn asset_pairs(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn decodes_the_asset_pairs() {
@@ -145,12 +147,12 @@ mod tests {
         assert_eq!(
             pair.fees_maker[1],
             FeeTier {
-                volume: 10000.0,
-                percent: 0.2
+                volume: dec!(10000.0),
+                percent: dec!(0.2)
             }
         );
-        assert_eq!(pair.ordermin, Some(0.00005));
-        assert_eq!(pair.tick_size, Some(0.1));
+        assert_eq!(pair.ordermin, Some(dec!(0.00005)));
+        assert_eq!(pair.tick_size, Some(dec!(0.1)));
     }
 
     #[test]

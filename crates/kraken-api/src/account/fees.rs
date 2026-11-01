@@ -2,6 +2,7 @@ use crate::KrakenError;
 use crate::lenient;
 use crate::params::Pairs;
 use kraken_network::PrivateClient;
+use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -9,34 +10,34 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct FeeInfo {
-    #[serde(deserialize_with = "lenient::number")]
-    pub fee: f64,
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub minfee: Option<f64>,
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub maxfee: Option<f64>,
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub fee: Decimal,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub minfee: Option<Decimal>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub maxfee: Option<Decimal>,
     /// None at the last tier
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub nextfee: Option<f64>,
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub nextvolume: Option<f64>,
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub tiervolume: Option<f64>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub nextfee: Option<Decimal>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub nextvolume: Option<Decimal>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub tiervolume: Option<Decimal>,
     /// Futures volume required by the next tier, None at the last tier
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub nextfuturesvolume: Option<f64>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub nextfuturesvolume: Option<Decimal>,
 }
 
 /// What the volume of the account is computed from
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct VolumeInputs {
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub domain_spot_volume_30d: Option<f64>,
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub domain_futures_volume_30d: Option<f64>,
-    #[serde(default, deserialize_with = "lenient::opt_number")]
-    pub domain_assets_on_platform: Option<f64>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub domain_spot_volume_30d: Option<Decimal>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub domain_futures_volume_30d: Option<Decimal>,
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub domain_assets_on_platform: Option<Decimal>,
 }
 
 /// <https://docs.kraken.com/api/docs/rest-api/get-trade-volume>
@@ -51,8 +52,8 @@ pub struct TradeVolume {
     #[serde(default)]
     pub inputs: Option<VolumeInputs>,
     /// 30 days volume
-    #[serde(deserialize_with = "lenient::number")]
-    pub volume: f64,
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub volume: Decimal,
     /// Taker fees, keyed by the Kraken name of the requested pairs
     #[serde(default)]
     pub fees: HashMap<String, FeeInfo>,
@@ -74,6 +75,7 @@ pub(crate) async fn trade_volume(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn decodes_the_trade_volume() {
@@ -86,9 +88,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(volume.volume, 200709587.4223);
-        assert_eq!(volume.fees["XXBTZUSD"].fee, 0.1);
-        assert_eq!(volume.fees_maker["XXBTZUSD"].maxfee, Some(0.16));
+        assert_eq!(volume.volume, dec!(200709587.4223));
+        assert_eq!(volume.fees["XXBTZUSD"].fee, dec!(0.1));
+        assert_eq!(volume.fees_maker["XXBTZUSD"].maxfee, Some(dec!(0.16)));
         assert_eq!(volume.fees["XXBTZUSD"].nextfee, None);
         assert_eq!(volume.inputs, None);
     }
@@ -111,11 +113,14 @@ mod tests {
 
         assert_eq!(volume.asset_class.as_deref(), Some("currency"));
         let inputs = volume.inputs.unwrap();
-        assert_eq!(inputs.domain_spot_volume_30d, Some(1234.5));
-        assert_eq!(inputs.domain_assets_on_platform, Some(42.1));
-        assert_eq!(inputs.domain_futures_volume_30d, Some(0.0));
-        assert_eq!(volume.fees["XXBTZUSD"].nextfuturesvolume, Some(100000.0));
-        assert_eq!(volume.fees_maker["XXBTZUSD"].nextfee, Some(0.2));
+        assert_eq!(inputs.domain_spot_volume_30d, Some(dec!(1234.5)));
+        assert_eq!(inputs.domain_assets_on_platform, Some(dec!(42.1)));
+        assert_eq!(inputs.domain_futures_volume_30d, Some(dec!(0.0)));
+        assert_eq!(
+            volume.fees["XXBTZUSD"].nextfuturesvolume,
+            Some(dec!(100000.0))
+        );
+        assert_eq!(volume.fees_maker["XXBTZUSD"].nextfee, Some(dec!(0.2)));
     }
 
     #[test]
@@ -123,7 +128,7 @@ mod tests {
         let volume: TradeVolume =
             serde_json::from_str(r#"{"currency":"ZUSD","volume":"0.0000"}"#).unwrap();
         assert!(volume.fees.is_empty() && volume.fees_maker.is_empty());
-        assert_eq!(volume.volume, 0.0);
+        assert_eq!(volume.volume, dec!(0.0));
     }
 
     #[test]

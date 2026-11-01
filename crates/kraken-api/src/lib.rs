@@ -9,6 +9,10 @@
 //! Each domain holds its models and its calls, [`PublicApi`] and [`PrivateApi`] being the facades
 //! composing them over the clients of `kraken-network`.
 //!
+//! The amounts and prices are exact [`Decimal`]s, parsed from the strings of Kraken: a float
+//! loses the last digits of the large volumes of the small assets (`123456789.12345678`). Through
+//! UniFFI, they are strings, to read as `BigDecimal` / `Decimal` by the foreign languages.
+//!
 //! ```no_run
 //! use kraken_api::{PublicApi, RateLimiter, RestOptions};
 //! use std::sync::Arc;
@@ -25,6 +29,14 @@
 #[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!("kraken_api");
 
+// the exact text of the decimal: "0.00058823", never a float
+#[cfg(feature = "uniffi")]
+uniffi::custom_type!(Decimal, String, {
+    remote,
+    lower: |decimal| decimal.to_string(),
+    try_lift: |text| Ok(lenient::parse_decimal(&text).map_err(uniffi::deps::anyhow::Error::msg)?),
+});
+
 pub mod account;
 mod lenient;
 pub mod market;
@@ -36,3 +48,4 @@ pub mod trading;
 pub use kraken_network::{KrakenError, Logger, RateLimiter, RestOptions};
 pub use private_api::PrivateApi;
 pub use public_api::PublicApi;
+pub use rust_decimal::Decimal;

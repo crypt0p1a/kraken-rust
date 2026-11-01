@@ -4,6 +4,7 @@
 mod common;
 
 use common::{FormIs, Signed, ok, private_api};
+use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer};
@@ -24,7 +25,7 @@ async fn extended_balance() {
         .await;
 
     let balances = private_api(&server).extended_balance().await.unwrap();
-    assert!((balances["ZUSD"].available() - 17185.45).abs() < 1e-9);
+    assert_eq!(balances["ZUSD"].available(), dec!(17185.45));
     assert_eq!(balances["XXBT"].hold_trade, None);
 }
 
@@ -48,7 +49,7 @@ async fn trade_volume() {
         .trade_volume(&["XBTUSD".into(), "ETHUSD".into()])
         .await
         .unwrap();
-    assert_eq!(volume.volume, 10000.5);
-    assert_eq!(volume.fees["XXBTZUSD"].fee, 0.26);
+    assert_eq!(volume.volume, dec!(10000.5));
+    assert_eq!(volume.fees["XXBTZUSD"].fee, dec!(0.26));
     assert_eq!(volume.fees_maker["XXBTZUSD"].nextfee, None);
 }

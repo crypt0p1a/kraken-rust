@@ -6,6 +6,7 @@
 
 #![allow(dead_code)]
 
+use kraken_api::Decimal;
 use kraken_api::{PrivateApi, PublicApi, RateLimiter, RestOptions};
 use kraken_network::{PrivateClient, PublicClient};
 use serde_json::Value;
@@ -139,7 +140,7 @@ pub fn entries(value: &Value) -> impl Iterator<Item = (&String, &Value)> {
     value.as_object().expect("an object keyed by id").iter()
 }
 
-/// `a <= b`, with a margin for the rounding of the decimals sent as strings
-pub fn le(a: f64, b: f64) -> bool {
-    a <= b + b.abs() * 1e-9 + 1e-12
+/// `a <= b`, with a margin of 1e-9 × b for the values Kraken computes and rounds (vwap, ...)
+pub fn le(a: Decimal, b: Decimal) -> bool {
+    a <= b + b.abs() * Decimal::new(1, 9)
 }

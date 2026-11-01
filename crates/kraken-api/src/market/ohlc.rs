@@ -1,6 +1,7 @@
 use crate::KrakenError;
 use crate::lenient;
 use kraken_network::PublicClient;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -61,12 +62,12 @@ pub struct CandlesRequest {
 pub struct Candle {
     /// Start of the candle, UTC timestamp in seconds
     pub time: i64,
-    pub open: f64,
-    pub high: f64,
-    pub low: f64,
-    pub close: f64,
-    pub vwap: f64,
-    pub volume: f64,
+    pub open: Decimal,
+    pub high: Decimal,
+    pub low: Decimal,
+    pub close: Decimal,
+    pub vwap: Decimal,
+    pub volume: Decimal,
     pub count: i64,
     /// false for the last candle of the answer, still being built
     pub is_closed: bool,
@@ -87,12 +88,12 @@ pub struct Candles {
 #[derive(Deserialize)]
 struct RawCandle(
     #[serde(deserialize_with = "lenient::number")] i64,
-    #[serde(deserialize_with = "lenient::number")] f64,
-    #[serde(deserialize_with = "lenient::number")] f64,
-    #[serde(deserialize_with = "lenient::number")] f64,
-    #[serde(deserialize_with = "lenient::number")] f64,
-    #[serde(deserialize_with = "lenient::number")] f64,
-    #[serde(deserialize_with = "lenient::number")] f64,
+    #[serde(deserialize_with = "lenient::decimal")] Decimal,
+    #[serde(deserialize_with = "lenient::decimal")] Decimal,
+    #[serde(deserialize_with = "lenient::decimal")] Decimal,
+    #[serde(deserialize_with = "lenient::decimal")] Decimal,
+    #[serde(deserialize_with = "lenient::decimal")] Decimal,
+    #[serde(deserialize_with = "lenient::decimal")] Decimal,
     #[serde(deserialize_with = "lenient::number")] i64,
 );
 
@@ -150,6 +151,7 @@ pub(crate) async fn candles(
 mod tests {
     use super::*;
     use kraken_network::params::encode;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn encodes_the_request() {
@@ -178,7 +180,7 @@ mod tests {
         assert_eq!(candles.pair, "XXBTZUSD");
         assert_eq!(candles.last, 1688671200);
         assert_eq!(candles.candles.len(), 2);
-        assert_eq!(candles.candles[0].close, 30305.7);
+        assert_eq!(candles.candles[0].close, dec!(30305.7));
         assert_eq!(candles.candles[1].count, 18);
         assert!(candles.candles[0].is_closed);
         assert!(!candles.candles[1].is_closed);
@@ -224,7 +226,7 @@ mod tests {
         .unwrap();
         assert_eq!(candles.candles.len(), 1);
         assert!(!candles.candles[0].is_closed);
-        assert_eq!(candles.candles[0].low, 0.5);
+        assert_eq!(candles.candles[0].low, dec!(0.5));
         assert_eq!(candles.candles[0].count, 4);
     }
 
@@ -240,7 +242,7 @@ mod tests {
             decode(serde_json::from_str(r#"{"XXBTZUSD":[[1,1,2,0.5,1.5,1.2,3,4]]}"#).unwrap())
                 .unwrap();
         assert_eq!(candles.last, 0);
-        assert_eq!(candles.candles[0].high, 2.0);
+        assert_eq!(candles.candles[0].high, dec!(2.0));
     }
 
     #[test]

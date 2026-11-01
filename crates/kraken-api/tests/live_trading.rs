@@ -6,6 +6,7 @@
 mod live;
 mod strict;
 
+use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::AssetPair;
 use kraken_api::trading::{
@@ -15,6 +16,7 @@ use kraken_api::trading::{
 use live::{
     Presence, decode_strict, entries, le, now_seconds, private_api, private_client, public_api,
 };
+use rust_decimal_macros::dec;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -59,13 +61,15 @@ fn check_order(txid: &str, order: &Order) {
         "{txid}: {order:?}"
     );
     assert!(order.open_time > 1_300_000_000.0, "{txid}: {order:?}");
-    assert!(order.volume > 0.0, "{txid}: {order:?}");
+    assert!(order.volume > Decimal::ZERO, "{txid}: {order:?}");
     assert!(
-        order.volume_executed >= 0.0 && le(order.volume_executed, order.volume),
+        order.volume_executed >= Decimal::ZERO && le(order.volume_executed, order.volume),
         "{txid}: {order:?}"
     );
     assert!(
-        order.cost >= 0.0 && order.fee >= 0.0 && order.average_price >= 0.0,
+        order.cost >= Decimal::ZERO
+            && order.fee >= Decimal::ZERO
+            && order.average_price >= Decimal::ZERO,
         "{txid}: {order:?}"
     );
     assert!(
@@ -73,10 +77,10 @@ fn check_order(txid: &str, order: &Order) {
         "{txid}"
     );
 
-    if order.volume_executed > 0.0 && order.average_price > 0.0 {
+    if order.volume_executed > Decimal::ZERO && order.average_price > Decimal::ZERO {
         let expected = order.volume_executed * order.average_price;
         assert!(
-            (order.cost - expected).abs() <= expected * 0.01 + 1e-6,
+            (order.cost - expected).abs() <= expected * dec!(0.01) + dec!(0.000001),
             "{txid}: cost {} != {} × {}",
             order.cost,
             order.volume_executed,
@@ -85,7 +89,7 @@ fn check_order(txid: &str, order: &Order) {
     }
     if order.description.order_type == OrderType::Limit {
         assert!(
-            order.description.price.is_some_and(|it| it > 0.0),
+            order.description.price.is_some_and(|it| it > Decimal::ZERO),
             "{txid}: {order:?}"
         );
     }
@@ -180,8 +184,8 @@ async fn closed_orders_of_the_first_pages() {
         for order in &page {
             assert!(order.status.is_final(), "{order:?}");
             let closed = order.close_time.expect("closetm of a closed order");
-            assert!(le(order.open_time, closed), "{order:?}");
-            if order.volume_executed > 0.0 {
+            assert!(order.open_time <= closed, "{order:?}");
+            if order.volume_executed > Decimal::ZERO {
                 assert!(
                     order.trades.as_ref().is_some_and(|it| !it.is_empty()),
                     "{order:?}"
@@ -379,8 +383,8 @@ fn validate_only(order: NewOrder) -> NewOrder {
 
 struct Market {
     pair: AssetPair,
-    bid: f64,
-    ask: f64,
+    bid: Decimal,
+    ask: Decimal,
 }
 
 async fn market(altname: &str) -> Market {
@@ -407,28 +411,31 @@ async fn market(altname: &str) -> Market {
 }
 
 impl Market {
-    fn price(&self, value: f64) -> String {
+    fn price(&self, value: Decimal) -> String {
         let tick = self.pair.tick_size.unwrap();
-        format!(
-            "{:.*}",
-            self.pair.pair_decimals as usize,
-            (value / tick).floor() * tick
-        )
+        ((value / tick).floor() * tick)
+            .round_dp(self.pair.pair_decimals as u32)
+            .normalize()
+            .to_string()
     }
 
     /// A volume above ordermin and costmin at this price
-    fn volume(&self, price: f64) -> String {
-        let decimals = self.pair.lot_decimals;
+    fn volume(&self, price: Decimal) -> String {
         let minimum = self
             .pair
             .ordermin
             .unwrap()
-            .max(self.pair.costmin.unwrap() * 1.5 / price);
-        let step = 10f64.powi(-decimals);
-        format!("{:.*}", decimals as usize, (minimum / step).ceil() * step)
+            .max(self.pair.costmin.unwrap() * dec!(1.5) / price);
+        minimum
+            .round_dp_with_strategy(
+                self.pair.lot_decimals as u32,
+                rust_decimal::RoundingStrategy::AwayFromZero,
+            )
+            .normalize()
+            .to_string()
     }
 
-    fn order(&self, side: OrderSide, order_type: OrderType, price: Option<f64>) -> NewOrder {
+    fn order(&self, side: OrderSide, order_type: OrderType, price: Option<Decimal>) -> NewOrder {
         let reference = price.unwrap_or(self.ask);
         validate_only(NewOrder {
             pair: self.pair.altname.clone(),
@@ -471,7 +478,7 @@ fn check_validated(context: &str, order: &NewOrder, answer: &NewOrderAnswer) {
 #[ignore = "calls the real Kraken API with credentials"]
 async fn validates_the_raw_answer_of_a_new_order() {
     let market = market("XBTUSD").await;
-    let order = market.order(OrderSide::Buy, OrderType::Limit, Some(market.bid / 2.0));
+    let order = market.order(OrderSide::Buy, OrderType::Limit, Some(market.bid / dec!(2)));
     assert_eq!(order.validate, Some(true));
 
     let raw: Value = private_client()
@@ -487,8 +494,8 @@ async fn validates_the_raw_answer_of_a_new_order() {
 async fn validates_every_kind_of_new_order() {
     let api = private_api();
     let market = market("XBTUSD").await;
-    let low = market.bid / 2.0;
-    let high = market.ask * 2.0;
+    let low = market.bid / dec!(2);
+    let high = market.ask * dec!(2);
 
     let orders = [
         (
@@ -545,7 +552,7 @@ async fn validates_every_kind_of_new_order() {
         (
             "stop-loss-limit buy",
             NewOrder {
-                price2: Some(market.price(high * 1.01)),
+                price2: Some(market.price(high * dec!(1.01))),
                 ..market.order(OrderSide::Buy, OrderType::StopLossLimit, Some(high))
             },
         ),
@@ -569,7 +576,7 @@ async fn validates_every_kind_of_new_order() {
 async fn maps_the_errors_of_invalid_new_orders() {
     let api = private_api();
     let market = market("XBTUSD").await;
-    let low = market.bid / 2.0;
+    let low = market.bid / dec!(2);
     let valid = market.order(OrderSide::Buy, OrderType::Limit, Some(low));
 
     let below_minimum = NewOrder {

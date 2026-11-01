@@ -6,6 +6,7 @@ mod common;
 mod strict;
 
 use common::{private_api, public_api};
+use kraken_api::Decimal;
 use kraken_api::account::{ExtendedBalance, TradeVolume};
 use kraken_api::market::{
     AssetPair, AssetPairStatus, CandleInterval, CandlesRequest, ServerTime, Ticker,
@@ -14,6 +15,7 @@ use kraken_api::trading::{
     ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
     OrderStatus, OrderType, QueryOrdersRequest, TimeInForce,
 };
+use rust_decimal_macros::dec;
 use serde_json::Value;
 use std::collections::HashMap;
 use strict::{decode_strict, fixture, fixture_answer};
@@ -57,11 +59,11 @@ fn tickers_are_decoded_strictly() {
     assert_eq!(tickers.len(), 4);
     assert!(tickers.keys().any(|it| it.ends_with(":BTNL")));
     assert!(
-        tickers.values().any(|it| it.bid.price == 0.0),
+        tickers.values().any(|it| it.bid.price == Decimal::ZERO),
         "a ticker without bid"
     );
     let btc = &tickers["XXBTZUSD"];
-    assert!(btc.bid.price > 0.0 && btc.bid.price <= btc.ask.price);
+    assert!(btc.bid.price > Decimal::ZERO && btc.bid.price <= btc.ask.price);
     assert!(btc.trades.last_24h > 0);
 }
 
@@ -99,11 +101,10 @@ fn candles_are_complete_rows_of_8_values() {
 fn balances_are_decoded_strictly() {
     let balances: HashMap<String, ExtendedBalance> = each("BalanceEx", &fixture("balance_ex.json"));
 
-    let close = |a: f64, b: f64| (a - b).abs() < 1e-9;
-    assert!(close(balances["ZEUR"].available(), 950.42));
-    assert!(close(balances["XETH"].available(), 0.0));
+    assert_eq!(balances["ZEUR"].available(), dec!(950.42));
+    assert_eq!(balances["XETH"].available(), Decimal::ZERO);
     // 25 + 10 of credit - 2.5 used
-    assert!(close(balances["USDC"].available(), 32.5));
+    assert_eq!(balances["USDC"].available(), dec!(32.5));
 }
 
 #[test]
@@ -116,11 +117,14 @@ fn trade_volume_is_decoded_strictly() {
             .inputs
             .as_ref()
             .and_then(|it| it.domain_spot_volume_30d),
-        Some(5321.45)
+        Some(dec!(5321.45))
     );
     assert_eq!(volume.fees.len(), 2);
-    assert_eq!(volume.fees_maker["XXBTZUSD"].fee, 0.25);
-    assert_eq!(volume.fees["XETHZUSD"].nextfuturesvolume, Some(100000.0));
+    assert_eq!(volume.fees_maker["XXBTZUSD"].fee, dec!(0.25));
+    assert_eq!(
+        volume.fees["XETHZUSD"].nextfuturesvolume,
+        Some(dec!(100000))
+    );
 }
 
 #[test]
@@ -142,7 +146,7 @@ fn closed_orders_are_decoded_strictly() {
     let market = &orders["OAAAAA-BBBBB-CCCCC3"];
     assert_eq!(market.description.order_type, OrderType::Market);
     assert_eq!(market.oflags, "viqc,fciq");
-    assert_eq!(market.stop_price, Some(0.0));
+    assert_eq!(market.stop_price, Some(Decimal::ZERO));
 }
 
 #[test]

@@ -113,7 +113,7 @@ async fn the_private_api_signs_its_calls() {
     .unwrap();
 
     let balances = api.extended_balance().await.unwrap();
-    assert_eq!(balances["ZEUR"].available(), 6.0);
+    assert_eq!(balances["ZEUR"].available(), kraken_api::Decimal::from(6));
 }
 
 #[test]
