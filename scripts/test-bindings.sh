@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generates the bindings of kraken-ffi, then runs their tests against a local mocked Kraken
 #
-#   scripts/test-bindings.sh kotlin    Kotlin on the JVM, with the library of the host (Gradle)
+#   scripts/test-bindings.sh kotlin    Kotlin Multiplatform on the JVM, with the library of the host
 #   scripts/test-bindings.sh swift     Swift with the library of the host: swift test (macOS:
 #                                      through the XCFramework, Linux: the shared library)
 #   scripts/test-bindings.sh ios       Swift on an iOS simulator, through the XCFramework (macOS)
@@ -22,8 +22,8 @@ apple_libraries() {
 }
 
 kotlin() {
-  scripts/bindings.sh kotlin
-  "$GRADLE" :kraken-kotlin:test --console=plain
+  # the uniffi plugin builds kraken-ffi for the host and generates the bindings
+  "$GRADLE" :kraken-multiplatform:jvmTest --console=plain
 }
 
 swift() {

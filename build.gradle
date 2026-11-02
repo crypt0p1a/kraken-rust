@@ -4,7 +4,6 @@ buildscript {
 }
 
 plugins {
-    alias(additionals.plugins.kotlin.jvm) apply false
     alias(additionals.plugins.kotlin.multiplatform) apply false
     alias(additionals.plugins.android.kotlin.multiplatform.library) apply false
     alias(additionals.plugins.ubique.uniffi) apply false

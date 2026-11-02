@@ -1,6 +1,5 @@
-// The Gradle builds of the Kotlin bindings of kraken-ffi (scripts/bindings.sh kotlin):
+// The Gradle build of the Kotlin library of kraken-ffi:
 //
-//   :kraken-kotlin          platforms/kotlin, the tests of the bindings on the JVM, with the library of the host
 //   :kraken-multiplatform   platforms/kotlin-multiplatform, the Kotlin Multiplatform library: JVM,
 //                           Android, iOS, macOS, Linux (UbiqueInnovation/uniffi-kotlin-multiplatform-bindings)
 pluginManagement {
@@ -36,7 +35,5 @@ includeBuild "gradle/extended/${ext.GRADLE_EXTENDED_VERSION_USED}/kt-plugins"
 
 rootProject.name = "kraken-rust"
 
-include(":kraken-kotlin")
-project(":kraken-kotlin").projectDir = file("platforms/kotlin")
 include(":kraken-multiplatform")
 project(":kraken-multiplatform").projectDir = file("platforms/kotlin-multiplatform")

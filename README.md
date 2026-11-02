@@ -246,7 +246,6 @@ the libraries), from the library of the host: they are the same for every platfo
 | Directory | What | Built with |
 |-----------|------|------------|
 | [`platforms/apple`](platforms/apple) | Swift package: Swift bindings, `KrakenFFI.xcframework` (iOS, iOS simulator, macOS) | SwiftPM / Xcode |
-| [`platforms/kotlin`](platforms/kotlin) | the tests of the Kotlin bindings on the JVM | Gradle (`:kraken-kotlin`) |
 | [`platforms/kotlin-multiplatform`](platforms/kotlin-multiplatform) | Kotlin Multiplatform library, the one of Kotlin: JVM, Android (AAR), iOS, macOS, Linux | Gradle (`:kraken-multiplatform`), [uniffi KMP plugin](https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings) |
 
 ```sh
@@ -256,7 +255,7 @@ scripts/bindings.sh xcframework         # platforms/apple/KrakenFFI.xcframework 
 ```
 
 The Gradle build lives at the root (`settings.gradle`, `build.gradle`, the wrapper `./gradlew`) and
-includes `platforms/kotlin` and `platforms/kotlin-multiplatform`. It is based on
+includes `platforms/kotlin-multiplatform`. It is based on
 [the-inkwell/gradle-tools](https://github.com/the-inkwell/gradle-tools), like the other projects:
 its commit is `GRADLE_EXTENDED_VERSION_USED` in `gradle.properties`, its catalog `additionals`
 (Kotlin, AGP, SDK levels, test libraries) and its `kt-plugins` are downloaded in `gradle/extended`.
@@ -296,7 +295,7 @@ The bindings are tested on every platform against a local mocked Kraken (exact d
 ways, signed private call, errors, invalid secret, logger implemented in the foreign language):
 
 ```sh
-scripts/test-bindings.sh kotlin    # JVM, library of the host
+scripts/test-bindings.sh kotlin    # JVM through Kotlin Multiplatform, library of the host
 scripts/test-bindings.sh swift     # macOS through the XCFramework, Linux through the .so
 scripts/test-bindings.sh ios       # iOS simulator (macOS, Xcode)
 scripts/test-bindings.sh android   # Android device or emulator, through Kotlin Multiplatform (adb, Android SDK, NDK)
