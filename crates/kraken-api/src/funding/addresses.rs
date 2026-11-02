@@ -342,6 +342,29 @@ pub(crate) async fn update_withdrawal_address(
     Ok(answer.verified)
 }
 
+#[derive(Deserialize)]
+struct Deleted {
+    result: bool,
+}
+
+/// Deletes a saved address: whether it was deleted. Requires the "Funds permissions - Add
+/// withdrawal addresses" permission
+pub(crate) async fn delete_withdrawal_address(
+    client: &FundingClient,
+    address_id: &str,
+    account_id: Option<&str>,
+) -> Result<bool, KrakenError> {
+    let answer: Deleted = client
+        .call(
+            FundingMethod::Delete,
+            &format!("/funding/v1/addresses/{address_id}"),
+            Some(&AccountQuery { account_id }),
+            None::<&()>,
+        )
+        .await?;
+    Ok(answer.result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

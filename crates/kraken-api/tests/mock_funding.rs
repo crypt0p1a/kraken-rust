@@ -391,3 +391,24 @@ async fn update_withdrawal_address() {
         .unwrap();
     assert!(verified);
 }
+
+#[tokio::test]
+async fn delete_withdrawal_address() {
+    let server = MockServer::start().await;
+    Mock::given(method("DELETE"))
+        .and(path("/funding/v1/addresses/AB7J4FF-BGM7G-V2JMIH"))
+        .and(SignedFunding)
+        .and(QueryIs(vec![]))
+        .respond_with(plain(json!({"result": true})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let deleted = private_api(&server)
+        .delete_withdrawal_address("AB7J4FF-BGM7G-V2JMIH", None)
+        .await
+        .unwrap();
+    assert!(deleted);
+    // no body
+    assert!(server.received_requests().await.unwrap()[0].body.is_empty());
+}

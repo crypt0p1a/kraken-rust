@@ -634,4 +634,16 @@ impl PrivateApi {
         )
         .await
     }
+
+    /// Deletes a saved withdrawal address: whether it was deleted. Requires the "Funds
+    /// permissions - Add withdrawal addresses" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/delete-funding-address>
+    pub async fn delete_withdrawal_address(
+        &self,
+        address_id: &str,
+        account_id: Option<&str>,
+    ) -> Result<bool, KrakenError> {
+        funding::addresses::delete_withdrawal_address(&self.funding, address_id, account_id).await
+    }
 }
