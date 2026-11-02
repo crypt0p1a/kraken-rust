@@ -870,3 +870,12 @@ async fn cancel_order_fixture() {
         .unwrap();
     assert_eq!(served, cancelled);
 }
+
+#[tokio::test]
+async fn cancel_all_fixture() {
+    // the same answer as CancelOrder
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/CancelAll", "cancel_order.json").await;
+    let cancelled = private_api(&server).cancel_all().await.unwrap();
+    assert_eq!(cancelled.count, 2);
+}

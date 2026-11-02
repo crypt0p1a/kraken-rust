@@ -47,6 +47,11 @@ pub(crate) async fn cancel_order(
     client.call_with("CancelOrder", Some(order)).await
 }
 
+/// Every open order of the account
+pub(crate) async fn cancel_all(client: &PrivateClient) -> Result<CancelledOrders, KrakenError> {
+    client.call("CancelAll").await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

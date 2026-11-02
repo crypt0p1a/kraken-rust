@@ -222,6 +222,13 @@ impl PrivateApi {
         trading::cancel::cancel_order(&self.client, order).await
     }
 
+    /// Cancels every open order of the account
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/cancel-all-orders>
+    pub async fn cancel_all(&self) -> Result<CancelledOrders, KrakenError> {
+        trading::cancel::cancel_all(&self.client).await
+    }
+
     /// The versions of an order, the original one first
     ///
     /// <https://docs.kraken.com/api/docs/rest-api/get-order-amends>

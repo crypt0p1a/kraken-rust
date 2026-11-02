@@ -400,3 +400,20 @@ async fn cancel_order() {
         .unwrap();
     assert_eq!(cancelled.count, 1);
 }
+
+#[tokio::test]
+async fn cancel_all() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/CancelAll"))
+        .and(Signed)
+        .and(FormIs(vec![]))
+        .respond_with(ok(json!({"count": 4, "pending": false})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let cancelled = private_api(&server).cancel_all().await.unwrap();
+    assert_eq!(cancelled.count, 4);
+    assert_eq!(cancelled.pending, Some(false));
+}
