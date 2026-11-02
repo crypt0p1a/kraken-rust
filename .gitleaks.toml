@@ -33,6 +33,9 @@ regexTarget = "secret"
 regexes = [
   '''^kQH5HW/8p1uGOVjbgWA7FunAmGO8lsSUXNsu3eow76sz84Q18fWxnyRzBHCd3pd5nE9qa99HAZtuZuj6F1huXg==$''',
   '''^4/dpxb3iT4tp/ZCVEwSnEsLxx0bqyhLpdfOpc6fn7OR8\+UClSV5n9E6aSS8MPtnRfp32bAb0nmbRn6H8ndwLUQ==$''',
+  # the token of GetWebSocketsToken and the key of GetApiKeyInfo in the examples of the documentation
+  '''^1Dwc4lzSwNWOAwkMdqhssNNFhs1ed606d1WcF3XfEMw$''',
+  '''^4/SDrDBcOOPnm3nPlNfEMMJDeRcIVqPz\+QhRxIodyZbI9po/aVRiHsgX$''',
 ]
 
 [[allowlists]]
