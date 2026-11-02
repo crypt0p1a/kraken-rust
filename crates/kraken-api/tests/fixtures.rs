@@ -18,7 +18,7 @@ use kraken_api::trading::{
     ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
     OrderStatus, OrderType, QueryOrdersRequest, TimeInForce,
 };
-use kraken_api::transparency::PreTradeData;
+use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -497,4 +497,30 @@ async fn pre_trade_fixture() {
     let server = MockServer::start().await;
     serve(&server, "/0/public/PreTrade", "pre_trade.json").await;
     assert_eq!(public_api(&server).pre_trade("BTC/USD").await.unwrap(), pre);
+}
+
+#[tokio::test]
+async fn post_trade_fixture() {
+    let post: PostTradeData = decode_strict("PostTrade", &fixture("post_trade.json"));
+    assert_eq!(post.count as usize, post.trades.len());
+    // most recent first, the documentation says the opposite
+    assert_eq!(
+        post.last_ts.as_ref(),
+        post.trades.first().map(|it| &it.trade_ts)
+    );
+    assert!(
+        post.trades
+            .windows(2)
+            .all(|it| it[0].trade_ts >= it[1].trade_ts)
+    );
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/public/PostTrade", "post_trade.json").await;
+    assert_eq!(
+        public_api(&server)
+            .post_trade(&PostTradeRequest::default())
+            .await
+            .unwrap(),
+        post
+    );
 }

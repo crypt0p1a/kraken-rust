@@ -1,0 +1,47 @@
+{
+  "error": [],
+  "result": {
+    "last_ts": "2026-11-02T09:37:16.828994156Z",
+    "count": 2,
+    "trades": [
+      {
+        "trade_id": "OOM6MK-R3F4D-FTCPL7",
+        "price": "77931.00000",
+        "quantity": "0.02565931",
+        "symbol": "BTC/USD",
+        "description": "Bitcoin / US Dollar",
+        "base_asset": "XBT",
+        "base_notation": "UNIT",
+        "base_dti_code": "V15WLZJMF",
+        "base_dti_short_name": "BTC,XBT",
+        "quote_asset": "USD",
+        "quote_notation": "MONE",
+        "quote_dti_code": "",
+        "quote_dti_short_name": "",
+        "trade_venue": "PGSL",
+        "trade_ts": "2026-11-02T09:37:16.828994156Z",
+        "publication_venue": "PGSL",
+        "publication_ts": "2026-11-02T09:37:16.828994156Z"
+      },
+      {
+        "trade_id": "OFVZXC-IPJFJ-H4YOCR",
+        "price": "77931.00000",
+        "quantity": "0.00000069",
+        "symbol": "BTC/USD",
+        "description": "Bitcoin / US Dollar",
+        "base_asset": "XBT",
+        "base_notation": "UNIT",
+        "base_dti_code": "V15WLZJMF",
+        "base_dti_short_name": "BTC,XBT",
+        "quote_asset": "USD",
+        "quote_notation": "MONE",
+        "quote_dti_code": "",
+        "quote_dti_short_name": "",
+        "trade_venue": "PGSL",
+        "trade_ts": "2026-11-02T09:37:16.828994144Z",
+        "publication_venue": "PGSL",
+        "publication_ts": "2026-11-02T09:37:16.828994144Z"
+      }
+    ]
+  }
+}

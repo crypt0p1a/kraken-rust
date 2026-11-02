@@ -15,7 +15,7 @@ use kraken_api::market::{
     RecentTradesRequest, ServerTime, SystemState, SystemStatus, Ticker,
 };
 use kraken_api::trading::OrderType;
-use kraken_api::transparency::PreTradeData;
+use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
 use rust_decimal_macros::dec;
 use serde::Serialize;
@@ -616,4 +616,44 @@ async fn pre_trade_data() {
     let pre: PreTradeData = decode_strict("PreTrade", &raw);
     assert_eq!((pre.bids.len(), pre.asks.len()), (10, 10));
     assert!(pre.bids[0].price < pre.asks[0].price, "crossed book");
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn post_trade_data_most_recent_first() {
+    #[derive(Serialize)]
+    struct Params<'a> {
+        symbol: &'a str,
+        count: u32,
+    }
+    let raw: Value = public_client()
+        .call_with(
+            "PostTrade",
+            Some(&Params {
+                symbol: "BTC/USD",
+                count: 20,
+            }),
+        )
+        .await
+        .unwrap();
+    let post: PostTradeData = decode_strict("PostTrade", &raw);
+    assert_eq!(post.count, 20);
+    assert!(post.trades.iter().all(|it| it.symbol == "BTC/USD"));
+    // most recent first, the documentation says the opposite
+    assert!(
+        post.trades
+            .windows(2)
+            .all(|it| it[0].trade_ts >= it[1].trade_ts)
+    );
+    assert_eq!(post.last_ts.as_ref(), Some(&post.trades[0].trade_ts));
+
+    let typed = public_api()
+        .post_trade(&PostTradeRequest {
+            symbol: Some("BTC/USD".into()),
+            count: Some(1),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(typed.trades.len(), 1);
 }

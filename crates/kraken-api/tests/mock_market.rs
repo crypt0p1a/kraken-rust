@@ -9,6 +9,7 @@ use kraken_api::market::{
     RecentTradesRequest, SystemState,
 };
 use kraken_api::trading::{OrderSide, OrderType};
+use kraken_api::transparency::PostTradeRequest;
 use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -352,4 +353,32 @@ async fn pre_trade() {
     let data = public_api(&server).pre_trade("BTC/USD").await.unwrap();
     assert_eq!(data.system, "CLOB");
     assert_eq!(data.base_dti_code, None);
+}
+
+#[tokio::test]
+async fn post_trade() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/0/public/PostTrade"))
+        .and(QueryIs(vec![
+            ("symbol", "BTC/USD"),
+            ("from_ts", "2026-11-02T09:00:00Z"),
+            ("to_ts", "2026-11-02T10:00:00Z"),
+            ("count", "10"),
+        ]))
+        .respond_with(ok(json!({"count": 0, "trades": []})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let data = public_api(&server)
+        .post_trade(&PostTradeRequest {
+            symbol: Some("BTC/USD".into()),
+            from_ts: Some("2026-11-02T09:00:00Z".into()),
+            to_ts: Some("2026-11-02T10:00:00Z".into()),
+            count: Some(10),
+        })
+        .await
+        .unwrap();
+    assert_eq!(data.count, 0);
 }
