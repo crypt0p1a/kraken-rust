@@ -41,7 +41,10 @@ pub use methods::{
     FundingMethods, FundingMethodsRequest, MethodFees, MethodNetwork,
 };
 pub use networks::{FundingNetwork, FundingNetworks, NetworkGroup};
-pub use withdrawals::{Withdrawal, WithdrawalStatus, Withdrawals, WithdrawalsRequest};
+pub use withdrawals::{
+    CreatedWithdrawal, NewWithdrawal, Withdrawal, WithdrawalAmount, WithdrawalFee,
+    WithdrawalStatus, Withdrawals, WithdrawalsRequest,
+};
 
 /// An asset of the funding API: its class and its name
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

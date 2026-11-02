@@ -6,9 +6,9 @@ mod common;
 use common::{QueryIs, SignedFunding, plain, private_api};
 use kraken_api::funding::{
     AddressDetails, ClaimedAddressesRequest, DepositsRequest, FundingAsset, FundingDirection,
-    FundingFeeRequest, FundingLimitsRequest, FundingMethodsRequest, FundingScope,
-    NewWithdrawalAddress, TransferStatus, WithdrawalAddressesRequest, WithdrawalStatus,
-    WithdrawalsRequest,
+    FundingFeeRequest, FundingLimitsRequest, FundingMethodsRequest, FundingScope, NewWithdrawal,
+    NewWithdrawalAddress, TransferStatus, WithdrawalAddressesRequest, WithdrawalFee,
+    WithdrawalStatus, WithdrawalsRequest,
 };
 use kraken_api::market::AssetClass;
 use serde_json::json;
@@ -438,4 +438,52 @@ async fn withdrawals() {
         .await
         .unwrap();
     assert_eq!(page.withdrawals[0].withdrawal_id, "FT1");
+}
+
+#[tokio::test]
+async fn create_withdrawal() {
+    let server = MockServer::start().await;
+    let usdc_amount = |amount: &str| {
+        json!({"asset_amount": {"asset": {"class": "currency",
+        "name": "USDC"}, "amount": amount}})
+    };
+    Mock::given(method("POST"))
+        .and(path("/funding/v1/withdrawals"))
+        .and(SignedFunding)
+        .and(wiremock::matchers::body_json(
+            json!({"scope": {"network_id": "d9d375da"},
+            "address_id": "ABR6SXP-SF6CY-VJMONY", "amount": usdc_amount("5"),
+            "fee": {"current_fee": {"max_fee": usdc_amount("2")}, "fee_included": false},
+            "expected_address": "0xBef7B36845cA31045E86D0B46DBCac4e675277B4"}),
+        ))
+        .respond_with(plain(
+            json!({"withdrawal_id": "FTVZiTI-e02T84mm87JmibnObWNdnW",
+            "net_amount": usdc_amount("5"), "gross_amount": usdc_amount("6"),
+            "fee": usdc_amount("1"), "approval_request_id": "AR1"}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let created = private_api(&server)
+        .create_withdrawal(
+            &NewWithdrawal {
+                scope: FundingScope::NetworkId {
+                    network_id: "d9d375da".into(),
+                },
+                address_id: "ABR6SXP-SF6CY-VJMONY".into(),
+                asset: usdc(),
+                amount: "5".into(),
+                fee: WithdrawalFee::Current {
+                    max_fee: Some("2".into()),
+                },
+                fee_included: false,
+                rebase_multiplier: None,
+                expected_address: Some("0xBef7B36845cA31045E86D0B46DBCac4e675277B4".into()),
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.approval_request_id.as_deref(), Some("AR1"));
 }

@@ -11,11 +11,11 @@ use crate::earn::{
     self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
 use crate::funding::{
-    self, AddressDetails, ClaimedAddresses, ClaimedAddressesRequest, DepositLimits, Deposits,
-    DepositsRequest, FundingAsset, FundingAssets, FundingDirection, FundingFee, FundingFeeRequest,
-    FundingLimitsRequest, FundingMethods, FundingMethodsRequest, FundingNetworks,
-    NewWithdrawalAddress, SavedAddress, WithdrawalAddresses, WithdrawalAddressesRequest,
-    WithdrawalLimits, Withdrawals, WithdrawalsRequest,
+    self, AddressDetails, ClaimedAddresses, ClaimedAddressesRequest, CreatedWithdrawal,
+    DepositLimits, Deposits, DepositsRequest, FundingAsset, FundingAssets, FundingDirection,
+    FundingFee, FundingFeeRequest, FundingLimitsRequest, FundingMethods, FundingMethodsRequest,
+    FundingNetworks, NewWithdrawal, NewWithdrawalAddress, SavedAddress, WithdrawalAddresses,
+    WithdrawalAddressesRequest, WithdrawalLimits, Withdrawals, WithdrawalsRequest,
 };
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
@@ -656,5 +656,17 @@ impl PrivateApi {
         request: &WithdrawalsRequest,
     ) -> Result<Withdrawals, KrakenError> {
         funding::withdrawals::withdrawals(&self.funding, request).await
+    }
+
+    /// Withdraws funds to a saved address. Requires the "Funds permissions - Withdraw"
+    /// permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/create-funding-withdrawal>
+    pub async fn create_withdrawal(
+        &self,
+        withdrawal: &NewWithdrawal,
+        account_id: Option<&str>,
+    ) -> Result<CreatedWithdrawal, KrakenError> {
+        funding::withdrawals::create_withdrawal(&self.funding, withdrawal, account_id).await
     }
 }

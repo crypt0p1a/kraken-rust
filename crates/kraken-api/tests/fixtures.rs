@@ -15,10 +15,10 @@ use kraken_api::account::{
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
 use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
 use kraken_api::funding::{
-    AddressDetails, ClaimedAddresses, DepositLimits, Deposits, FundingAsset, FundingAssets,
-    FundingDirection, FundingFee, FundingFeeRequest, FundingMethods, FundingNetworks, FundingScope,
-    LimitValue, NewWithdrawalAddress, SavedAddress, TransferStatus, WithdrawalAddresses,
-    WithdrawalLimits, Withdrawals,
+    AddressDetails, ClaimedAddresses, CreatedWithdrawal, DepositLimits, Deposits, FundingAsset,
+    FundingAssets, FundingDirection, FundingFee, FundingFeeRequest, FundingMethods,
+    FundingNetworks, FundingScope, LimitValue, NewWithdrawal, NewWithdrawalAddress, SavedAddress,
+    TransferStatus, WithdrawalAddresses, WithdrawalFee, WithdrawalLimits, Withdrawals,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -1635,4 +1635,43 @@ async fn withdrawals_fixture() {
             .unwrap(),
         page
     );
+}
+
+#[tokio::test]
+async fn create_withdrawal_fixture() {
+    let created: CreatedWithdrawal = decode_strict(
+        "create withdrawal",
+        &funding_fixture("create_withdrawal.json"),
+    );
+    assert_eq!(
+        created.gross_amount.asset_amount.amount - created.fee.asset_amount.amount,
+        created.net_amount.asset_amount.amount
+    );
+
+    let server = MockServer::start().await;
+    serve_funding(&server, "/funding/v1/withdrawals", "create_withdrawal.json").await;
+    let served = private_api(&server)
+        .create_withdrawal(
+            &NewWithdrawal {
+                scope: FundingScope::MethodId {
+                    method_id: "d4ec4d52-b159-428e-ba64-f45455a978a1".into(),
+                },
+                address_id: "ABR6SXP-SF6CY-VJMONY".into(),
+                asset: FundingAsset {
+                    class: kraken_api::market::AssetClass::Currency,
+                    name: "USDC".into(),
+                },
+                amount: "5".into(),
+                fee: WithdrawalFee::Quoted {
+                    token: "AAAAAAAAAAHG33Wc1eES6Qpe".into(),
+                },
+                fee_included: true,
+                rebase_multiplier: None,
+                expected_address: None,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(served, created);
 }
