@@ -245,9 +245,9 @@ the libraries), from the library of the host: they are the same for every platfo
 
 | Directory | What | Built with |
 |-----------|------|------------|
-| [`platforms/android`](platforms/android) | Android library (AAR): Kotlin bindings, `libkraken_ffi.so` of the 4 ABIs, JNA | Gradle, Android SDK |
+| [`platforms/android`](platforms/android) | Android library (AAR): Kotlin bindings, `libkraken_ffi.so` of the 4 ABIs, JNA | Gradle (`:kraken-android`), Android SDK |
 | [`platforms/apple`](platforms/apple) | Swift package: Swift bindings, `KrakenFFI.xcframework` (iOS, iOS simulator, macOS) | SwiftPM / Xcode |
-| [`platforms/kotlin`](platforms/kotlin) | the tests of the Kotlin bindings on the JVM, shared with Android | Gradle |
+| [`platforms/kotlin`](platforms/kotlin) | the tests of the Kotlin bindings on the JVM, shared with Android | Gradle (`:kraken-kotlin`) |
 
 ```sh
 scripts/bindings.sh kotlin              # dist/bindings/kotlin
@@ -255,8 +255,15 @@ scripts/bindings.sh swift               # platforms/apple/Sources, dist/bindings
 scripts/bindings.sh xcframework         # platforms/apple/KrakenFFI.xcframework (after build.sh ios macos)
 
 scripts/build.sh android && scripts/bindings.sh kotlin
-gradle -p platforms/android assembleRelease   # build/outputs/aar/kraken-android-release.aar
+./gradlew :kraken-android:assembleRelease     # platforms/android/build/outputs/aar/kraken-android-release.aar
 ```
+
+The Gradle build lives at the root (`settings.gradle`, `build.gradle`, the wrapper `./gradlew`) and
+includes `platforms/kotlin` and `platforms/android`. It is based on
+[the-inkwell/gradle-tools](https://github.com/the-inkwell/gradle-tools), like the other projects:
+its commit is `GRADLE_EXTENDED_VERSION_USED` in `gradle.properties`, its catalog `additionals`
+(Kotlin, AGP, SDK levels, test libraries) and its `kt-plugins` are downloaded in `gradle/extended`.
+The dependencies missing from that catalog are in `gradle/libs.versions.toml` (`libs`).
 
 In Swift, the C declarations of the 3 crates are a single module, `KrakenFFI` (the
 `ffi_module_name` of their `uniffi.toml`), and the Swift sources a single one, `Kraken`.

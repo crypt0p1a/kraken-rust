@@ -1,0 +1,6 @@
+# The dependencies of this repository missing from the catalog "additionals" of gradle-tools
+[versions]
+jna = "5.17.0"
+
+[libraries]
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }

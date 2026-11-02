@@ -1,0 +1,24 @@
+buildscript {
+    apply from: gradle.extended.files.modules
+    apply from: "gradle/versions.gradle"
+}
+
+plugins {
+    alias(additionals.plugins.android.library) apply false
+    alias(additionals.plugins.kotlin.jvm) apply false
+    id("idea")
+}
+
+group = rootProject.ext.group
+version = rootProject.ext.version
+
+subprojects {
+    group = rootProject.ext.group
+    version = rootProject.ext.version
+
+    tasks.register("allDeps", DependencyReportTask)
+
+    if (rootProject.isSourcesModule(it)) {
+        apply from: gradle.extended.files.moduleSetup
+    }
+}

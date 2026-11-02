@@ -1,0 +1,15 @@
+/* * * * * * * * * * * * * * * * *
+ * Default project info
+ * * * * * * * * * * * * * * * * */
+def defaultVersion = "0.1.0"
+def defaultGroup = "com.crypt0p1a"
+
+ext {
+    javaVersion = "21"
+    prop = { name, defValue ->
+        return rootProject.findProperty(name) ?: defValue
+    }
+
+    group = prop("GROUP_ID", defaultGroup)
+    version = [defaultVersion, prop("SUFFIX", null)].findAll().join("-")
+}

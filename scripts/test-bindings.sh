@@ -8,12 +8,12 @@
 #   scripts/test-bindings.sh android   Kotlin on an Android device or emulator (adb), through the
 #                                      AAR (Android SDK, cargo-ndk)
 #
-# GRADLE=<command> to use another Gradle than the one of the PATH.
+# GRADLE=<command> to use another Gradle than the wrapper of the repository.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-GRADLE="${GRADLE:-gradle}"
+GRADLE="${GRADLE:-./gradlew}"
 APPLE="platforms/apple"
 
 apple_libraries() {
@@ -23,7 +23,7 @@ apple_libraries() {
 
 kotlin() {
   scripts/bindings.sh kotlin
-  "$GRADLE" -p platforms/kotlin test --console=plain
+  "$GRADLE" :kraken-kotlin:test --console=plain
 }
 
 swift() {
@@ -55,7 +55,7 @@ print(next(device["udid"] for runtime, list in sorted(devices.items(), reverse=T
 android() {
   scripts/build.sh android
   scripts/bindings.sh kotlin
-  "$GRADLE" -p platforms/android connectedDebugAndroidTest --console=plain
+  "$GRADLE" :kraken-android:connectedDebugAndroidTest --console=plain
 }
 
 if [ "$#" -eq 0 ]; then
