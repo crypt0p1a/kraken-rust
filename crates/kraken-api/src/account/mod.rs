@@ -5,7 +5,9 @@
 pub(crate) mod balance;
 pub(crate) mod credit;
 pub(crate) mod fees;
+pub(crate) mod trade_balance;
 
 pub use balance::{BalanceRequest, ExtendedBalance, RebaseMultiplier};
 pub use credit::{CreditLimits, CreditLineAsset, CreditLines};
 pub use fees::{FeeInfo, TradeVolume, VolumeInputs};
+pub use trade_balance::{TradeBalance, TradeBalanceRequest};

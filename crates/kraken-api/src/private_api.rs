@@ -1,5 +1,8 @@
 use crate::Decimal;
-use crate::account::{self, BalanceRequest, CreditLines, ExtendedBalance, TradeVolume};
+use crate::account::{
+    self, BalanceRequest, CreditLines, ExtendedBalance, TradeBalance, TradeBalanceRequest,
+    TradeVolume,
+};
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, ClosedOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
@@ -63,6 +66,16 @@ impl PrivateApi {
     /// <https://docs.kraken.com/api/docs/rest-api/get-extended-balance>
     pub async fn extended_balance(&self) -> Result<HashMap<String, ExtendedBalance>, KrakenError> {
         account::balance::extended_balance(&self.client).await
+    }
+
+    /// Collateral, margin positions, equity and margin level, in one asset
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-trade-balance>
+    pub async fn trade_balance(
+        &self,
+        request: &TradeBalanceRequest,
+    ) -> Result<TradeBalance, KrakenError> {
+        account::trade_balance::trade_balance(&self.client, request).await
     }
 
     /// 30 days volume, and the current fees of the `pairs`

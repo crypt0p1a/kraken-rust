@@ -4,7 +4,7 @@
 mod common;
 
 use common::{FormIs, Signed, ok, private_api};
-use kraken_api::account::{BalanceRequest, RebaseMultiplier};
+use kraken_api::account::{BalanceRequest, RebaseMultiplier, TradeBalanceRequest};
 use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -73,6 +73,32 @@ async fn extended_balance() {
     let balances = private_api(&server).extended_balance().await.unwrap();
     assert_eq!(balances["ZUSD"].available(), dec!(17185.45));
     assert_eq!(balances["XXBT"].hold_trade, None);
+}
+
+#[tokio::test]
+async fn trade_balance() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/TradeBalance"))
+        .and(Signed)
+        .and(FormIs(vec![("asset", "ZEUR")]))
+        .respond_with(ok(
+            json!({"eb": "100.5", "tb": "90", "m": "10", "n": "-1.5", "c": "50",
+            "v": "48.5", "e": "88.5", "mf": "78.5", "mfo": "70", "ml": "885.00", "uv": "0"}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let balance = private_api(&server)
+        .trade_balance(&TradeBalanceRequest {
+            asset: Some("ZEUR".into()),
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(balance.unrealized_net, dec!(-1.5));
+    assert_eq!(balance.margin_level, Some(dec!(885)));
 }
 
 #[tokio::test]

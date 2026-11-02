@@ -6,7 +6,7 @@ mod live;
 mod strict;
 
 use kraken_api::Decimal;
-use kraken_api::account::{ExtendedBalance, FeeInfo, TradeVolume};
+use kraken_api::account::{ExtendedBalance, FeeInfo, TradeBalance, TradeVolume};
 use kraken_api::market::Level3OrderBook;
 use kraken_api::{KrakenError, PrivateApi, RestOptions};
 use live::{Presence, decode_strict, entries, le, private_api, private_client};
@@ -227,4 +227,19 @@ async fn balance_matches_the_extended_balance() {
             "{asset}"
         );
     }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn trade_balance() {
+    let raw: Value = private_client().call("TradeBalance").await.unwrap();
+    let balance: TradeBalance = decode_strict("TradeBalance", &raw);
+    assert!(balance.equivalent_balance >= Decimal::ZERO, "{balance:?}");
+    // rounded by Kraken to 4 decimals
+    assert!(
+        (balance.equity - balance.trade_balance - balance.unrealized_net).abs()
+            <= Decimal::new(1, 4),
+        "{balance:?}"
+    );
+    assert!(balance.unexecuted_value >= Decimal::ZERO, "{balance:?}");
 }

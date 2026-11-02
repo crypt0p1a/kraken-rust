@@ -7,7 +7,7 @@ mod strict;
 
 use common::{private_api, public_api};
 use kraken_api::Decimal;
-use kraken_api::account::{CreditLines, ExtendedBalance, TradeVolume};
+use kraken_api::account::{CreditLines, ExtendedBalance, TradeBalance, TradeVolume};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -557,5 +557,26 @@ async fn credit_lines_fixture() {
             .await
             .unwrap(),
         lines
+    );
+}
+
+#[tokio::test]
+async fn trade_balance_fixture() {
+    let balance: TradeBalance = decode_strict("TradeBalance", &fixture("trade_balance.json"));
+    // equity = trade balance + unrealized net
+    assert_eq!(
+        balance.equity,
+        balance.trade_balance + balance.unrealized_net
+    );
+    assert_eq!(balance.free_margin, balance.equity - balance.margin);
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/TradeBalance", "trade_balance.json").await;
+    assert_eq!(
+        private_api(&server)
+            .trade_balance(&Default::default())
+            .await
+            .unwrap(),
+        balance
     );
 }
