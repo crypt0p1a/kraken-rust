@@ -1,6 +1,9 @@
 # The dependencies of this repository missing from the catalog "additionals" of gradle-tools
 [versions]
 jna = "5.17.0"
+bignum = "0.3.10"
 
 [libraries]
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
+# the exact decimals of every target of Kotlin Multiplatform: the type of kraken_api.Decimal
+bignum = { module = "com.ionspin.kotlin:bignum", version.ref = "bignum" }

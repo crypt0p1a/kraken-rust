@@ -248,6 +248,7 @@ the libraries), from the library of the host: they are the same for every platfo
 | [`platforms/android`](platforms/android) | Android library (AAR): Kotlin bindings, `libkraken_ffi.so` of the 4 ABIs, JNA | Gradle (`:kraken-android`), Android SDK |
 | [`platforms/apple`](platforms/apple) | Swift package: Swift bindings, `KrakenFFI.xcframework` (iOS, iOS simulator, macOS) | SwiftPM / Xcode |
 | [`platforms/kotlin`](platforms/kotlin) | the tests of the Kotlin bindings on the JVM, shared with Android | Gradle (`:kraken-kotlin`) |
+| [`platforms/kotlin-multiplatform`](platforms/kotlin-multiplatform) | Kotlin Multiplatform library: JVM, Android, iOS, macOS, Linux | Gradle (`:kraken-multiplatform`), [uniffi KMP plugin](https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings) |
 
 ```sh
 scripts/bindings.sh kotlin              # dist/bindings/kotlin
@@ -259,11 +260,32 @@ scripts/build.sh android && scripts/bindings.sh kotlin
 ```
 
 The Gradle build lives at the root (`settings.gradle`, `build.gradle`, the wrapper `./gradlew`) and
-includes `platforms/kotlin` and `platforms/android`. It is based on
+includes `platforms/kotlin`, `platforms/android` and `platforms/kotlin-multiplatform`. It is based on
 [the-inkwell/gradle-tools](https://github.com/the-inkwell/gradle-tools), like the other projects:
 its commit is `GRADLE_EXTENDED_VERSION_USED` in `gradle.properties`, its catalog `additionals`
 (Kotlin, AGP, SDK levels, test libraries) and its `kt-plugins` are downloaded in `gradle/extended`.
 The dependencies missing from that catalog are in `gradle/libs.versions.toml` (`libs`).
+
+#### Kotlin Multiplatform
+
+[`platforms/kotlin-multiplatform`](platforms/kotlin-multiplatform) is built with the Gradle plugin
+`ch.ubique.uniffi.plugin` of
+[UbiqueInnovation/uniffi-kotlin-multiplatform-bindings](https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings)
+(uniffi 0.32.0, Gradle ≥ 9.6.1; Kotlin, AGP and the plugin are versioned by the catalog
+`additionals`): it builds `kraken-ffi` with Cargo for every target and generates the bindings of the 3 crates (`generateBindingsForExternalCrates`), in the
+same packages as the Kotlin ones (`uniffi.kraken_api`, ...). The `Decimal`s are the `BigDecimal` of
+[`com.ionspin.kotlin:bignum`](https://github.com/ionspin/kotlin-multiplatform-bignum), available on
+every target (top-level `[custom_types.Decimal]` of `crates/kraken-api/uniffi.toml`, read by this
+generator only).
+
+```sh
+./gradlew :kraken-multiplatform:jvmTest :kraken-multiplatform:linuxX64Test                 # Linux
+./gradlew :kraken-multiplatform:iosSimulatorArm64Test :kraken-multiplatform:macosArm64Test  # macOS
+./gradlew :kraken-multiplatform:assemble    # the libraries of every target, the AAR (Android SDK, NDK)
+```
+
+The common tests run on every target (options, exact decimals through the converter, invalid
+secret, transport error, logger implemented in Kotlin); the calls to a mocked Kraken run on the JVM.
 
 In Swift, the C declarations of the 3 crates are a single module, `KrakenFFI` (the
 `ffi_module_name` of their `uniffi.toml`), and the Swift sources a single one, `Kraken`.
@@ -408,6 +430,8 @@ the pair (`AssetPair.pair_decimals`, `lot_decimals`).
 - **bindings**: generated and tested on the JVM, on Linux (Swift), on macOS and on the iOS
   simulator (XCFramework), and on an Android emulator (AAR); the AAR, the Swift package and the
   Kotlin sources as artifacts
+- **Kotlin Multiplatform**: tested on the JVM, Linux, macOS and the iOS simulator; the libraries of
+  every target, Android included, as artifacts
 - **audit**: `cargo audit` of the dependencies
 
 Daily and on demand, the live contracts run against the real Kraken API, the private ones with the

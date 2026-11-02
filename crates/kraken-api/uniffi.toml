@@ -20,3 +20,12 @@ lower = "NSDecimalNumber(decimal: {}).description(withLocale: Locale(identifier:
 [bindings.swift]
 ffi_module_name = "KrakenFFI"
 ffi_module_filename = "kraken_apiFFI"
+
+# Kotlin Multiplatform (platforms/kotlin-multiplatform): its generator, the one of
+# UbiqueInnovation/uniffi-kotlin-multiplatform-bindings, reads the top level of the file. The
+# BigDecimal of com.ionspin.kotlin:bignum, available on every target (JVM, Android, Native)
+[custom_types.Decimal]
+type_name = "com.ionspin.kotlin.bignum.decimal.BigDecimal"
+imports = ["com.ionspin.kotlin.bignum.decimal.BigDecimal"]
+lift = "com.ionspin.kotlin.bignum.decimal.BigDecimal.parseString({})"
+lower = "{}.toStringExpanded()"

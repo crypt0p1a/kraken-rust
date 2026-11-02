@@ -2,6 +2,8 @@
 //
 //   :kraken-kotlin    platforms/kotlin, the tests of the bindings on the JVM, with the library of the host
 //   :kraken-android   platforms/android, the Android library (AAR) with the libraries of every ABI
+//   :kraken-multiplatform   platforms/kotlin-multiplatform, the Kotlin Multiplatform library: JVM,
+//                           Android, iOS, macOS, Linux (UbiqueInnovation/uniffi-kotlin-multiplatform-bindings)
 pluginManagement {
     repositories {
         gradlePluginPortal()
@@ -40,3 +42,5 @@ include(":kraken-kotlin")
 project(":kraken-kotlin").projectDir = file("platforms/kotlin")
 include(":kraken-android")
 project(":kraken-android").projectDir = file("platforms/android")
+include(":kraken-multiplatform")
+project(":kraken-multiplatform").projectDir = file("platforms/kotlin-multiplatform")
