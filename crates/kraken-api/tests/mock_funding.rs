@@ -5,7 +5,8 @@ mod common;
 
 use common::{QueryIs, SignedFunding, plain, private_api};
 use kraken_api::funding::{
-    FundingAsset, FundingDirection, FundingFeeRequest, FundingLimitsRequest, FundingMethodsRequest,
+    AddressDetails, FundingAsset, FundingDirection, FundingFeeRequest, FundingLimitsRequest,
+    FundingMethodsRequest,
 };
 use kraken_api::market::AssetClass;
 use serde_json::json;
@@ -200,4 +201,36 @@ async fn withdrawal_limits() {
         .await
         .unwrap();
     assert_eq!(limits.available_balance.amount.to_string(), "100");
+}
+
+#[tokio::test]
+async fn claim_deposit_address() {
+    let server = MockServer::start().await;
+    Mock::given(method("PUT"))
+        .and(path("/funding/v1/deposit/address"))
+        .and(SignedFunding)
+        .and(QueryIs(vec![]))
+        .and(wiremock::matchers::body_json(
+            json!({"method_id": "27ede8db"}),
+        ))
+        .respond_with(plain(
+            json!({"address_details": {"crypto": {"address": "0x0d5cff23",
+            "tag": "123"}}}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let address = private_api(&server)
+        .claim_deposit_address("27ede8db", None)
+        .await
+        .unwrap();
+    assert_eq!(
+        address,
+        AddressDetails::Crypto {
+            address: "0x0d5cff23".into(),
+            tag: Some("123".into()),
+            memo: None,
+        }
+    );
 }

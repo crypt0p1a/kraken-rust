@@ -11,7 +11,7 @@ use crate::earn::{
     self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
 use crate::funding::{
-    self, DepositLimits, FundingAsset, FundingAssets, FundingDirection, FundingFee,
+    self, AddressDetails, DepositLimits, FundingAsset, FundingAssets, FundingDirection, FundingFee,
     FundingFeeRequest, FundingLimitsRequest, FundingMethods, FundingMethodsRequest,
     FundingNetworks, WithdrawalLimits,
 };
@@ -558,5 +558,17 @@ impl PrivateApi {
         request: &FundingLimitsRequest,
     ) -> Result<WithdrawalLimits, KrakenError> {
         funding::limits::withdrawal_limits(&self.funding, asset, request).await
+    }
+
+    /// Claims a new deposit address of a funding method. Requires the "Funds permissions -
+    /// Deposit" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/claim-funding-deposit-address>
+    pub async fn claim_deposit_address(
+        &self,
+        method_id: &str,
+        account_id: Option<&str>,
+    ) -> Result<AddressDetails, KrakenError> {
+        funding::deposits::claim_deposit_address(&self.funding, method_id, account_id).await
     }
 }

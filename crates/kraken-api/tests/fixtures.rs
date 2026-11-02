@@ -15,8 +15,8 @@ use kraken_api::account::{
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
 use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
 use kraken_api::funding::{
-    DepositLimits, FundingAsset, FundingAssets, FundingDirection, FundingFee, FundingFeeRequest,
-    FundingMethods, FundingNetworks, LimitValue, WithdrawalLimits,
+    AddressDetails, DepositLimits, FundingAsset, FundingAssets, FundingDirection, FundingFee,
+    FundingFeeRequest, FundingMethods, FundingNetworks, LimitValue, WithdrawalLimits,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -1471,4 +1471,23 @@ async fn withdrawal_limits_fixture() {
         .await
         .unwrap();
     assert_eq!(served, limits);
+}
+
+#[tokio::test]
+async fn claim_deposit_address_fixture() {
+    let server = MockServer::start().await;
+    serve_funding(
+        &server,
+        "/funding/v1/deposit/address",
+        "claim_deposit_address.json",
+    )
+    .await;
+    let address = private_api(&server)
+        .claim_deposit_address("27ede8db-804b-4d91-8e25-46b7b9668730", None)
+        .await
+        .unwrap();
+    assert!(matches!(
+        address,
+        AddressDetails::Crypto { memo: Some(_), .. }
+    ));
 }

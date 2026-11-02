@@ -2,7 +2,7 @@
 //!
 //! | Module           | Endpoints                                         |
 //! |------------------|---------------------------------------------------|
-//! | [`funding`]      | private, Funding (Beta): /funding/v1/assets, /funding/v1/methods, /funding/v1/networks, /funding/v1/fees, /funding/v1/limits |
+//! | [`funding`]      | private, Funding (Beta): /funding/v1/assets, /funding/v1/methods, /funding/v1/networks, /funding/v1/fees, /funding/v1/limits, /funding/v1/deposit/address |
 //! | [`market`]       | public: Time, SystemStatus, MaintenanceSchedule, Assets, AssetPairs, Ticker, OHLC, Depth, GroupedBook, Trades, Spread; private: Level3 |
 //! | [`transparency`] | public: PreTrade, PostTrade                       |
 //! | [`account`]      | private: Balance, BalanceEx, CreditLines, TradeBalance, TradeVolume, Ledgers, QueryLedgers, AddExport, ExportStatus, RetrieveExport, RemoveExport, GetApiKeyInfo, ListWalletAccounts |

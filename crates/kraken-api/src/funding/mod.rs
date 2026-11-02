@@ -14,12 +14,14 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 pub(crate) mod assets;
+pub(crate) mod deposits;
 pub(crate) mod fees;
 pub(crate) mod limits;
 pub(crate) mod methods;
 pub(crate) mod networks;
 
 pub use assets::{FundingAssets, FundingDirection, NamedAsset};
+pub use deposits::{AddressDetails, FiatAccount};
 pub use fees::{FeeDetails, FundingFee, FundingFeeRequest};
 pub use limits::{
     DepositLimits, FundingLimit, FundingLimitsRequest, LimitAmounts, LimitValue, TimedLimit,
