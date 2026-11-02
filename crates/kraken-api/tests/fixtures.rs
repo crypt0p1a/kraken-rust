@@ -13,7 +13,7 @@ use kraken_api::account::{
     WalletStatus,
 };
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
-use kraken_api::earn::{EarnAllocations, EarnStrategies, LockType};
+use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -1191,4 +1191,18 @@ async fn earn_allocations_fixture() {
             .unwrap(),
         allocations
     );
+}
+
+#[tokio::test]
+async fn earn_allocate_fixture() {
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/Earn/Allocate", "earn_allocate.json").await;
+    let started = private_api(&server)
+        .earn_allocate(&EarnFunds {
+            strategy_id: "ESRFUO3-Q62XD-WIOIL7".into(),
+            amount: "4.3".into(),
+        })
+        .await
+        .unwrap();
+    assert!(started);
 }

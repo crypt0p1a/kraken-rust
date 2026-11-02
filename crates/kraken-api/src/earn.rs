@@ -305,6 +305,27 @@ pub(crate) async fn allocations(
     client.call_with("Earn/Allocations", Some(request)).await
 }
 
+/// Funds to (de)allocate
+///
+/// <https://docs.kraken.com/api/docs/rest-api/allocate-strategy>
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct EarnFunds {
+    /// The id of an Earn strategy
+    pub strategy_id: String,
+    /// In the asset of the strategy, a string to keep the precision of the caller
+    pub amount: String,
+}
+
+/// Starts allocating funds to a strategy: asynchronous, followed by `allocate_status`. Requires
+/// the "Earn Funds" permission
+pub(crate) async fn allocate(
+    client: &PrivateClient,
+    funds: &EarnFunds,
+) -> Result<bool, KrakenError> {
+    client.call_with("Earn/Allocate", Some(funds)).await
+}
+
 #[cfg(test)]
 pub(crate) const STRATEGIES: &str = r#"{"items":[
     {"id":"ESRFUO3-Q62XD-WIOIL7","asset":"DOT","lock_type":{"type":"instant","payout_frequency":604800},
@@ -430,6 +451,18 @@ mod tests {
             dec!(0.5581)
         );
         assert_eq!(allocations.total_allocated, dec!(49.2398));
+    }
+
+    #[test]
+    fn encodes_the_funds() {
+        let funds = EarnFunds {
+            strategy_id: "ESRFUO3-Q62XD-WIOIL7".into(),
+            amount: "4.3".into(),
+        };
+        assert_eq!(
+            kraken_network::params::encode(&funds).unwrap(),
+            "strategy_id=ESRFUO3-Q62XD-WIOIL7&amount=4.3"
+        );
     }
 
     #[test]

@@ -3,7 +3,9 @@
 mod common;
 
 use common::{FormIs, JsonIs, Signed, SignedJson, ok, private_api};
-use kraken_api::earn::{EarnAllocationsRequest, EarnStrategiesRequest, LockType, LockTypeFilter};
+use kraken_api::earn::{
+    EarnAllocationsRequest, EarnFunds, EarnStrategiesRequest, LockType, LockTypeFilter,
+};
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer};
@@ -66,4 +68,30 @@ async fn earn_allocations() {
         .unwrap();
     assert_eq!(allocations.items[0].native_asset, "USDC");
     assert_eq!(allocations.items[0].payout, None);
+}
+
+#[tokio::test]
+async fn earn_allocate() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/Earn/Allocate"))
+        .and(Signed)
+        .and(FormIs(vec![
+            ("strategy_id", "ESRFUO3-Q62XD-WIOIL7"),
+            ("amount", "4.3"),
+        ]))
+        .respond_with(ok(json!(true)))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    assert!(
+        private_api(&server)
+            .earn_allocate(&EarnFunds {
+                strategy_id: "ESRFUO3-Q62XD-WIOIL7".into(),
+                amount: "4.3".into(),
+            })
+            .await
+            .unwrap()
+    );
 }

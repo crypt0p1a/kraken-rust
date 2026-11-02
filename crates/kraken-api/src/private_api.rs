@@ -8,7 +8,7 @@ use crate::algo::{
     self, ClosedStrategies, ClosedStrategiesRequest, NewStrategy, Strategy, StrategyType,
 };
 use crate::earn::{
-    self, EarnAllocations, EarnAllocationsRequest, EarnStrategies, EarnStrategiesRequest,
+    self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
@@ -417,5 +417,13 @@ impl PrivateApi {
         request: &EarnAllocationsRequest,
     ) -> Result<EarnAllocations, KrakenError> {
         earn::allocations(&self.client, request).await
+    }
+
+    /// Starts allocating funds to an Earn strategy: asynchronous, followed by
+    /// `earn_allocate_status`. Requires the "Earn Funds" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/allocate-strategy>
+    pub async fn earn_allocate(&self, funds: &EarnFunds) -> Result<bool, KrakenError> {
+        earn::allocate(&self.client, funds).await
     }
 }
