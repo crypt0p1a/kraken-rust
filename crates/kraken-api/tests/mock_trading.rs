@@ -155,6 +155,14 @@ fn limit_buy() -> NewOrder {
         cl_ord_id: Some("mgr1_buy_1".into()),
         userref: None,
         validate: None,
+        display_volume: None,
+        asset_class: None,
+        trigger: None,
+        leverage: None,
+        reduce_only: None,
+        self_trade_prevention: None,
+        deadline: None,
+        broker: None,
     }
 }
 
@@ -592,6 +600,7 @@ async fn add_order_batch_is_signed_json() {
             asset_class: None,
             deadline: None,
             validate: Some(true),
+            broker: None,
         })
         .await
         .unwrap();

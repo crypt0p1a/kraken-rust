@@ -253,6 +253,14 @@ async fn every_private_method_is_exported() {
             cl_ord_id: None,
             userref: None,
             validate: Some(true),
+            display_volume: None,
+            asset_class: None,
+            trigger: None,
+            leverage: None,
+            reduce_only: None,
+            self_trade_prevention: None,
+            deadline: None,
+            broker: None,
         })
         .await
         .unwrap();

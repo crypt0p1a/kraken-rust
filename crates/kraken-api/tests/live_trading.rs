@@ -453,6 +453,14 @@ impl Market {
             cl_ord_id: None,
             userref: None,
             validate: None,
+            display_volume: None,
+            asset_class: None,
+            trigger: None,
+            leverage: None,
+            reduce_only: None,
+            self_trade_prevention: None,
+            deadline: None,
+            broker: None,
         })
     }
 }
@@ -932,6 +940,7 @@ async fn validates_a_batch_of_orders() {
         asset_class: None,
         deadline: None,
         validate: Some(true),
+        broker: None,
     };
     let answers = private_api().add_order_batch(&request).await.unwrap();
     assert_eq!(answers.len(), 2, "{answers:?}");

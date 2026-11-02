@@ -93,6 +93,10 @@ pub struct AddOrderBatch {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub validate: Option<bool>,
+    /// IIBAN of the broker (partner) of the orders
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub broker: Option<String>,
 }
 
 /// An order of the batch, in the order of the request
@@ -173,6 +177,7 @@ mod tests {
             asset_class: None,
             deadline: Some("2026-11-02T10:00:00Z".into()),
             validate: Some(true),
+            broker: None,
         };
         assert_eq!(
             serde_json::to_value(&request).unwrap(),

@@ -64,6 +64,9 @@ pub enum TimeInForce {
     /// Good 'til date: requires `expire_time`
     #[serde(alias = "gtd")]
     Gtd,
+    /// Fill or kill: entirely filled at once, or cancelled
+    #[serde(alias = "fok")]
+    Fok,
     /// Sent by Kraken but unknown to this version of the library. Never send it
     #[serde(other)]
     Unknown,
@@ -169,7 +172,9 @@ mod tests {
             ("ioc", TimeInForce::Ioc),
             ("GTD", TimeInForce::Gtd),
             ("gtd", TimeInForce::Gtd),
-            ("FOK", TimeInForce::Unknown),
+            ("FOK", TimeInForce::Fok),
+            ("fok", TimeInForce::Fok),
+            ("GTX", TimeInForce::Unknown),
         ] {
             let decoded: TimeInForce = serde_json::from_str(&format!("\"{text}\"")).unwrap();
             assert_eq!(decoded, expected, "{text}");

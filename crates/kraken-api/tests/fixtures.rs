@@ -289,6 +289,14 @@ async fn private_calls_read_the_real_shapes() {
             cl_ord_id: None,
             userref: None,
             validate: Some(true),
+            display_volume: None,
+            asset_class: None,
+            trigger: None,
+            leverage: None,
+            reduce_only: None,
+            self_trade_prevention: None,
+            deadline: None,
+            broker: None,
         })
         .await
         .unwrap();
@@ -987,6 +995,7 @@ async fn add_order_batch_fixture() {
             asset_class: None,
             deadline: None,
             validate: None,
+            broker: None,
         })
         .await
         .unwrap();
