@@ -11,7 +11,7 @@ use kraken_api::KrakenError;
 use kraken_api::market::AssetPair;
 use kraken_api::trading::{
     CloseTime, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderFlag,
-    OrderSide, OrderStatus, OrderType, TimeInForce,
+    OrderSide, OrderStatus, OrderType, TimeInForce, Trade, TradesHistoryRequest,
 };
 use live::{
     Presence, decode_strict, entries, le, now_seconds, private_api, private_client, public_api,
@@ -610,4 +610,54 @@ async fn maps_the_errors_of_invalid_new_orders() {
         api.new_order(&gtd_without_expiry).await,
         Err(KrakenError::InvalidArgument { .. })
     ));
+}
+
+#[derive(Serialize)]
+struct TradesParams {
+    ledgers: bool,
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn trades_history_is_consistent_and_paginated() {
+    let raw: Value = private_client()
+        .call_with("TradesHistory", Some(&TradesParams { ledgers: true }))
+        .await
+        .unwrap();
+    let mut presence = Presence::default();
+    for (txid, value) in entries(&raw["trades"]) {
+        presence.record(value);
+        let trade: Trade = decode_strict(&format!("TradesHistory {txid}"), value);
+        assert!(
+            trade.volume > Decimal::ZERO && trade.fee >= Decimal::ZERO,
+            "{txid}"
+        );
+        // cost = price × volume, to the decimals of the pair
+        let cost = trade.price * trade.volume;
+        assert!(
+            (trade.cost - cost).abs() <= trade.cost * dec!(0.0001) + dec!(0.01),
+            "{txid}: {} vs {cost}",
+            trade.cost
+        );
+    }
+    presence.print("TradesHistory");
+
+    let api = private_api();
+    let request = |cursor: Option<String>| TradesHistoryRequest {
+        limit: Some(2),
+        with_cursor: Some(true),
+        cursor,
+        ..Default::default()
+    };
+    let first = api.trades_history(&request(None)).await.unwrap();
+    assert!(first.trades.len() <= 2);
+    assert!(first.trades.windows(2).all(|it| it[0].time >= it[1].time));
+    if let Some(next) = first.cursor.and_then(|it| it.next) {
+        let second = api.trades_history(&request(Some(next))).await.unwrap();
+        let first_ids: HashSet<_> = first.trades.iter().map(|it| &it.txid).collect();
+        assert!(second.trades.iter().all(|it| !first_ids.contains(&it.txid)));
+        if let (Some(newest), Some(oldest)) = (second.trades.first(), first.trades.last()) {
+            assert!(newest.time <= oldest.time);
+        }
+    }
 }

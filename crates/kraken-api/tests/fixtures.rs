@@ -19,7 +19,7 @@ use kraken_api::market::{
 };
 use kraken_api::trading::{
     ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
-    OrderStatus, OrderType, QueryOrdersRequest, TimeInForce,
+    OrderStatus, OrderType, QueryOrdersRequest, TimeInForce, Trade,
 };
 use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
@@ -623,5 +623,40 @@ async fn wallet_accounts_fixture() {
     assert_eq!(
         private_api(&server).wallet_accounts().await.unwrap(),
         wallets
+    );
+}
+
+// trades
+
+#[tokio::test]
+async fn trades_history_fixture() {
+    let result = fixture("trades_history.json");
+    let trades: HashMap<String, Trade> = each("TradesHistory", &result["trades"]);
+    assert_eq!(result["count"], 3);
+    let position = &trades["TKH2SE-M7IF5-CFI7LT"];
+    assert_eq!(position.position_status.as_deref(), Some("closed"));
+    // net = closed cost - cost - fees
+    assert_eq!(
+        position.net,
+        Some(
+            position.closed_cost.unwrap()
+                - position.cost
+                - position.fee
+                - position.closed_fee.unwrap()
+        )
+    );
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/TradesHistory", "trades_history.json").await;
+    let page = private_api(&server)
+        .trades_history(&Default::default())
+        .await
+        .unwrap();
+    assert_eq!(page.count, 3);
+    assert!(page.trades.windows(2).all(|it| it[0].time >= it[1].time));
+    assert!(
+        page.trades
+            .iter()
+            .all(|it| trades[&it.txid].trade_id == it.trade_id)
     );
 }

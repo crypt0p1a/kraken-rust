@@ -1,4 +1,4 @@
-use crate::KrakenError;
+use crate::{Cursor, KrakenError};
 use kraken_network::PrivateClient;
 use serde::Deserialize;
 
@@ -50,20 +50,12 @@ pub struct WalletAccount {
     pub name: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
-pub struct WalletCursor {
-    /// None when there is no further page
-    #[serde(default)]
-    pub next: Option<String>,
-}
-
 /// <https://docs.kraken.com/api/docs/rest-api/list-wallet-accounts>
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct WalletAccounts {
     pub accounts: Vec<WalletAccount>,
-    pub cursor: WalletCursor,
+    pub cursor: Cursor,
 }
 
 pub(crate) async fn wallet_accounts(client: &PrivateClient) -> Result<WalletAccounts, KrakenError> {

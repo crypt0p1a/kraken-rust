@@ -6,7 +6,7 @@ use crate::account::{
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, ClosedOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
-    QueryOrdersRequest,
+    QueryOrdersRequest, TradesHistory, TradesHistoryRequest,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PrivateClient;
@@ -161,5 +161,15 @@ impl PrivateApi {
     /// <https://docs.kraken.com/api/docs/rest-api/add-order>
     pub async fn new_order(&self, request: &NewOrder) -> Result<NewOrderAnswer, KrakenError> {
         trading::add::add_order(&self.client, request).await
+    }
+
+    /// A page of the trades (fills) of the account, most recent first
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-trade-history>
+    pub async fn trades_history(
+        &self,
+        request: &TradesHistoryRequest,
+    ) -> Result<TradesHistory, KrakenError> {
+        trading::trades::trades_history(&self.client, request).await
     }
 }

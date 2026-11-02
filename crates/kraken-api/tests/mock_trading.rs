@@ -6,7 +6,7 @@ use common::{FormIs, Signed, ok, orders_fixture, private_api};
 use kraken_api::KrakenError;
 use kraken_api::trading::{
     CloseTime, ClosedOrdersRequest, NewOrder, OpenOrdersRequest, OrderFlag, OrderSide, OrderStatus,
-    OrderType, QueryOrdersRequest, TimeInForce,
+    OrderType, QueryOrdersRequest, TimeInForce, TradesHistoryRequest,
 };
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -213,4 +213,38 @@ async fn new_order_rejects_the_invalid_requests_without_calling() {
         api.new_order(&with_both_ids).await,
         Err(KrakenError::InvalidArgument { .. })
     ));
+}
+
+#[tokio::test]
+async fn trades_history() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/TradesHistory"))
+        .and(Signed)
+        .and(FormIs(vec![
+            ("pair", "XBTUSD"),
+            ("limit", "2"),
+            ("with_cursor", "true"),
+        ]))
+        .respond_with(ok(json!({"count": 0, "cursor": {"next": "page-2"}, "trades": {
+            "THVRQM-33VKH-UCI7BS": {"ordertxid": "OQCLML-BW3P3-BUCMWZ", "pair": "XXBTZUSD",
+                "time": 1688667796.8802, "type": "buy", "ordertype": "limit", "price": "30010.0",
+                "cost": "616.79361", "fee": "1.60366", "vol": "0.02055308", "misc": "",
+                "trade_id": 93748276, "maker": true}
+        }})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let page = private_api(&server)
+        .trades_history(&TradesHistoryRequest {
+            pair: Some("XBTUSD".into()),
+            limit: Some(2),
+            with_cursor: Some(true),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(page.trades[0].txid, "THVRQM-33VKH-UCI7BS");
+    assert_eq!(page.cursor.unwrap().next.as_deref(), Some("page-2"));
 }

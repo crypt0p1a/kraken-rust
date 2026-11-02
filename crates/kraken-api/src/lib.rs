@@ -39,6 +39,7 @@ uniffi::custom_type!(Decimal, String, {
 });
 
 pub mod account;
+mod cursor;
 mod lenient;
 pub mod market;
 mod params;
@@ -47,6 +48,7 @@ mod public_api;
 pub mod trading;
 pub mod transparency;
 
+pub use cursor::Cursor;
 pub use kraken_network::{KrakenError, Logger, RateLimiter, RestOptions};
 pub use private_api::PrivateApi;
 pub use public_api::PublicApi;
