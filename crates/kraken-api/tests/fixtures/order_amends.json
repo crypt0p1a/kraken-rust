@@ -1,0 +1,39 @@
+{
+  "error": [],
+  "result": {
+    "count": 3,
+    "amends": [
+      {
+        "amend_id": "TM2EBP-HGEUP-36CIRK",
+        "amend_type": "original",
+        "order_qty": "1.25000000",
+        "remaining_qty": "1.25000000",
+        "limit_price": "30010.0",
+        "post_only": false,
+        "timestamp": 1688666559897
+      },
+      {
+        "amend_id": "TJSMEH-AA67V-YUSQ6O",
+        "amend_type": "user",
+        "order_qty": "1.00000000",
+        "display_qty": "0.50000000",
+        "remaining_qty": "1.00000000",
+        "limit_price": "30000.0",
+        "reason": "User requested",
+        "post_only": true,
+        "timestamp": 1688666600000
+      },
+      {
+        "amend_id": "TP2YNV-6TJQX-AWNJ6E",
+        "amend_type": "restated",
+        "order_qty": "1.00000000",
+        "remaining_qty": "0.62500000",
+        "limit_price": "30000.0",
+        "trigger_price": "29900.0",
+        "reason": "Partially filled",
+        "post_only": true,
+        "timestamp": 1688666700000
+      }
+    ]
+  }
+}

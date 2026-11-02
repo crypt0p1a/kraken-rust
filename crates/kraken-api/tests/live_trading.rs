@@ -10,9 +10,9 @@ use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::AssetPair;
 use kraken_api::trading::{
-    CloseTime, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderFlag,
-    OrderSide, OrderStatus, OrderType, QueryTradesRequest, TimeInForce, Trade,
-    TradesHistoryRequest,
+    AmendType, CloseTime, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
+    OrderAmends, OrderFlag, OrderSide, OrderStatus, OrderType, QueryTradesRequest, TimeInForce,
+    Trade, TradesHistoryRequest,
 };
 use live::{
     Presence, decode_strict, entries, le, now_seconds, private_api, private_client, public_api,
@@ -716,4 +716,44 @@ async fn query_trades_finds_the_trades_of_the_history() {
             .unwrap();
         assert_eq!(trade, original);
     }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn order_amends_start_with_the_original_order() {
+    let closed = private_api()
+        .closed_orders(&ClosedOrdersRequest::default())
+        .await
+        .unwrap();
+    let Some(order) = closed.orders.first() else {
+        println!("no closed order on the account: no amends to query");
+        return;
+    };
+
+    #[derive(Serialize)]
+    struct Params<'a> {
+        order_id: &'a str,
+    }
+    let raw: Value = private_client()
+        .call_with(
+            "OrderAmends",
+            Some(&Params {
+                order_id: &order.txid,
+            }),
+        )
+        .await
+        .unwrap();
+    let amends: OrderAmends = decode_strict("OrderAmends", &raw);
+    assert!(amends.count >= 1, "{amends:?}");
+    assert_eq!(
+        amends.amends[0].amend_type,
+        AmendType::Original,
+        "{amends:?}"
+    );
+    // the current volume of the order is the one of its last version
+    assert_eq!(
+        amends.amends.last().unwrap().order_quantity,
+        order.volume,
+        "{amends:?}"
+    );
 }

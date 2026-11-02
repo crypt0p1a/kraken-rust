@@ -5,8 +5,9 @@ mod common;
 use common::{FormIs, Signed, ok, orders_fixture, private_api};
 use kraken_api::KrakenError;
 use kraken_api::trading::{
-    CloseTime, ClosedOrdersRequest, NewOrder, OpenOrdersRequest, OrderFlag, OrderSide, OrderStatus,
-    OrderType, QueryOrdersRequest, QueryTradesRequest, TimeInForce, TradesHistoryRequest,
+    AmendType, CloseTime, ClosedOrdersRequest, NewOrder, OpenOrdersRequest, OrderAmendsRequest,
+    OrderFlag, OrderSide, OrderStatus, OrderType, QueryOrdersRequest, QueryTradesRequest,
+    TimeInForce, TradesHistoryRequest,
 };
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -279,4 +280,30 @@ async fn query_trades() {
         .await
         .unwrap();
     assert_eq!(trades[0].side, OrderSide::Sell);
+}
+
+#[tokio::test]
+async fn order_amends() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/OrderAmends"))
+        .and(Signed)
+        .and(FormIs(vec![("order_id", "OQCLML-BW3P3-BUCMWZ")]))
+        .respond_with(ok(
+            json!({"count": 1, "amends": [{"amend_id": "TM2EBP-HGEUP-36CIRK",
+            "amend_type": "original", "order_qty": "1.25", "remaining_qty": "1.25",
+            "limit_price": "30010.0", "post_only": false, "timestamp": 1688666559897u64}]}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let amends = private_api(&server)
+        .order_amends(&OrderAmendsRequest {
+            order_id: "OQCLML-BW3P3-BUCMWZ".into(),
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(amends.amends[0].amend_type, AmendType::Original);
 }

@@ -6,7 +6,8 @@ use crate::account::{
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, ClosedOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
-    QueryOrdersRequest, QueryTradesRequest, Trade, TradesHistory, TradesHistoryRequest,
+    OrderAmends, OrderAmendsRequest, QueryOrdersRequest, QueryTradesRequest, Trade, TradesHistory,
+    TradesHistoryRequest,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PrivateClient;
@@ -154,6 +155,16 @@ impl PrivateApi {
             .await?
             .into_iter()
             .find(|order| order.txid == txid))
+    }
+
+    /// The versions of an order, the original one first
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-order-amends>
+    pub async fn order_amends(
+        &self,
+        request: &OrderAmendsRequest,
+    ) -> Result<OrderAmends, KrakenError> {
+        trading::amends::order_amends(&self.client, request).await
     }
 
     /// Places an order. Prefer setting a cl_ord_id, to find the order again if the answer is lost

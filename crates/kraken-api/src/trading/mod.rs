@@ -5,14 +5,17 @@
 //! - `query`: open, closed and queried orders
 //! - `add`: new orders
 //! - `trades`: the trades (fills) of the account
+//! - `amends`: the versions of an amended order
 
 pub(crate) mod add;
+pub(crate) mod amends;
 pub(crate) mod order;
 pub(crate) mod query;
 pub(crate) mod trades;
 mod types;
 
 pub use add::{NewOrder, NewOrderAnswer, NewOrderDescription};
+pub use amends::{AmendType, OrderAmend, OrderAmends, OrderAmendsRequest};
 pub use order::{Order, OrderDescription};
 pub use query::{
     CloseTime, ClosedOrders, ClosedOrdersRequest, OpenOrdersRequest, QueryOrdersRequest,

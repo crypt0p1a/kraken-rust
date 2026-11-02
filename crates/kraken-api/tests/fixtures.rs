@@ -18,8 +18,9 @@ use kraken_api::market::{
     SystemStatus, Ticker,
 };
 use kraken_api::trading::{
-    ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
-    OrderStatus, OrderType, QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade,
+    AmendType, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
+    OrderAmends, OrderAmendsRequest, OrderSide, OrderStatus, OrderType, QueryOrdersRequest,
+    QueryTradesRequest, TimeInForce, Trade,
 };
 use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
@@ -680,4 +681,28 @@ async fn query_trades_fixture() {
     for trade in &served {
         assert_eq!(trade.trade_id, trades[&trade.txid].trade_id);
     }
+}
+
+#[tokio::test]
+async fn order_amends_fixture() {
+    let amends: OrderAmends = decode_strict("OrderAmends", &fixture("order_amends.json"));
+    assert_eq!(amends.count as usize, amends.amends.len());
+    assert_eq!(amends.amends[0].amend_type, AmendType::Original);
+    assert!(
+        amends
+            .amends
+            .windows(2)
+            .all(|it| it[0].timestamp < it[1].timestamp)
+    );
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/OrderAmends", "order_amends.json").await;
+    let served = private_api(&server)
+        .order_amends(&OrderAmendsRequest {
+            order_id: "OQCLML-BW3P3-BUCMWZ".into(),
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(served, amends);
 }
