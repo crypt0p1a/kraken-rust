@@ -18,7 +18,8 @@
 - **build**: the [native libraries](native-libraries.md) of every platform, as artifacts
 - **Kotlin Multiplatform**: the library of every target built on macOS (the JVM jar and the AAR as
   artifacts), tested on the JVM (macOS and Linux), macOS and the iOS simulator; the tests of
-  Linux on Linux. The common tests run on the JVM target, not on an Android emulator
+  Linux on Linux. The common tests run on the JVM target, not on an Android emulator; the generator of
+  the Kotlin bindings (`build/uniffi/bindgen`) is cached, rebuilt only with a new plugin version
 - **Swift**: tested on Linux, on macOS and on the iOS simulator (XCFramework); the Swift package as
   an artifact
 - **audit**: `cargo audit` of the dependencies
