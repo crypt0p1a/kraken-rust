@@ -10,7 +10,8 @@ use crate::algo::{
 use crate::earn::{
     self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
-use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
+use crate::funding::{self, FundingAssets, FundingDirection};
+use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
 use crate::trading::{
     self, AddOrderBatch, AmendOrder, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
@@ -20,13 +21,15 @@ use crate::trading::{
     TradesHistory, TradesHistoryRequest, WebSocketsToken,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
-use kraken_network::PrivateClient;
+use kraken_network::{FundingClient, PrivateClient};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Private API of Kraken Spot, signed with the API key and its base64 secret
 pub struct PrivateApi {
     client: PrivateClient,
+    /// The same key, on the funding API
+    funding: FundingClient,
 }
 
 impl PrivateApi {
@@ -37,6 +40,12 @@ impl PrivateApi {
         rate_limiter: Arc<RateLimiter>,
     ) -> Result<Self, KrakenError> {
         Ok(Self {
+            funding: FundingClient::new(
+                api_key.clone(),
+                &api_secret,
+                options.clone(),
+                rate_limiter.clone(),
+            )?,
             client: PrivateClient::new(api_key, &api_secret, options, rate_limiter)?,
         })
     }
@@ -471,5 +480,20 @@ impl PrivateApi {
         transfer: &AccountTransfer,
     ) -> Result<TransferResult, KrakenError> {
         subaccounts::account_transfer(&self.client, transfer).await
+    }
+
+    // funding
+
+    /// The assets which can be deposited or withdrawn, by class. Requires the "Funds permissions
+    /// - Query" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-funding-assets>
+    pub async fn funding_assets(
+        &self,
+        direction: FundingDirection,
+        asset_class: Option<AssetClass>,
+        account_id: Option<&str>,
+    ) -> Result<FundingAssets, KrakenError> {
+        funding::assets::funding_assets(&self.funding, direction, asset_class, account_id).await
     }
 }

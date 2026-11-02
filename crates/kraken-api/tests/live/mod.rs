@@ -8,7 +8,7 @@
 
 use kraken_api::Decimal;
 use kraken_api::{PrivateApi, PublicApi, RateLimiter, RestOptions};
-use kraken_network::{PrivateClient, PublicClient};
+use kraken_network::{FundingClient, PrivateClient, PublicClient};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::{Arc, LazyLock};
@@ -79,12 +79,25 @@ pub fn private_client() -> PrivateClient {
 /// The answer of a call, or None when the API key of the tests lacks its permission
 pub fn unless_denied<T>(context: &str, answer: Result<T, kraken_api::KrakenError>) -> Option<T> {
     match answer {
-        Err(kraken_api::KrakenError::Api { body, .. }) if body.contains("Permission denied") => {
+        // "Permission denied" on /0/private, an undocumented error body on the funding API
+        Err(kraken_api::KrakenError::Api { body, .. })
+            if body.to_lowercase().contains("permission") =>
+        {
             println!("{context}: skipped, the API key lacks the permission ({body})");
             None
         }
         answer => Some(answer.unwrap()),
     }
+}
+
+pub fn funding_client() -> FundingClient {
+    FundingClient::new(
+        env("KRAKEN_API_KEY"),
+        &env("KRAKEN_API_SECRET"),
+        RestOptions::default(),
+        RATE_LIMITER.clone(),
+    )
+    .unwrap()
 }
 
 pub fn now_seconds() -> i64 {

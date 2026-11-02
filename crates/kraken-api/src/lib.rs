@@ -2,6 +2,7 @@
 //!
 //! | Module           | Endpoints                                         |
 //! |------------------|---------------------------------------------------|
+//! | [`funding`]      | private, Funding (Beta): /funding/v1/assets       |
 //! | [`market`]       | public: Time, SystemStatus, MaintenanceSchedule, Assets, AssetPairs, Ticker, OHLC, Depth, GroupedBook, Trades, Spread; private: Level3 |
 //! | [`transparency`] | public: PreTrade, PostTrade                       |
 //! | [`account`]      | private: Balance, BalanceEx, CreditLines, TradeBalance, TradeVolume, Ledgers, QueryLedgers, AddExport, ExportStatus, RetrieveExport, RemoveExport, GetApiKeyInfo, ListWalletAccounts |
@@ -45,6 +46,7 @@ pub mod account;
 pub mod algo;
 mod cursor;
 pub mod earn;
+pub mod funding;
 mod lenient;
 pub mod market;
 mod params;

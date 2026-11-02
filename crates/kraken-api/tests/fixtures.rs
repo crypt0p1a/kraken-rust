@@ -14,6 +14,7 @@ use kraken_api::account::{
 };
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
 use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
+use kraken_api::funding::{FundingAssets, FundingDirection};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -31,7 +32,7 @@ use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
 use serde_json::Value;
 use std::collections::HashMap;
-use strict::{decode_strict, fixture, fixture_answer};
+use strict::{decode_strict, fixture, fixture_answer, funding_fixture};
 use wiremock::matchers::path;
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -1299,4 +1300,27 @@ async fn account_transfer_fixture() {
         .await
         .unwrap();
     assert_eq!(served, result);
+}
+
+// funding
+
+async fn serve_funding(server: &MockServer, endpoint: &str, name: &str) {
+    Mock::given(path(endpoint))
+        .respond_with(ResponseTemplate::new(200).set_body_json(funding_fixture(name)))
+        .mount(server)
+        .await;
+}
+
+#[tokio::test]
+async fn funding_assets_fixture() {
+    let assets: FundingAssets =
+        decode_strict("funding assets", &funding_fixture("funding_assets.json"));
+
+    let server = MockServer::start().await;
+    serve_funding(&server, "/funding/v1/assets/deposit", "funding_assets.json").await;
+    let served = private_api(&server)
+        .funding_assets(FundingDirection::Deposit, None, None)
+        .await
+        .unwrap();
+    assert_eq!(served, assets);
 }
