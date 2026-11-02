@@ -17,7 +17,7 @@ use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
 use kraken_api::funding::{
     AddressDetails, ClaimedAddresses, DepositLimits, Deposits, FundingAsset, FundingAssets,
     FundingDirection, FundingFee, FundingFeeRequest, FundingMethods, FundingNetworks, LimitValue,
-    TransferStatus, WithdrawalLimits,
+    TransferStatus, WithdrawalAddresses, WithdrawalLimits,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -1542,6 +1542,34 @@ async fn deposits_fixture() {
     assert_eq!(
         private_api(&server)
             .deposits(&Default::default())
+            .await
+            .unwrap(),
+        page
+    );
+}
+
+#[tokio::test]
+async fn withdrawal_addresses_fixture() {
+    let page: WithdrawalAddresses = decode_strict(
+        "withdrawal addresses",
+        &funding_fixture("withdrawal_addresses.json"),
+    );
+    assert!(
+        page.addresses
+            .iter()
+            .all(|it| it.address_id.starts_with("AB"))
+    );
+
+    let server = MockServer::start().await;
+    serve_funding(
+        &server,
+        "/funding/v1/addresses",
+        "withdrawal_addresses.json",
+    )
+    .await;
+    assert_eq!(
+        private_api(&server)
+            .withdrawal_addresses(&Default::default())
             .await
             .unwrap(),
         page

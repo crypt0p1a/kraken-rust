@@ -13,6 +13,7 @@ use crate::market::AssetClass;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
+pub(crate) mod addresses;
 pub(crate) mod assets;
 pub(crate) mod deposits;
 pub(crate) mod fees;
@@ -20,6 +21,10 @@ pub(crate) mod limits;
 pub(crate) mod methods;
 pub(crate) mod networks;
 
+pub use addresses::{
+    Beneficiary, WithdrawalAccount, WithdrawalAddress, WithdrawalAddressDetails,
+    WithdrawalAddresses, WithdrawalAddressesRequest,
+};
 pub use assets::{FundingAssets, FundingDirection, NamedAsset};
 pub use deposits::{
     AddressDetails, ClaimedAddress, ClaimedAddresses, ClaimedAddressesRequest, Deposit, Deposits,
@@ -45,9 +50,11 @@ pub struct FundingAsset {
     pub name: String,
 }
 
-/// What a funding request applies to: a method, a network or a group of networks
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// What a funding request applies to: a method, a network or a group of networks, sent and
+/// answered as an object of a single key, e.g. `{"network_id": "..."}`
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[serde(untagged)]
 pub enum FundingScope {
     MethodId { method_id: String },
     NetworkId { network_id: String },

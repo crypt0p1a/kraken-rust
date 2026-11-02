@@ -7,6 +7,7 @@ use common::{QueryIs, SignedFunding, plain, private_api};
 use kraken_api::funding::{
     AddressDetails, ClaimedAddressesRequest, DepositsRequest, FundingAsset, FundingDirection,
     FundingFeeRequest, FundingLimitsRequest, FundingMethodsRequest, FundingScope, TransferStatus,
+    WithdrawalAddressesRequest,
 };
 use kraken_api::market::AssetClass;
 use serde_json::json;
@@ -296,4 +297,35 @@ async fn deposits() {
         .await
         .unwrap();
     assert_eq!(page.deposits[0].status, TransferStatus::Pending);
+}
+
+#[tokio::test]
+async fn withdrawal_addresses() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/funding/v1/addresses"))
+        .and(SignedFunding)
+        .and(QueryIs(vec![
+            ("scope[network_group_id]", "f95acdb7"),
+            ("limit", "20"),
+        ]))
+        .respond_with(plain(
+            json!({"addresses": [{"address_id": "ABR6SXP-SF6CY-VJMONY",
+            "scope": {"network_group_id": "f95acdb7"}, "verified": true}]}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let page = private_api(&server)
+        .withdrawal_addresses(&WithdrawalAddressesRequest {
+            scope: Some(FundingScope::NetworkGroupId {
+                network_group_id: "f95acdb7".into(),
+            }),
+            limit: Some(20),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(page.addresses[0].verified);
 }

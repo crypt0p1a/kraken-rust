@@ -13,7 +13,8 @@ use crate::earn::{
 use crate::funding::{
     self, AddressDetails, ClaimedAddresses, ClaimedAddressesRequest, DepositLimits, Deposits,
     DepositsRequest, FundingAsset, FundingAssets, FundingDirection, FundingFee, FundingFeeRequest,
-    FundingLimitsRequest, FundingMethods, FundingMethodsRequest, FundingNetworks, WithdrawalLimits,
+    FundingLimitsRequest, FundingMethods, FundingMethodsRequest, FundingNetworks,
+    WithdrawalAddresses, WithdrawalAddressesRequest, WithdrawalLimits,
 };
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
@@ -589,5 +590,16 @@ impl PrivateApi {
     /// <https://docs.kraken.com/api/docs/rest-api/list-funding-deposits>
     pub async fn deposits(&self, request: &DepositsRequest) -> Result<Deposits, KrakenError> {
         funding::deposits::deposits(&self.funding, request).await
+    }
+
+    /// A page of the saved withdrawal addresses. Requires the "Funds permissions - Query"
+    /// permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-funding-addresses>
+    pub async fn withdrawal_addresses(
+        &self,
+        request: &WithdrawalAddressesRequest,
+    ) -> Result<WithdrawalAddresses, KrakenError> {
+        funding::addresses::withdrawal_addresses(&self.funding, request).await
     }
 }
