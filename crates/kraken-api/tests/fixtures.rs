@@ -10,7 +10,8 @@ use kraken_api::Decimal;
 use kraken_api::account::{ExtendedBalance, TradeVolume};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
-    OrderBookRequest, ServerTime, SystemState, SystemStatus, Ticker,
+    GroupedOrderBook, GroupedOrderBookRequest, OrderBookRequest, ServerTime, SystemState,
+    SystemStatus, Ticker,
 };
 use kraken_api::trading::{
     ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
@@ -396,4 +397,24 @@ async fn order_book_fixture() {
     assert_eq!(book.pair, "XXBTZUSD");
     assert_eq!((book.asks.len(), book.bids.len()), (3, 3));
     assert!(book.bids[0].price < book.asks[0].price);
+}
+
+#[tokio::test]
+async fn grouped_order_book_fixture() {
+    let grouped: GroupedOrderBook = decode_strict("GroupedBook", &fixture("grouped_book.json"));
+    assert_eq!(grouped.grouping, Some(100));
+    assert_eq!(grouped.bids.len(), 10);
+    assert!(grouped.bids[0].price < grouped.asks[0].price);
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/public/GroupedBook", "grouped_book.json").await;
+    let served = public_api(&server)
+        .grouped_order_book(&GroupedOrderBookRequest {
+            pair: "XBTUSD".into(),
+            depth: None,
+            grouping: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(served, grouped);
 }

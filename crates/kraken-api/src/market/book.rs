@@ -86,6 +86,53 @@ pub(crate) async fn order_book(
     decode_book(client.call_with("Depth", Some(request)).await?)
 }
 
+/// A level of the grouped order book
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct GroupedLevel {
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub price: Decimal,
+    #[serde(rename = "qty", deserialize_with = "lenient::decimal")]
+    pub quantity: Decimal,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/get-grouped-order-book>
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct GroupedOrderBook {
+    /// The pair as requested, e.g. "XBTUSD"
+    pub pair: String,
+    /// Ticks per level
+    #[serde(default, deserialize_with = "lenient::opt_number")]
+    pub grouping: Option<u32>,
+    /// Highest first
+    pub bids: Vec<GroupedLevel>,
+    /// Lowest first
+    pub asks: Vec<GroupedLevel>,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/get-grouped-order-book>
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct GroupedOrderBookRequest {
+    pub pair: String,
+    /// Levels per side: 10, 25, 100, 250 or 1000; 10 when missing
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub depth: Option<u32>,
+    /// Ticks per level: 1, 5, 10, 25, 50, 100, 250, 500 or 1000; 1 when missing
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub grouping: Option<u32>,
+}
+
+pub(crate) async fn grouped_order_book(
+    client: &PublicClient,
+    request: &GroupedOrderBookRequest,
+) -> Result<GroupedOrderBook, KrakenError> {
+    client.call_with("GroupedBook", Some(request)).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,6 +150,16 @@ mod tests {
             encode(&request).unwrap(),
             "pair=XBTUSD&count=3&asset_class=tokenized_asset"
         );
+    }
+
+    #[test]
+    fn encodes_the_grouped_order_book_request() {
+        let request = GroupedOrderBookRequest {
+            pair: "XBTUSD".into(),
+            depth: Some(25),
+            grouping: None,
+        };
+        assert_eq!(encode(&request).unwrap(), "pair=XBTUSD&depth=25");
     }
 
     #[test]
@@ -129,5 +186,16 @@ mod tests {
             serde_json::from_str(r#"{"XXBTZUSD":{"asks":[["1","2"]],"bids":[]}}"#).unwrap(),
         );
         assert!(matches!(short, Err(KrakenError::Decode { .. })));
+    }
+
+    #[test]
+    fn decodes_the_grouped_order_book() {
+        let grouped: GroupedOrderBook = serde_json::from_str(
+            r#"{"pair":"XBTUSD","grouping":100,"bids":[{"price":"77930.00000","qty":"0.0038893"}],
+            "asks":[{"price":"77940.00000","qty":"17.27504303"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(grouped.grouping, Some(100));
+        assert_eq!(grouped.asks[0].quantity, dec!(17.27504303));
     }
 }

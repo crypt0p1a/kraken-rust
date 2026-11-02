@@ -11,7 +11,8 @@ use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetsRequest, CandleInterval, CandlesRequest,
-    MaintenanceEvent, OrderBookRequest, ServerTime, SystemState, SystemStatus, Ticker,
+    GroupedOrderBook, MaintenanceEvent, OrderBookRequest, ServerTime, SystemState, SystemStatus,
+    Ticker,
 };
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
 use rust_decimal_macros::dec;
@@ -515,4 +516,34 @@ async fn order_book_is_ordered() {
             .chain(&book.bids)
             .all(|it| it.volume > Decimal::ZERO)
     );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn grouped_order_book_is_ordered() {
+    #[derive(Serialize)]
+    struct Params<'a> {
+        pair: &'a str,
+        depth: u32,
+        grouping: u32,
+    }
+    let raw: Value = public_client()
+        .call_with(
+            "GroupedBook",
+            Some(&Params {
+                pair: "XBTUSD",
+                depth: 25,
+                grouping: 10,
+            }),
+        )
+        .await
+        .unwrap();
+    let grouped: GroupedOrderBook = decode_strict("GroupedBook", &raw);
+    assert_eq!(grouped.grouping, Some(10));
+    assert!(grouped.bids.len() <= 25 && !grouped.bids.is_empty());
+    assert!(
+        grouped.bids[0].price < grouped.asks[0].price,
+        "crossed book"
+    );
+    assert!(grouped.asks.windows(2).all(|it| it[0].price < it[1].price));
 }

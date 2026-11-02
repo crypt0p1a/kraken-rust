@@ -4,8 +4,8 @@ mod common;
 
 use common::{QueryIs, ok, public_api};
 use kraken_api::market::{
-    AssetClass, AssetStatus, AssetsRequest, CandleInterval, CandlesRequest, OrderBookRequest,
-    SystemState,
+    AssetClass, AssetStatus, AssetsRequest, CandleInterval, CandlesRequest,
+    GroupedOrderBookRequest, OrderBookRequest, SystemState,
 };
 use rust_decimal_macros::dec;
 use serde_json::json;
@@ -219,4 +219,32 @@ async fn order_book() {
     assert_eq!(book.pair, "XXBTZUSD");
     assert_eq!(book.asks.len(), 2);
     assert_eq!(book.bids[0].price, dec!(77934));
+}
+
+#[tokio::test]
+async fn grouped_order_book() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/0/public/GroupedBook"))
+        .and(QueryIs(vec![
+            ("pair", "XBTUSD"),
+            ("depth", "10"),
+            ("grouping", "100"),
+        ]))
+        .respond_with(ok(json!({"pair": "XBTUSD", "grouping": 100,
+            "bids": [{"price": "77930.00000", "qty": "0.00388930"}],
+            "asks": [{"price": "77940.00000", "qty": "17.27504303"}]})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let book = public_api(&server)
+        .grouped_order_book(&GroupedOrderBookRequest {
+            pair: "XBTUSD".into(),
+            depth: Some(10),
+            grouping: Some(100),
+        })
+        .await
+        .unwrap();
+    assert_eq!(book.bids[0].quantity, dec!(0.0038893));
 }

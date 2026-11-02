@@ -1,6 +1,7 @@
 use crate::market::{
-    self, Asset, AssetPair, AssetsRequest, Candles, CandlesRequest, MaintenanceEvent, OrderBook,
-    OrderBookRequest, ServerTime, SystemStatus, Ticker,
+    self, Asset, AssetPair, AssetsRequest, Candles, CandlesRequest, GroupedOrderBook,
+    GroupedOrderBookRequest, MaintenanceEvent, OrderBook, OrderBookRequest, ServerTime,
+    SystemStatus, Ticker,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PublicClient;
@@ -72,6 +73,16 @@ impl PublicApi {
     /// <https://docs.kraken.com/api/docs/rest-api/get-order-book>
     pub async fn order_book(&self, request: &OrderBookRequest) -> Result<OrderBook, KrakenError> {
         market::book::order_book(&self.client, request).await
+    }
+
+    /// Order book of a pair grouped over ranges of ticks
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-grouped-order-book>
+    pub async fn grouped_order_book(
+        &self,
+        request: &GroupedOrderBookRequest,
+    ) -> Result<GroupedOrderBook, KrakenError> {
+        market::book::grouped_order_book(&self.client, request).await
     }
 
     /// OHLC candles of a pair, the last one being still open
