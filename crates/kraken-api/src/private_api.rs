@@ -11,7 +11,7 @@ use crate::earn::{
     self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
-use crate::subaccounts::{self, NewSubaccount};
+use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
 use crate::trading::{
     self, AddOrderBatch, AmendOrder, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
     ClosedOrders, ClosedOrdersRequest, ConsolidatedPosition, EditOrder, EditedOrder, NewOrder,
@@ -460,5 +460,16 @@ impl PrivateApi {
     /// <https://docs.kraken.com/api/docs/rest-api/create-subaccount>
     pub async fn create_subaccount(&self, subaccount: &NewSubaccount) -> Result<bool, KrakenError> {
         subaccounts::create_subaccount(&self.client, subaccount).await
+    }
+
+    /// Transfers funds between the master account and a subaccount: institutional accounts only,
+    /// with a key of the master account having the "Funds permissions - Withdraw" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/account-transfer>
+    pub async fn account_transfer(
+        &self,
+        transfer: &AccountTransfer,
+    ) -> Result<TransferResult, KrakenError> {
+        subaccounts::account_transfer(&self.client, transfer).await
     }
 }

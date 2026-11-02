@@ -20,7 +20,7 @@ use kraken_api::market::{
     OrderBookRequest, RecentSpreadsRequest, RecentTradesRequest, ServerTime, SystemState,
     SystemStatus, Ticker,
 };
-use kraken_api::subaccounts::NewSubaccount;
+use kraken_api::subaccounts::{AccountTransfer, NewSubaccount, TransferResult};
 use kraken_api::trading::{
     AddOrderBatch, AmendOrder, AmendType, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
     ClosedOrdersRequest, EditOrder, EditedOrder, NewOrder, NewOrderAnswer, OpenOrdersRequest,
@@ -1274,4 +1274,29 @@ async fn create_subaccount_fixture() {
         .await
         .unwrap();
     assert!(created);
+}
+
+#[tokio::test]
+async fn account_transfer_fixture() {
+    let result: TransferResult =
+        decode_strict("AccountTransfer", &fixture("account_transfer.json"));
+
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/AccountTransfer",
+        "account_transfer.json",
+    )
+    .await;
+    let served = private_api(&server)
+        .account_transfer(&AccountTransfer {
+            asset: "XBT".into(),
+            asset_class: None,
+            amount: "0.5".into(),
+            from: "ABCD 1234 EFGH 5678".into(),
+            to: "IJKL 0987 MNOP 6543".into(),
+        })
+        .await
+        .unwrap();
+    assert_eq!(served, result);
 }
