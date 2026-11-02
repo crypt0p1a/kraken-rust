@@ -6,10 +6,10 @@ use crate::account::{
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
-    self, ClosedOrders, ClosedOrdersRequest, ConsolidatedPosition, NewOrder, NewOrderAnswer,
-    OpenOrdersRequest, OpenPositionsRequest, Order, OrderAmends, OrderAmendsRequest, Position,
-    QueryOrdersRequest, QueryTradesRequest, Trade, TradesHistory, TradesHistoryRequest,
-    WebSocketsToken,
+    self, CancelledOrders, ClosedOrders, ClosedOrdersRequest, ConsolidatedPosition, NewOrder,
+    NewOrderAnswer, OpenOrdersRequest, OpenPositionsRequest, Order, OrderAmends,
+    OrderAmendsRequest, OrderReference, Position, QueryOrdersRequest, QueryTradesRequest, Trade,
+    TradesHistory, TradesHistoryRequest, WebSocketsToken,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PrivateClient;
@@ -210,6 +210,16 @@ impl PrivateApi {
             .await?
             .into_iter()
             .find(|order| order.txid == txid))
+    }
+
+    /// Cancels an open order, or the open orders of a user reference
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/cancel-order>
+    pub async fn cancel_order(
+        &self,
+        order: &OrderReference,
+    ) -> Result<CancelledOrders, KrakenError> {
+        trading::cancel::cancel_order(&self.client, order).await
     }
 
     /// The versions of an order, the original one first

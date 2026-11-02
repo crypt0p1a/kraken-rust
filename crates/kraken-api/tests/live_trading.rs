@@ -11,8 +11,9 @@ use kraken_api::KrakenError;
 use kraken_api::market::AssetPair;
 use kraken_api::trading::{
     AmendType, CloseTime, ClosedOrdersRequest, ConsolidatedPosition, NewOrder, NewOrderAnswer,
-    OpenOrdersRequest, Order, OrderAmends, OrderFlag, OrderSide, OrderStatus, OrderType, Position,
-    QueryTradesRequest, TimeInForce, Trade, TradesHistoryRequest, WebSocketsToken,
+    OpenOrdersRequest, Order, OrderAmends, OrderFlag, OrderReference, OrderSide, OrderStatus,
+    OrderType, Position, QueryTradesRequest, TimeInForce, Trade, TradesHistoryRequest,
+    WebSocketsToken,
 };
 use live::{
     Presence, decode_strict, entries, le, now_seconds, private_api, private_client, public_api,
@@ -819,4 +820,19 @@ async fn websockets_token_with_the_permission() {
     let token: WebSocketsToken = decode_strict("GetWebSocketsToken", &raw);
     assert!(!token.token.is_empty());
     assert!(token.expires > 0 && token.expires <= 900, "{token:?}");
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn cancel_an_unknown_order_is_refused() {
+    // no order of the account is touched: this txid doesn't exist
+    let answer = private_api()
+        .cancel_order(&OrderReference::Txid {
+            txid: "OAAAAA-AAAAA-AAAAAA".into(),
+        })
+        .await;
+    match answer {
+        Err(KrakenError::Api { body, .. }) => assert!(body.starts_with("EOrder:"), "{body}"),
+        other => panic!("unexpected {other:?}"),
+    }
 }

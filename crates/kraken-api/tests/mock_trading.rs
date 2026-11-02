@@ -6,8 +6,8 @@ use common::{FormIs, Signed, ok, orders_fixture, private_api};
 use kraken_api::KrakenError;
 use kraken_api::trading::{
     AmendType, CloseTime, ClosedOrdersRequest, NewOrder, OpenOrdersRequest, OpenPositionsRequest,
-    OrderAmendsRequest, OrderFlag, OrderSide, OrderStatus, OrderType, QueryOrdersRequest,
-    QueryTradesRequest, TimeInForce, TradesHistoryRequest,
+    OrderAmendsRequest, OrderFlag, OrderReference, OrderSide, OrderStatus, OrderType,
+    QueryOrdersRequest, QueryTradesRequest, TimeInForce, TradesHistoryRequest,
 };
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -378,4 +378,25 @@ async fn websockets_token() {
 
     let token = private_api(&server).websockets_token().await.unwrap();
     assert_eq!(token.expires, 900);
+}
+
+#[tokio::test]
+async fn cancel_order() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/CancelOrder"))
+        .and(Signed)
+        .and(FormIs(vec![("cl_ord_id", "mgr1_buy_1")]))
+        .respond_with(ok(json!({"count": 1})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let cancelled = private_api(&server)
+        .cancel_order(&OrderReference::ClOrdId {
+            cl_ord_id: "mgr1_buy_1".into(),
+        })
+        .await
+        .unwrap();
+    assert_eq!(cancelled.count, 1);
 }

@@ -6,11 +6,13 @@
 //! - `add`: new orders
 //! - `trades`: the trades (fills) of the account
 //! - `amends`: the versions of an amended order
+//! - `cancel`: the cancellations of open orders
 //! - `positions`: the open margin positions
 //! - `websocket`: the token of the private WebSocket feeds
 
 pub(crate) mod add;
 pub(crate) mod amends;
+pub(crate) mod cancel;
 pub(crate) mod order;
 pub(crate) mod positions;
 pub(crate) mod query;
@@ -20,6 +22,7 @@ pub(crate) mod websocket;
 
 pub use add::{NewOrder, NewOrderAnswer, NewOrderDescription};
 pub use amends::{AmendType, OrderAmend, OrderAmends, OrderAmendsRequest};
+pub use cancel::{CancelledOrders, OrderReference};
 pub use order::{Order, OrderDescription};
 pub use positions::{ConsolidatedPosition, OpenPositionsRequest, Position};
 pub use query::{

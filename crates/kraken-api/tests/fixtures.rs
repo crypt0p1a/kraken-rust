@@ -19,9 +19,9 @@ use kraken_api::market::{
     SystemStatus, Ticker,
 };
 use kraken_api::trading::{
-    AmendType, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
-    OrderAmends, OrderAmendsRequest, OrderSide, OrderStatus, OrderType, Position,
-    QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade, WebSocketsToken,
+    AmendType, CancelledOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest,
+    Order, OrderAmends, OrderAmendsRequest, OrderReference, OrderSide, OrderStatus, OrderType,
+    Position, QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade, WebSocketsToken,
 };
 use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
@@ -856,4 +856,17 @@ async fn websockets_token_fixture() {
         private_api(&server).websockets_token().await.unwrap(),
         token
     );
+}
+
+#[tokio::test]
+async fn cancel_order_fixture() {
+    let cancelled: CancelledOrders = decode_strict("CancelOrder", &fixture("cancel_order.json"));
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/CancelOrder", "cancel_order.json").await;
+    let served = private_api(&server)
+        .cancel_order(&OrderReference::Userref { userref: 45 })
+        .await
+        .unwrap();
+    assert_eq!(served, cancelled);
 }
