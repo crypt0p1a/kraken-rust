@@ -4,8 +4,8 @@
 //! |------------------|---------------------------------------------------|
 //! | [`market`]       | public: Time, SystemStatus, MaintenanceSchedule, Assets, AssetPairs, Ticker, OHLC, Depth, GroupedBook, Trades, Spread; private: Level3 |
 //! | [`transparency`] | public: PreTrade, PostTrade                       |
-//! | [`account`]      | private: BalanceEx, TradeVolume                   |
-//! | [`trading`]      | private: OpenOrders, ClosedOrders, QueryOrders, AddOrder |
+//! | [`account`]      | private: Balance, BalanceEx, CreditLines, TradeBalance, TradeVolume, Ledgers, QueryLedgers, AddExport, ExportStatus, RetrieveExport, RemoveExport, GetApiKeyInfo, ListWalletAccounts |
+//! | [`trading`]      | private: OpenOrders, ClosedOrders, QueryOrders, OrderAmends, TradesHistory, QueryTrades, OpenPositions, AddOrder |
 //!
 //! Each domain holds its models and its calls, [`PublicApi`] and [`PrivateApi`] being the facades
 //! composing them over the clients of `kraken-network`.

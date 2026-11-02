@@ -14,5 +14,12 @@ models, no required field missing):
 - `balance_ex.json`, `trade_volume.json`, `open_orders.json`, `closed_orders.json`,
   `query_orders.json`, `add_order_validate.json`, `add_order.json`: shapes of the real private
   answers with **synthetic values**: no account data is recorded here
+- `balance.json`, `credit_lines.json`, `trade_balance.json`, `api_key_info.json`,
+  `wallet_accounts.json`, `trades_history.json`, `query_trades.json`, `order_amends.json`,
+  `open_positions.json`, `ledgers.json`, `query_ledgers.json`, `add_export.json`,
+  `export_status.json`, `remove_export.json`: the documented shapes of the private answers,
+  synthetic values; `open_positions.json` and `export_status.json` extend the examples of the
+  documentation. Their live contracts, run with the credentials of the CI, check them against
+  the real answers (Ledgers and the exports only when the key has their permission)
 
 Update them when Kraken changes its answers, which the live contract tests detect.
