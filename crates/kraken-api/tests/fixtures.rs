@@ -19,10 +19,10 @@ use kraken_api::market::{
     SystemStatus, Ticker,
 };
 use kraken_api::trading::{
-    AmendType, CancelAllAfter, CancelledOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer,
-    OpenOrdersRequest, Order, OrderAmends, OrderAmendsRequest, OrderReference, OrderSide,
-    OrderStatus, OrderType, Position, QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade,
-    WebSocketsToken,
+    AmendOrder, AmendType, CancelAllAfter, CancelledOrders, ClosedOrdersRequest, NewOrder,
+    NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends, OrderAmendsRequest, OrderReference,
+    OrderSide, OrderStatus, OrderType, Position, QueryOrdersRequest, QueryTradesRequest,
+    TimeInForce, Trade, WebSocketsToken,
 };
 use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
@@ -926,4 +926,19 @@ async fn cancel_order_batch_fixture() {
         .await
         .unwrap();
     assert_eq!(served, cancelled);
+}
+
+#[tokio::test]
+async fn amend_order_fixture() {
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/AmendOrder", "amend_order.json").await;
+    let amend_id = private_api(&server)
+        .amend_order(&AmendOrder {
+            txid: Some("OQCLML-BW3P3-BUCMWZ".into()),
+            order_qty: Some("1.0".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(amend_id, "TJSMEH-AA67V-YUSQ6O");
 }

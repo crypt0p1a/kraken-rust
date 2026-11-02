@@ -10,9 +10,9 @@ use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::AssetPair;
 use kraken_api::trading::{
-    AmendType, CloseTime, ClosedOrdersRequest, ConsolidatedPosition, NewOrder, NewOrderAnswer,
-    OpenOrdersRequest, Order, OrderAmends, OrderFlag, OrderReference, OrderSide, OrderStatus,
-    OrderType, Position, QueryTradesRequest, TimeInForce, Trade, TradesHistoryRequest,
+    AmendOrder, AmendType, CloseTime, ClosedOrdersRequest, ConsolidatedPosition, NewOrder,
+    NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends, OrderFlag, OrderReference, OrderSide,
+    OrderStatus, OrderType, Position, QueryTradesRequest, TimeInForce, Trade, TradesHistoryRequest,
     WebSocketsToken,
 };
 use live::{
@@ -859,6 +859,23 @@ async fn cancel_a_batch_of_unknown_orders() {
             assert!(!body.contains("Invalid arguments"), "{body}");
             assert!(body.starts_with("EOrder:"), "{body}");
         }
+        other => panic!("unexpected {other:?}"),
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn amend_an_unknown_order_is_refused() {
+    // no order of the account is touched: this txid doesn't exist
+    let answer = private_api()
+        .amend_order(&AmendOrder {
+            txid: Some("OAAAAA-AAAAA-AAAAAA".into()),
+            order_qty: Some("1".into()),
+            ..Default::default()
+        })
+        .await;
+    match answer {
+        Err(KrakenError::Api { body, .. }) => assert!(body.starts_with("EOrder:"), "{body}"),
         other => panic!("unexpected {other:?}"),
     }
 }

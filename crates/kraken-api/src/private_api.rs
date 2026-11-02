@@ -6,10 +6,10 @@ use crate::account::{
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
-    self, CancelAllAfter, CancelledOrders, ClosedOrders, ClosedOrdersRequest, ConsolidatedPosition,
-    NewOrder, NewOrderAnswer, OpenOrdersRequest, OpenPositionsRequest, Order, OrderAmends,
-    OrderAmendsRequest, OrderReference, Position, QueryOrdersRequest, QueryTradesRequest, Trade,
-    TradesHistory, TradesHistoryRequest, WebSocketsToken,
+    self, AmendOrder, CancelAllAfter, CancelledOrders, ClosedOrders, ClosedOrdersRequest,
+    ConsolidatedPosition, NewOrder, NewOrderAnswer, OpenOrdersRequest, OpenPositionsRequest, Order,
+    OrderAmends, OrderAmendsRequest, OrderReference, Position, QueryOrdersRequest,
+    QueryTradesRequest, Trade, TradesHistory, TradesHistoryRequest, WebSocketsToken,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PrivateClient;
@@ -248,6 +248,14 @@ impl PrivateApi {
         orders: &[OrderReference],
     ) -> Result<CancelledOrders, KrakenError> {
         trading::cancel::cancel_order_batch(&self.client, orders).await
+    }
+
+    /// Amends an open order in place, keeping its identifiers and its priority: the identifier of
+    /// the amend
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/amend-order>
+    pub async fn amend_order(&self, request: &AmendOrder) -> Result<String, KrakenError> {
+        trading::amends::amend_order(&self.client, request).await
     }
 
     /// The versions of an order, the original one first

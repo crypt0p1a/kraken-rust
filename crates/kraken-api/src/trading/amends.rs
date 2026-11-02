@@ -79,6 +79,69 @@ pub struct OrderAmendsRequest {
     pub rebase_multiplier: Option<RebaseMultiplier>,
 }
 
+/// An amend in place: the identifiers and the priority in the queue of the order are kept
+///
+/// <https://docs.kraken.com/api/docs/rest-api/amend-order>
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct AmendOrder {
+    /// Kraken identifier of the order: this or `cl_ord_id`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub txid: Option<String>,
+    /// Client identifier of the order: this or `txid`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub cl_ord_id: Option<String>,
+    /// New quantity, in the base asset
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub order_qty: Option<String>,
+    /// New quantity shown in the book, for the iceberg orders
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub display_qty: Option<String>,
+    /// New limit price, absolute or relative ("+1.5%")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub limit_price: Option<String>,
+    /// New trigger price, absolute or relative
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub trigger_price: Option<String>,
+    /// Required for the pairs which aren't crypto, e.g. the xStocks
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub pair: Option<String>,
+    /// Rejects a new limit price which would take liquidity
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub post_only: Option<bool>,
+    /// RFC 3339: the amend is rejected after it
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub deadline: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct Amended {
+    amend_id: String,
+}
+
+/// The identifier of the amend
+pub(crate) async fn amend_order(
+    client: &PrivateClient,
+    request: &AmendOrder,
+) -> Result<String, KrakenError> {
+    if request.txid.is_some() == request.cl_ord_id.is_some() {
+        return Err(KrakenError::InvalidArgument {
+            reason: "an amend takes either the txid or the cl_ord_id of the order".into(),
+        });
+    }
+    let amended: Amended = client.call_with("AmendOrder", Some(request)).await?;
+    Ok(amended.amend_id)
+}
+
 pub(crate) async fn order_amends(
     client: &PrivateClient,
     request: &OrderAmendsRequest,
@@ -99,6 +162,23 @@ mod tests {
             rebase_multiplier: None,
         };
         assert_eq!(encode(&request).unwrap(), "order_id=OQCLML-BW3P3-BUCMWZ");
+    }
+
+    #[test]
+    fn encodes_the_amend() {
+        let request = AmendOrder {
+            txid: Some("OQCLML-BW3P3-BUCMWZ".into()),
+            order_qty: Some("1.0".into()),
+            limit_price: Some("+1.5%".into()),
+            post_only: Some(true),
+            deadline: Some("2026-11-02T10:00:00Z".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            encode(&request).unwrap(),
+            "txid=OQCLML-BW3P3-BUCMWZ&order_qty=1.0&limit_price=%2B1.5%25&post_only=true\
+             &deadline=2026-11-02T10%3A00%3A00Z"
+        );
     }
 
     #[test]

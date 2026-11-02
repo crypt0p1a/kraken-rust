@@ -21,7 +21,7 @@ mod types;
 pub(crate) mod websocket;
 
 pub use add::{NewOrder, NewOrderAnswer, NewOrderDescription};
-pub use amends::{AmendType, OrderAmend, OrderAmends, OrderAmendsRequest};
+pub use amends::{AmendOrder, AmendType, OrderAmend, OrderAmends, OrderAmendsRequest};
 pub use cancel::{CancelAllAfter, CancelledOrders, OrderReference};
 pub use order::{Order, OrderDescription};
 pub use positions::{ConsolidatedPosition, OpenPositionsRequest, Position};

@@ -5,9 +5,9 @@ mod common;
 use common::{FormIs, JsonIs, Signed, SignedJson, ok, orders_fixture, private_api};
 use kraken_api::KrakenError;
 use kraken_api::trading::{
-    AmendType, CloseTime, ClosedOrdersRequest, NewOrder, OpenOrdersRequest, OpenPositionsRequest,
-    OrderAmendsRequest, OrderFlag, OrderReference, OrderSide, OrderStatus, OrderType,
-    QueryOrdersRequest, QueryTradesRequest, TimeInForce, TradesHistoryRequest,
+    AmendOrder, AmendType, CloseTime, ClosedOrdersRequest, NewOrder, OpenOrdersRequest,
+    OpenPositionsRequest, OrderAmendsRequest, OrderFlag, OrderReference, OrderSide, OrderStatus,
+    OrderType, QueryOrdersRequest, QueryTradesRequest, TimeInForce, TradesHistoryRequest,
 };
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -464,4 +464,46 @@ async fn cancel_order_batch_is_signed_json() {
         .await
         .unwrap();
     assert_eq!(cancelled.count, 3);
+}
+
+#[tokio::test]
+async fn amend_order() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/AmendOrder"))
+        .and(Signed)
+        .and(FormIs(vec![
+            ("cl_ord_id", "mgr1_buy_1"),
+            ("limit_price", "30000.0"),
+        ]))
+        .respond_with(ok(json!({"amend_id": "TJSMEH-AA67V-YUSQ6O"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let api = private_api(&server);
+    let amend_id = api
+        .amend_order(&AmendOrder {
+            cl_ord_id: Some("mgr1_buy_1".into()),
+            limit_price: Some("30000.0".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(amend_id, "TJSMEH-AA67V-YUSQ6O");
+
+    // neither or both identifiers: refused before any request
+    for request in [
+        AmendOrder::default(),
+        AmendOrder {
+            txid: Some("O".into()),
+            cl_ord_id: Some("C".into()),
+            ..Default::default()
+        },
+    ] {
+        assert!(matches!(
+            api.amend_order(&request).await,
+            Err(KrakenError::InvalidArgument { .. })
+        ));
+    }
 }
