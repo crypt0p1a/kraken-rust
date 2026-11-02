@@ -1,0 +1,23 @@
+{
+  "error": [],
+  "result": {
+    "orders": [
+      {
+        "txid": "O5OR23-ADFAD-Y2G61C",
+        "descr": {
+          "order": "buy 0.80300000 XBTUSD @ limit 28300.0",
+          "close": "close position @ stop loss 27000.0 -> limit 26000.0"
+        }
+      },
+      {
+        "txid": "OR6QMM-BCKM4-Q6YHIN",
+        "descr": {
+          "order": "sell 0.80300000 XBTUSD @ limit 36000.0"
+        }
+      },
+      {
+        "error": "EOrder:Insufficient funds"
+      }
+    ]
+  }
+}

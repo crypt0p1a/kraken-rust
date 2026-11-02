@@ -4,6 +4,7 @@
 //! - `order`: the order model returned by the queries
 //! - `query`: open, closed and queried orders
 //! - `add`: new orders
+//! - `batch`: batches of new orders
 //! - `trades`: the trades (fills) of the account
 //! - `amends`: the versions of an amended order
 //! - `cancel`: the cancellations of open orders
@@ -13,6 +14,7 @@
 
 pub(crate) mod add;
 pub(crate) mod amends;
+pub(crate) mod batch;
 pub(crate) mod cancel;
 pub(crate) mod edit;
 pub(crate) mod order;
@@ -24,6 +26,7 @@ pub(crate) mod websocket;
 
 pub use add::{NewOrder, NewOrderAnswer, NewOrderDescription};
 pub use amends::{AmendOrder, AmendType, OrderAmend, OrderAmends, OrderAmendsRequest};
+pub use batch::{AddOrderBatch, BatchOrder, BatchOrderAnswer};
 pub use cancel::{CancelAllAfter, CancelledOrders, OrderReference};
 pub use edit::{EditOrder, EditedOrder, EditedOrderDescription};
 pub use order::{Order, OrderDescription};
@@ -34,5 +37,7 @@ pub use query::{
 pub use trades::{
     QueryTradesRequest, Trade, TradeHistoryType, TradesHistory, TradesHistoryRequest,
 };
-pub use types::{OrderFlag, OrderSide, OrderStatus, OrderType, TimeInForce};
+pub use types::{
+    OrderFlag, OrderSide, OrderStatus, OrderType, SelfTradePrevention, TimeInForce, Trigger,
+};
 pub use websocket::WebSocketsToken;

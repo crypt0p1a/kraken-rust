@@ -19,10 +19,10 @@ use kraken_api::market::{
     SystemStatus, Ticker,
 };
 use kraken_api::trading::{
-    AmendOrder, AmendType, CancelAllAfter, CancelledOrders, ClosedOrdersRequest, EditOrder,
-    EditedOrder, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends,
-    OrderAmendsRequest, OrderReference, OrderSide, OrderStatus, OrderType, Position,
-    QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade, WebSocketsToken,
+    AddOrderBatch, AmendOrder, AmendType, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
+    ClosedOrdersRequest, EditOrder, EditedOrder, NewOrder, NewOrderAnswer, OpenOrdersRequest,
+    Order, OrderAmends, OrderAmendsRequest, OrderReference, OrderSide, OrderStatus, OrderType,
+    Position, QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade, WebSocketsToken,
 };
 use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
@@ -960,4 +960,35 @@ async fn edit_order_fixture() {
         .await
         .unwrap();
     assert_eq!(served, edited);
+}
+
+#[tokio::test]
+async fn add_order_batch_fixture() {
+    let raw = fixture("add_order_batch.json");
+    let answers: Vec<BatchOrderAnswer> = raw["orders"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|it| decode_strict("AddOrderBatch", it))
+        .collect();
+    // each order either placed or failed
+    assert!(
+        answers
+            .iter()
+            .all(|it| it.txid.is_some() != it.error.is_some())
+    );
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/AddOrderBatch", "add_order_batch.json").await;
+    let served = private_api(&server)
+        .add_order_batch(&AddOrderBatch {
+            pair: "XBTUSD".into(),
+            orders: vec![],
+            asset_class: None,
+            deadline: None,
+            validate: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(served, answers);
 }

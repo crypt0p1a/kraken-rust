@@ -98,6 +98,28 @@ impl AsRef<str> for OrderFlag {
     }
 }
 
+/// Price signal triggering the stop-loss and take-profit orders
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[serde(rename_all = "lowercase")]
+pub enum Trigger {
+    /// The last trade, the default
+    Last,
+    Index,
+}
+
+/// What happens when an order would trade against another order of the account
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[serde(rename_all = "kebab-case")]
+pub enum SelfTradePrevention {
+    /// The arriving order is cancelled, the default
+    CancelNewest,
+    /// The resting order is cancelled
+    CancelOldest,
+    CancelBoth,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,6 +142,21 @@ mod tests {
             serde_json::from_str::<OrderStatus>(r#""something-new""#).unwrap(),
             OrderStatus::Unknown
         );
+    }
+
+    #[test]
+    fn encodes_the_trigger_and_the_self_trade_prevention() {
+        assert_eq!(
+            serde_json::to_string(&Trigger::Index).unwrap(),
+            r#""index""#
+        );
+        for (prevention, text) in [
+            (SelfTradePrevention::CancelNewest, r#""cancel-newest""#),
+            (SelfTradePrevention::CancelOldest, r#""cancel-oldest""#),
+            (SelfTradePrevention::CancelBoth, r#""cancel-both""#),
+        ] {
+            assert_eq!(serde_json::to_string(&prevention).unwrap(), text);
+        }
     }
 
     #[test]

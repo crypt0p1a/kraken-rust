@@ -6,11 +6,11 @@ use crate::account::{
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
-    self, AmendOrder, CancelAllAfter, CancelledOrders, ClosedOrders, ClosedOrdersRequest,
-    ConsolidatedPosition, EditOrder, EditedOrder, NewOrder, NewOrderAnswer, OpenOrdersRequest,
-    OpenPositionsRequest, Order, OrderAmends, OrderAmendsRequest, OrderReference, Position,
-    QueryOrdersRequest, QueryTradesRequest, Trade, TradesHistory, TradesHistoryRequest,
-    WebSocketsToken,
+    self, AddOrderBatch, AmendOrder, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
+    ClosedOrders, ClosedOrdersRequest, ConsolidatedPosition, EditOrder, EditedOrder, NewOrder,
+    NewOrderAnswer, OpenOrdersRequest, OpenPositionsRequest, Order, OrderAmends,
+    OrderAmendsRequest, OrderReference, Position, QueryOrdersRequest, QueryTradesRequest, Trade,
+    TradesHistory, TradesHistoryRequest, WebSocketsToken,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PrivateClient;
@@ -330,5 +330,16 @@ impl PrivateApi {
     /// <https://docs.kraken.com/api/docs/rest-api/get-websockets-token>
     pub async fn websockets_token(&self) -> Result<WebSocketsToken, KrakenError> {
         trading::websocket::websockets_token(&self.client).await
+    }
+
+    /// Places 2 to 15 orders of a pair, validated as a whole: the answer of each order, in the
+    /// order of the request
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/add-order-batch>
+    pub async fn add_order_batch(
+        &self,
+        request: &AddOrderBatch,
+    ) -> Result<Vec<BatchOrderAnswer>, KrakenError> {
+        trading::batch::add_order_batch(&self.client, request).await
     }
 }
