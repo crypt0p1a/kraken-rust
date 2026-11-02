@@ -132,3 +132,22 @@ async fn add_strategy() {
         .unwrap();
     assert_eq!(id, "ASMBA64-R23M2-J7JRJV");
 }
+
+#[tokio::test]
+async fn cancel_strategy() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/CancelStrategy"))
+        .and(Signed)
+        .and(FormIs(vec![("strategy_id", "ASMBA64-R23M2-J7JRJV")]))
+        .respond_with(ok(json!({"strategy_id": "ASMBA64-R23M2-J7JRJV"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let id = private_api(&server)
+        .cancel_strategy("ASMBA64-R23M2-J7JRJV")
+        .await
+        .unwrap();
+    assert_eq!(id, "ASMBA64-R23M2-J7JRJV");
+}

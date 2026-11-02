@@ -1103,3 +1103,15 @@ async fn add_strategy_fixture() {
         .unwrap();
     assert!(id.starts_with("AS"));
 }
+
+#[tokio::test]
+async fn cancel_strategy_fixture() {
+    // the same answer as AddStrategy
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/CancelStrategy", "add_strategy.json").await;
+    let id = private_api(&server)
+        .cancel_strategy("ASMBA64-R23M2-J7JRJV")
+        .await
+        .unwrap();
+    assert_eq!(id, "ASMBA64-R23M2-J7JRJV");
+}

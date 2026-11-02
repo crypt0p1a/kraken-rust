@@ -247,6 +247,23 @@ pub(crate) async fn add_strategy(
     Ok(answer.strategy_id)
 }
 
+#[derive(Serialize)]
+struct Cancel<'a> {
+    strategy_id: &'a str,
+}
+
+/// Stops the scheduling of the child orders of a pending or open strategy: a child order already
+/// sent may still fill. Returns the id of the cancelled strategy
+pub(crate) async fn cancel_strategy(
+    client: &PrivateClient,
+    strategy_id: &str,
+) -> Result<String, KrakenError> {
+    let answer: StrategyId = client
+        .call_with("CancelStrategy", Some(&Cancel { strategy_id }))
+        .await?;
+    Ok(answer.strategy_id)
+}
+
 #[cfg(test)]
 pub(crate) const SAMPLE: &str = r#"{
     "ASPBVCI-6MKBA-QE4VF6":{"strategy_id":"ASPBVCI-6MKBA-QE4VF6","status":"pending",
@@ -356,6 +373,17 @@ mod tests {
     fn decodes_the_id_of_a_validated_strategy() {
         let answer: StrategyId = serde_json::from_str(r#"{"strategy_id":""}"#).unwrap();
         assert!(answer.strategy_id.is_empty());
+    }
+
+    #[test]
+    fn encodes_the_cancellation() {
+        assert_eq!(
+            encode(&Cancel {
+                strategy_id: "ASMBA64-R23M2-J7JRJV"
+            })
+            .unwrap(),
+            "strategy_id=ASMBA64-R23M2-J7JRJV"
+        );
     }
 
     #[test]

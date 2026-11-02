@@ -6,11 +6,11 @@
 mod live;
 mod strict;
 
-use kraken_api::Decimal;
 use kraken_api::algo::{
     ClosedStrategies, ClosedStrategiesRequest, NewStrategy, Strategy, StrategyStatus, StrategyType,
 };
 use kraken_api::trading::{OrderSide, OrderType};
+use kraken_api::{Decimal, KrakenError};
 use live::{decode_strict, entries, private_api, private_client};
 use serde_json::Value;
 
@@ -147,4 +147,14 @@ async fn validates_a_new_strategy() {
         .await
         .unwrap();
     assert!(id.is_empty(), "a validated strategy has no id: {id}");
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn cancel_an_unknown_strategy_is_refused() {
+    // no strategy of the account is touched: this id doesn't exist
+    match private_api().cancel_strategy("ASAAAAA-AAAAA-AAAAAA").await {
+        Err(KrakenError::Api { body, .. }) => assert!(body.starts_with('E'), "{body}"),
+        other => panic!("unexpected {other:?}"),
+    }
 }

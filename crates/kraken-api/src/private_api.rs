@@ -384,4 +384,11 @@ impl PrivateApi {
     pub async fn add_strategy(&self, request: &NewStrategy) -> Result<String, KrakenError> {
         algo::add_strategy(&self.client, request).await
     }
+
+    /// Cancels a pending or open strategy: a child order already sent may still fill
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/cancel-strategy>
+    pub async fn cancel_strategy(&self, strategy_id: &str) -> Result<String, KrakenError> {
+        algo::cancel_strategy(&self.client, strategy_id).await
+    }
 }
