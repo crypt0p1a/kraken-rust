@@ -1,5 +1,5 @@
 use crate::Decimal;
-use crate::account::{self, BalanceRequest, ExtendedBalance, TradeVolume};
+use crate::account::{self, BalanceRequest, CreditLines, ExtendedBalance, TradeVolume};
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, ClosedOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
@@ -49,6 +49,13 @@ impl PrivateApi {
         request: &BalanceRequest,
     ) -> Result<HashMap<String, Decimal>, KrakenError> {
         account::balance::balance(&self.client, request).await
+    }
+
+    /// The credit lines of the account and their usage: VIP accounts only
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-credit-lines>
+    pub async fn credit_lines(&self, request: &BalanceRequest) -> Result<CreditLines, KrakenError> {
+        account::credit::credit_lines(&self.client, request).await
     }
 
     /// Balances per asset, with the amounts held by the open orders

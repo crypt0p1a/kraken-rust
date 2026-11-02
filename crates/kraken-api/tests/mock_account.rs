@@ -33,6 +33,29 @@ async fn balance() {
 }
 
 #[tokio::test]
+async fn credit_lines() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/CreditLines"))
+        .and(Signed)
+        .and(FormIs(vec![]))
+        .respond_with(ok(json!({
+            "asset_details": {"ZUSD": {"balance": "1000.5", "hold_trade": "0", "credit": "50000"}},
+            "limits_monitor": {"total_credit_usd": "50000.00", "equity_usd": "110000.00"}
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let lines = private_api(&server)
+        .credit_lines(&Default::default())
+        .await
+        .unwrap();
+    assert_eq!(lines.asset_details["ZUSD"].credit, Some(dec!(50000)));
+    assert_eq!(lines.limits_monitor.equity_usd, Some(dec!(110000)));
+}
+
+#[tokio::test]
 async fn extended_balance() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
