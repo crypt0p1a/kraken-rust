@@ -40,6 +40,7 @@ its linker.
 
 ```sh
 brew tap messense/macos-cross-toolchains
+brew trust --tap messense/macos-cross-toolchains   # Homebrew 7 and later
 brew install aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu mingw-w64
 ```
 

@@ -261,6 +261,8 @@ jobs:
         run: |
           echo "ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
           brew tap messense/macos-cross-toolchains
+          # Homebrew 7 refuses to load the formulae of a tap which isn't trusted
+          brew trust --tap messense/macos-cross-toolchains
           brew install x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu mingw-w64
           echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=x86_64-linux-gnu-gcc" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
