@@ -75,6 +75,10 @@ pub(crate) async fn pre_trade(
 }
 
 /// A trade of the exchange
+///
+/// Its pair is described by the same fields as [`PreTradeData`], repeated rather than shared
+/// through `#[serde(flatten)]`: a flattened struct would hide the undocumented fields from the
+/// strict decoding of the tests
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 pub struct PostTrade {

@@ -3,9 +3,10 @@ use crate::market::AssetClass;
 use crate::{KrakenError, lenient};
 use kraken_network::{FundingClient, FundingMethod};
 use rust_decimal::Decimal;
-use serde::de::Error;
+use serde::de::value::MapAccessDeserializer;
+use serde::de::{Error, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::Value;
+use std::fmt;
 
 /// An amount of a limit, in the asset of its policy, in USD and in the requested asset
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -28,17 +29,45 @@ pub enum LimitValue {
     Count { count: Decimal },
 }
 
+/// The object of the amounts is given to [`LimitAmounts`] as it is, without buffering: the
+/// strict decoding of the tests sees its fields
+struct LimitValueVisitor;
+
+impl<'de> Visitor<'de> for LimitValueVisitor {
+    type Value = LimitValue;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("amounts, or a count")
+    }
+
+    fn visit_map<M: MapAccess<'de>>(self, map: M) -> Result<LimitValue, M::Error> {
+        Ok(LimitValue::Amounts {
+            amounts: LimitAmounts::deserialize(MapAccessDeserializer::new(map))?,
+        })
+    }
+
+    fn visit_str<E: Error>(self, count: &str) -> Result<LimitValue, E> {
+        Ok(LimitValue::Count {
+            count: lenient::parse_decimal(count).map_err(E::custom)?,
+        })
+    }
+
+    fn visit_u64<E: Error>(self, count: u64) -> Result<LimitValue, E> {
+        Ok(LimitValue::Count {
+            count: Decimal::from(count),
+        })
+    }
+
+    fn visit_i64<E: Error>(self, count: i64) -> Result<LimitValue, E> {
+        Ok(LimitValue::Count {
+            count: Decimal::from(count),
+        })
+    }
+}
+
 impl<'de> Deserialize<'de> for LimitValue {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        match Value::deserialize(deserializer)? {
-            Value::Object(amounts) => Ok(LimitValue::Amounts {
-                amounts: serde_json::from_value(Value::Object(amounts))
-                    .map_err(D::Error::custom)?,
-            }),
-            count => Ok(LimitValue::Count {
-                count: lenient::decimal(count).map_err(D::Error::custom)?,
-            }),
-        }
+        deserializer.deserialize_any(LimitValueVisitor)
     }
 }
 

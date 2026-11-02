@@ -128,25 +128,54 @@ impl<'a> AssetFilterQuery<'a> {
 /// An address of a deposit or a withdrawal: `{"crypto": {...}}` or `{"fiat": {...}}`
 // a decoded answer, not moved around: no Box, which the bindings can't carry
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
-#[serde(rename_all = "snake_case")]
 pub enum AddressDetails {
     Crypto {
         address: String,
         /// Destination tag, for the networks requiring one
-        #[serde(default)]
         tag: Option<String>,
-        #[serde(default)]
         memo: Option<String>,
         /// The withdrawal addresses only
-        #[serde(default)]
         beneficiary: Option<Beneficiary>,
     },
     Fiat {
-        #[serde(flatten)]
         account: FiatAccount,
     },
+}
+
+#[derive(Deserialize)]
+struct CryptoAddress {
+    address: String,
+    #[serde(default)]
+    tag: Option<String>,
+    #[serde(default)]
+    memo: Option<String>,
+    #[serde(default)]
+    beneficiary: Option<Beneficiary>,
+}
+
+/// Newtype variants, read without buffering: the strict decoding of the tests sees their fields
+#[allow(clippy::large_enum_variant)]
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum RawAddress {
+    Crypto(CryptoAddress),
+    Fiat(FiatAccount),
+}
+
+impl<'de> Deserialize<'de> for AddressDetails {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(match RawAddress::deserialize(deserializer)? {
+            RawAddress::Crypto(crypto) => AddressDetails::Crypto {
+                address: crypto.address,
+                tag: crypto.tag,
+                memo: crypto.memo,
+                beneficiary: crypto.beneficiary,
+            },
+            RawAddress::Fiat(account) => AddressDetails::Fiat { account },
+        })
+    }
 }
 
 /// The beneficiary of a withdrawal address (travel rule)

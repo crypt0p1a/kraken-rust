@@ -7,48 +7,37 @@
 use crate::{KrakenError, lenient};
 use kraken_network::PrivateClient;
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// How the funds are locked by a strategy
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub enum LockType {
     /// Not locked
     Flex,
     /// Locked during a bonding and an unbonding period
     Bonded {
         /// Seconds
-        #[serde(default)]
         bonding_period: Option<i64>,
-        #[serde(default)]
         bonding_period_variable: Option<bool>,
         /// Rewards earned during the bonding, paid after it
-        #[serde(default)]
         bonding_rewards: Option<bool>,
         /// Seconds in the exit queue before the unbonding, when greater than 0
-        #[serde(default)]
         exit_queue_period: Option<i64>,
         /// Seconds between the payouts of the rewards
-        #[serde(default)]
         payout_frequency: Option<i64>,
         /// Seconds to wait to remove the funds
-        #[serde(default)]
         unbonding_period: Option<i64>,
-        #[serde(default)]
         unbonding_period_variable: Option<bool>,
         /// Rewards earned and paid during the unbonding
-        #[serde(default)]
         unbonding_rewards: Option<bool>,
     },
     /// Removed at once
     Instant {
         /// Seconds between the payouts of the rewards
-        #[serde(default)]
         payout_frequency: Option<i64>,
     },
     /// Sent by Kraken but unknown to this version of the library
-    #[serde(other)]
     Unknown,
 }
 
@@ -63,31 +52,114 @@ pub enum LockTypeFilter {
     Instant,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub enum AutoCompound {
     Disabled,
     Enabled,
     /// Chosen by the user
     Optional {
         /// Enabled by default
-        #[serde(default)]
         default: Option<bool>,
     },
-    #[serde(other)]
     Unknown,
 }
 
 /// Where the rewards come from
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub enum YieldSource {
     Staking,
     OffChain,
-    #[serde(other)]
     Unknown,
+}
+
+/// The objects tagged by `type` are read as flat objects, then mapped to their enum: serde's
+/// internally tagged enums buffer their content, out of the reach of the strict decoding of the
+/// tests
+#[derive(Deserialize)]
+struct RawLockType {
+    #[serde(rename = "type")]
+    kind: String,
+    #[serde(default)]
+    bonding_period: Option<i64>,
+    #[serde(default)]
+    bonding_period_variable: Option<bool>,
+    #[serde(default)]
+    bonding_rewards: Option<bool>,
+    #[serde(default)]
+    exit_queue_period: Option<i64>,
+    #[serde(default)]
+    payout_frequency: Option<i64>,
+    #[serde(default)]
+    unbonding_period: Option<i64>,
+    #[serde(default)]
+    unbonding_period_variable: Option<bool>,
+    #[serde(default)]
+    unbonding_rewards: Option<bool>,
+}
+
+impl<'de> Deserialize<'de> for LockType {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = RawLockType::deserialize(deserializer)?;
+        Ok(match raw.kind.as_str() {
+            "flex" => LockType::Flex,
+            "bonded" => LockType::Bonded {
+                bonding_period: raw.bonding_period,
+                bonding_period_variable: raw.bonding_period_variable,
+                bonding_rewards: raw.bonding_rewards,
+                exit_queue_period: raw.exit_queue_period,
+                payout_frequency: raw.payout_frequency,
+                unbonding_period: raw.unbonding_period,
+                unbonding_period_variable: raw.unbonding_period_variable,
+                unbonding_rewards: raw.unbonding_rewards,
+            },
+            "instant" => LockType::Instant {
+                payout_frequency: raw.payout_frequency,
+            },
+            _ => LockType::Unknown,
+        })
+    }
+}
+
+#[derive(Deserialize)]
+struct RawAutoCompound {
+    #[serde(rename = "type")]
+    kind: String,
+    #[serde(default)]
+    default: Option<bool>,
+}
+
+impl<'de> Deserialize<'de> for AutoCompound {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = RawAutoCompound::deserialize(deserializer)?;
+        Ok(match raw.kind.as_str() {
+            "disabled" => AutoCompound::Disabled,
+            "enabled" => AutoCompound::Enabled,
+            "optional" => AutoCompound::Optional {
+                default: raw.default,
+            },
+            _ => AutoCompound::Unknown,
+        })
+    }
+}
+
+#[derive(Deserialize)]
+struct RawYieldSource {
+    #[serde(rename = "type")]
+    kind: String,
+}
+
+impl<'de> Deserialize<'de> for YieldSource {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(
+            match RawYieldSource::deserialize(deserializer)?.kind.as_str() {
+                "staking" => YieldSource::Staking,
+                "off_chain" => YieldSource::OffChain,
+                _ => YieldSource::Unknown,
+            },
+        )
+    }
 }
 
 /// Estimate of the yearly yield, from the past rewards

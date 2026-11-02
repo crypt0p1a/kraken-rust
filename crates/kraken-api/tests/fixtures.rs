@@ -1676,3 +1676,31 @@ async fn create_withdrawal_fixture() {
         .unwrap();
     assert_eq!(served, created);
 }
+
+// the polymorphic models stay within the reach of the strict decoding: an undocumented field is
+// caught there too
+
+#[test]
+#[should_panic(expected = "ignored by the model")]
+fn strict_decoding_reaches_the_fiat_accounts() {
+    let mut raw = funding_fixture("claimed_addresses.json");
+    raw["addresses"][1]["address_details"]["fiat"]["undocumented"] = serde_json::json!(1);
+    let _: ClaimedAddresses = decode_strict("claimed addresses", &raw);
+}
+
+#[test]
+#[should_panic(expected = "ignored by the model")]
+fn strict_decoding_reaches_the_amounts_of_the_limits() {
+    let mut raw = funding_fixture("withdrawal_limits.json");
+    raw["withdrawal_limits"][0]["limits"][0]["limit"]["maximum"]["undocumented"] =
+        serde_json::json!(1);
+    let _: WithdrawalLimits = decode_strict("withdrawal limits", &raw);
+}
+
+#[test]
+#[should_panic(expected = "ignored by the model")]
+fn strict_decoding_reaches_the_lock_types() {
+    let mut raw = fixture("earn_strategies.json");
+    raw["items"][1]["lock_type"]["undocumented"] = serde_json::json!(1);
+    let _: EarnStrategies = decode_strict("Earn/Strategies", &raw);
+}
