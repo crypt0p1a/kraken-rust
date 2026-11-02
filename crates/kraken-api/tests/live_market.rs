@@ -11,9 +11,10 @@ use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetsRequest, CandleInterval, CandlesRequest,
-    GroupedOrderBook, MaintenanceEvent, OrderBookRequest, ServerTime, SystemState, SystemStatus,
-    Ticker,
+    GroupedOrderBook, MaintenanceEvent, OrderBookRequest, RecentTradesRequest, ServerTime,
+    SystemState, SystemStatus, Ticker,
 };
+use kraken_api::trading::OrderType;
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
 use rust_decimal_macros::dec;
 use serde::Serialize;
@@ -546,4 +547,34 @@ async fn grouped_order_book_is_ordered() {
         "crossed book"
     );
     assert!(grouped.asks.windows(2).all(|it| it[0].price < it[1].price));
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn recent_trades_continue_from_last() {
+    let api = public_api();
+    let request = |since: Option<String>| RecentTradesRequest {
+        pair: "XBTUSD".into(),
+        since,
+        count: Some(50),
+        asset_class: None,
+    };
+    let trades = api.recent_trades(&request(None)).await.unwrap();
+    assert_eq!(trades.pair, "XXBTZUSD");
+    assert_eq!(trades.trades.len(), 50);
+    assert!(trades.trades.windows(2).all(|it| it[0].time <= it[1].time));
+    assert!(trades.trades.iter().all(|it| it.price > Decimal::ZERO));
+    assert!(
+        trades
+            .trades
+            .iter()
+            .all(|it| it.order_type != OrderType::Unknown)
+    );
+    let next = api
+        .recent_trades(&request(Some(trades.last.clone())))
+        .await
+        .unwrap();
+    // `since` is inclusive: the last trade is sent again
+    let last_id = trades.trades.last().unwrap().trade_id;
+    assert!(next.trades.iter().all(|it| it.trade_id >= last_id));
 }

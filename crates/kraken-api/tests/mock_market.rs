@@ -5,8 +5,10 @@ mod common;
 use common::{FormIs, QueryIs, Signed, ok, private_api, public_api};
 use kraken_api::market::{
     AssetClass, AssetStatus, AssetsRequest, CandleInterval, CandlesRequest,
-    GroupedOrderBookRequest, Level3OrderBookRequest, OrderBookRequest, SystemState,
+    GroupedOrderBookRequest, Level3OrderBookRequest, OrderBookRequest, RecentTradesRequest,
+    SystemState,
 };
+use kraken_api::trading::{OrderSide, OrderType};
 use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -272,4 +274,36 @@ async fn level3_order_book_is_signed() {
         .await
         .unwrap();
     assert_eq!(book.bids[0].order_id, "O5KJU4-IEQTM-NDMS6W");
+}
+
+#[tokio::test]
+async fn recent_trades() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/0/public/Trades"))
+        .and(QueryIs(vec![
+            ("pair", "XBTUSD"),
+            ("since", "1793612206000000000"),
+            ("count", "1"),
+        ]))
+        .respond_with(ok(json!({
+            "XXBTZUSD": [["77934.10000", "0.00049086", 1793612206.5751364, "s", "m", "", 113876654]],
+            "last": "1793612206575136400"
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let trades = public_api(&server)
+        .recent_trades(&RecentTradesRequest {
+            pair: "XBTUSD".into(),
+            since: Some("1793612206000000000".into()),
+            count: Some(1),
+            asset_class: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(trades.last, "1793612206575136400");
+    assert_eq!(trades.trades[0].side, OrderSide::Sell);
+    assert_eq!(trades.trades[0].order_type, OrderType::Market);
 }

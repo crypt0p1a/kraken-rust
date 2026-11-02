@@ -11,7 +11,7 @@ use kraken_api::account::{ExtendedBalance, TradeVolume};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
-    OrderBookRequest, ServerTime, SystemState, SystemStatus, Ticker,
+    OrderBookRequest, RecentTradesRequest, ServerTime, SystemState, SystemStatus, Ticker,
 };
 use kraken_api::trading::{
     ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
@@ -435,4 +435,31 @@ async fn level3_order_book_fixture() {
         .await
         .unwrap();
     assert_eq!(served, level3);
+}
+
+#[tokio::test]
+async fn recent_trades_fixture() {
+    for row in rows("trades.json", None) {
+        assert_eq!(row.as_array().unwrap().len(), 7, "{row}");
+    }
+    assert!(fixture("trades.json")["last"].is_string());
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/public/Trades", "trades.json").await;
+    let trades = public_api(&server)
+        .recent_trades(&RecentTradesRequest {
+            pair: "XBTUSD".into(),
+            since: None,
+            count: None,
+            asset_class: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(trades.trades.len(), 3);
+    assert!(
+        trades
+            .trades
+            .windows(2)
+            .all(|it| it[0].trade_id < it[1].trade_id)
+    );
 }

@@ -11,6 +11,7 @@ pub(crate) mod pairs;
 pub(crate) mod status;
 pub(crate) mod ticker;
 pub(crate) mod time;
+pub(crate) mod trades;
 
 pub use assets::{Asset, AssetClass, AssetStatus, AssetsRequest};
 pub use book::{
@@ -25,3 +26,4 @@ pub use status::{
 };
 pub use ticker::{PriceLevel, Ticker, TradeLevel, Window, WindowCount};
 pub use time::ServerTime;
+pub use trades::{PublicTrade, RecentTrades, RecentTradesRequest};
