@@ -355,4 +355,14 @@ impl PrivateApi {
     ) -> Result<Vec<Strategy>, KrakenError> {
         algo::open_strategies(&self.client, strategy_type).await
     }
+
+    /// Up to 20 strategies by id, the most recent start first: the unknown ids are omitted
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/query-strategies>
+    pub async fn query_strategies(
+        &self,
+        strategy_ids: &[String],
+    ) -> Result<Vec<Strategy>, KrakenError> {
+        algo::query_strategies(&self.client, strategy_ids).await
+    }
 }

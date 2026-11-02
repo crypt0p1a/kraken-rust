@@ -36,3 +36,28 @@ async fn open_strategies() {
         .unwrap();
     assert_eq!(strategies[0].status, StrategyStatus::Pending);
 }
+
+#[tokio::test]
+async fn query_strategies() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/QueryStrategies"))
+        .and(Signed)
+        .and(FormIs(vec![(
+            "strategy_ids",
+            "ASPBVCI-6MKBA-QE4VF6,AS-UNKNOWN",
+        )]))
+        .respond_with(ok(json!({"strategies": {
+            "ASPBVCI-6MKBA-QE4VF6": twap("ASPBVCI-6MKBA-QE4VF6", "open")
+        }})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let strategies = private_api(&server)
+        .query_strategies(&["ASPBVCI-6MKBA-QE4VF6".into(), "AS-UNKNOWN".into()])
+        .await
+        .unwrap();
+    assert_eq!(strategies.len(), 1, "the unknown id is omitted");
+    assert_eq!(strategies[0].status, StrategyStatus::Open);
+}

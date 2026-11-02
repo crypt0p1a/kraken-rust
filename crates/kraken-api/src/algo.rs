@@ -4,6 +4,7 @@
 use crate::trading::{OrderSide, OrderType};
 use crate::{KrakenError, lenient};
 use kraken_network::PrivateClient;
+use kraken_network::params::comma_separated;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -115,6 +116,29 @@ pub(crate) async fn open_strategies(
     Ok(listed(answer.open))
 }
 
+#[derive(Serialize)]
+struct StrategyIds<'a> {
+    #[serde(serialize_with = "comma_separated")]
+    strategy_ids: &'a [String],
+}
+
+#[derive(Deserialize)]
+struct QueryAnswer {
+    #[serde(default)]
+    strategies: HashMap<String, Strategy>,
+}
+
+/// Up to 20 strategies by id, the most recent start first: the unknown ids are omitted
+pub(crate) async fn query_strategies(
+    client: &PrivateClient,
+    strategy_ids: &[String],
+) -> Result<Vec<Strategy>, KrakenError> {
+    let answer: QueryAnswer = client
+        .call_with("QueryStrategies", Some(&StrategyIds { strategy_ids }))
+        .await?;
+    Ok(listed(answer.strategies))
+}
+
 #[cfg(test)]
 pub(crate) const SAMPLE: &str = r#"{
     "ASPBVCI-6MKBA-QE4VF6":{"strategy_id":"ASPBVCI-6MKBA-QE4VF6","status":"pending",
@@ -149,6 +173,18 @@ mod tests {
             })
             .unwrap(),
             ""
+        );
+    }
+
+    #[test]
+    fn encodes_the_ids() {
+        let ids = [
+            "ASPBVCI-6MKBA-QE4VF6".to_string(),
+            "ASMBA64-R23M2-J7JRJV".to_string(),
+        ];
+        assert_eq!(
+            encode(&StrategyIds { strategy_ids: &ids }).unwrap(),
+            "strategy_ids=ASPBVCI-6MKBA-QE4VF6%2CASMBA64-R23M2-J7JRJV"
         );
     }
 

@@ -54,3 +54,30 @@ async fn open_strategies() {
     let typed = private_api().open_strategies(None).await.unwrap();
     assert_eq!(typed.len(), raw["open"].as_object().unwrap().len());
 }
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn query_strategies_finds_the_open_ones() {
+    let api = private_api();
+    let open = api.open_strategies(None).await.unwrap();
+    let ids: Vec<String> = open
+        .iter()
+        .take(20)
+        .map(|it| it.strategy_id.clone())
+        .collect();
+    // an unknown id is omitted
+    let unknown = api
+        .query_strategies(&["ASAAAAA-AAAAA-AAAAAA".into()])
+        .await
+        .unwrap();
+    assert!(unknown.is_empty(), "{unknown:?}");
+    if ids.is_empty() {
+        println!("no open strategy on the account: nothing to query");
+        return;
+    }
+    let queried = api.query_strategies(&ids).await.unwrap();
+    assert_eq!(queried.len(), ids.len());
+    for strategy in &queried {
+        check_strategy(&strategy.strategy_id, strategy);
+    }
+}

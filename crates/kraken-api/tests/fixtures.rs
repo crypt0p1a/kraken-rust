@@ -1031,3 +1031,24 @@ async fn open_strategies_fixture() {
             .all(|it| it[0].details.start_time >= it[1].details.start_time)
     );
 }
+
+#[tokio::test]
+async fn query_strategies_fixture() {
+    let strategies: HashMap<String, Strategy> = each(
+        "QueryStrategies",
+        &fixture("query_strategies.json")["strategies"],
+    );
+
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/QueryStrategies",
+        "query_strategies.json",
+    )
+    .await;
+    let served = private_api(&server)
+        .query_strategies(&strategies.keys().cloned().collect::<Vec<_>>())
+        .await
+        .unwrap();
+    assert!(served.iter().all(|it| strategies[&it.strategy_id] == *it));
+}
