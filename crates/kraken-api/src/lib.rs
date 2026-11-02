@@ -5,6 +5,7 @@
 //! | [`market`]       | public: Time, SystemStatus, MaintenanceSchedule, Assets, AssetPairs, Ticker, OHLC, Depth, GroupedBook, Trades, Spread; private: Level3 |
 //! | [`transparency`] | public: PreTrade, PostTrade                       |
 //! | [`account`]      | private: Balance, BalanceEx, CreditLines, TradeBalance, TradeVolume, Ledgers, QueryLedgers, AddExport, ExportStatus, RetrieveExport, RemoveExport, GetApiKeyInfo, ListWalletAccounts |
+//! | [`algo`]         | private: GetOpenStrategies                        |
 //! | [`trading`]      | private: OpenOrders, ClosedOrders, QueryOrders, OrderAmends, TradesHistory, QueryTrades, OpenPositions, AddOrder, AddOrderBatch, AmendOrder, EditOrder, CancelOrder, CancelAll, CancelAllOrdersAfter, CancelOrderBatch, GetWebSocketsToken |
 //!
 //! Each domain holds its models and its calls, [`PublicApi`] and [`PrivateApi`] being the facades
@@ -39,6 +40,7 @@ uniffi::custom_type!(Decimal, String, {
 });
 
 pub mod account;
+pub mod algo;
 mod cursor;
 mod lenient;
 pub mod market;

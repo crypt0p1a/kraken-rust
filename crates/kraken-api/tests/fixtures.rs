@@ -12,6 +12,7 @@ use kraken_api::account::{
     LedgerType, QueryLedgersRequest, RemoveExportType, TradeBalance, TradeVolume, WalletAccounts,
     WalletStatus,
 };
+use kraken_api::algo::Strategy;
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -1000,4 +1001,33 @@ async fn add_order_batch_fixture() {
         .await
         .unwrap();
     assert_eq!(served, answers);
+}
+
+// algo
+
+#[tokio::test]
+async fn open_strategies_fixture() {
+    let strategies: HashMap<String, Strategy> = each(
+        "GetOpenStrategies",
+        &fixture("open_strategies.json")["open"],
+    );
+    assert!(strategies.iter().all(|(id, it)| *id == it.strategy_id));
+    // avg_price = total_cost / filled_volume
+    let open = &strategies["ASMBA64-R23M2-J7JRJV"].details;
+    assert_eq!(open.avg_price, Some(open.total_cost / open.filled_volume));
+
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/GetOpenStrategies",
+        "open_strategies.json",
+    )
+    .await;
+    let served = private_api(&server).open_strategies(None).await.unwrap();
+    assert_eq!(served.len(), 2);
+    assert!(
+        served
+            .windows(2)
+            .all(|it| it[0].details.start_time >= it[1].details.start_time)
+    );
 }

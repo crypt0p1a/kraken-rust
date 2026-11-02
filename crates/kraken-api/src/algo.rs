@@ -1,0 +1,186 @@
+//! Private algorithmic trading: the TWAP strategies, which execute a volume evenly over a period
+//! as market or limit child orders
+
+use crate::trading::{OrderSide, OrderType};
+use crate::{KrakenError, lenient};
+use kraken_network::PrivateClient;
+use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// The only type of strategy today
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[serde(rename_all = "lowercase")]
+pub enum StrategyType {
+    Twap,
+    /// Sent by Kraken but unknown to this version of the library. Never send it
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[serde(rename_all = "lowercase")]
+pub enum StrategyStatus {
+    /// Accepted, waiting for its start
+    Pending,
+    /// Running
+    Open,
+    /// Fully executed
+    Closed,
+    Expired,
+    Cancelled,
+    #[serde(other)]
+    Unknown,
+}
+
+/// The TWAP and its execution
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct StrategyDetails {
+    pub strategy_type: StrategyType,
+    pub side: OrderSide,
+    /// Total volume, in the base currency
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub volume: Decimal,
+    /// Volume executed so far
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub filled_volume: Decimal,
+    /// None until the first fill
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub avg_price: Option<Decimal>,
+    /// In the quote currency
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub total_cost: Decimal,
+    /// In the quote currency
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub total_fee: Decimal,
+    /// UTC timestamps in seconds
+    #[serde(rename = "starttm", deserialize_with = "lenient::number")]
+    pub start_time: i64,
+    #[serde(rename = "expiretm", deserialize_with = "lenient::number")]
+    pub expire_time: i64,
+    /// e.g. "BTC/USD"
+    pub symbol: String,
+    /// "forex", "tokenized_asset" or "synthetic_pair"
+    pub asset_class: String,
+    /// Type of the child orders: market or limit
+    #[serde(rename = "ordertype")]
+    pub order_type: OrderType,
+    /// Limit price of the child orders
+    #[serde(default, deserialize_with = "lenient::opt_decimal")]
+    pub price: Option<Decimal>,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/get-open-strategies>
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct Strategy {
+    /// Starts with "AS"
+    pub strategy_id: String,
+    pub status: StrategyStatus,
+    /// More about the status, e.g. "insufficientFunds", "userRequested"
+    #[serde(default)]
+    pub reason: Option<String>,
+    pub details: StrategyDetails,
+}
+
+/// Strategies keyed by id → their list, the most recent start first
+fn listed(strategies: HashMap<String, Strategy>) -> Vec<Strategy> {
+    let mut strategies: Vec<Strategy> = strategies.into_values().collect();
+    strategies.sort_by_key(|it| std::cmp::Reverse(it.details.start_time));
+    strategies
+}
+
+#[derive(Serialize)]
+struct OfType {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    strategy_type: Option<StrategyType>,
+}
+
+#[derive(Deserialize)]
+struct OpenAnswer {
+    open: HashMap<String, Strategy>,
+}
+
+/// The pending and running strategies, the most recent start first
+pub(crate) async fn open_strategies(
+    client: &PrivateClient,
+    strategy_type: Option<StrategyType>,
+) -> Result<Vec<Strategy>, KrakenError> {
+    let answer: OpenAnswer = client
+        .call_with("GetOpenStrategies", Some(&OfType { strategy_type }))
+        .await?;
+    Ok(listed(answer.open))
+}
+
+#[cfg(test)]
+pub(crate) const SAMPLE: &str = r#"{
+    "ASPBVCI-6MKBA-QE4VF6":{"strategy_id":"ASPBVCI-6MKBA-QE4VF6","status":"pending",
+        "details":{"strategy_type":"twap","side":"buy","volume":"0.01000000","filled_volume":"0",
+        "avg_price":"","total_cost":"0","total_fee":"0","starttm":"1781169958",
+        "expiretm":"1781173558","symbol":"BTC/USD","asset_class":"forex","ordertype":"market"}},
+    "ASMBA64-R23M2-J7JRJV":{"strategy_id":"ASMBA64-R23M2-J7JRJV","status":"open",
+        "details":{"strategy_type":"twap","side":"sell","volume":"2.00000000",
+        "filled_volume":"0.50000000","avg_price":"67050.10","total_cost":"33525.05",
+        "total_fee":"53.64","starttm":"1781166400","expiretm":"1781173600","symbol":"BTC/USD",
+        "asset_class":"forex","ordertype":"limit","price":"67000.0"}}
+}"#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kraken_network::params::encode;
+    use rust_decimal_macros::dec;
+
+    #[test]
+    fn encodes_the_type() {
+        assert_eq!(
+            encode(&OfType {
+                strategy_type: Some(StrategyType::Twap)
+            })
+            .unwrap(),
+            "strategy_type=twap"
+        );
+        assert_eq!(
+            encode(&OfType {
+                strategy_type: None
+            })
+            .unwrap(),
+            ""
+        );
+    }
+
+    #[test]
+    fn decodes_the_strategies_most_recent_first() {
+        let answer: OpenAnswer = serde_json::from_str(&format!(r#"{{"open":{SAMPLE}}}"#)).unwrap();
+        let strategies = listed(answer.open);
+        let pending = &strategies[0];
+        assert_eq!(pending.status, StrategyStatus::Pending);
+        // no fill yet: an empty average price
+        assert_eq!(pending.details.avg_price, None);
+        assert_eq!(pending.details.order_type, OrderType::Market);
+        let open = &strategies[1];
+        assert_eq!(open.details.avg_price, Some(dec!(67050.10)));
+        assert_eq!(open.details.price, Some(dec!(67000)));
+        assert_eq!(open.details.start_time, 1781166400);
+    }
+
+    #[test]
+    fn decodes_every_status() {
+        for (text, status) in [
+            ("pending", StrategyStatus::Pending),
+            ("open", StrategyStatus::Open),
+            ("closed", StrategyStatus::Closed),
+            ("expired", StrategyStatus::Expired),
+            ("cancelled", StrategyStatus::Cancelled),
+            ("paused", StrategyStatus::Unknown),
+        ] {
+            assert_eq!(
+                serde_json::from_value::<StrategyStatus>(text.into()).unwrap(),
+                status
+            );
+        }
+    }
+}

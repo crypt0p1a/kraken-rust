@@ -4,6 +4,7 @@ use crate::account::{
     ExportRequest, ExtendedBalance, LedgerEntry, Ledgers, LedgersRequest, QueryLedgersRequest,
     RemoveExportType, TradeBalance, TradeBalanceRequest, TradeVolume, WalletAccounts,
 };
+use crate::algo::{self, Strategy, StrategyType};
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, AddOrderBatch, AmendOrder, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
@@ -341,5 +342,17 @@ impl PrivateApi {
         request: &AddOrderBatch,
     ) -> Result<Vec<BatchOrderAnswer>, KrakenError> {
         trading::batch::add_order_batch(&self.client, request).await
+    }
+
+    // algo
+
+    /// The pending and running TWAP strategies, the most recent start first
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-open-strategies>
+    pub async fn open_strategies(
+        &self,
+        strategy_type: Option<StrategyType>,
+    ) -> Result<Vec<Strategy>, KrakenError> {
+        algo::open_strategies(&self.client, strategy_type).await
     }
 }
