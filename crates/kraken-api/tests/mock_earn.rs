@@ -95,3 +95,23 @@ async fn earn_allocate() {
             .unwrap()
     );
 }
+
+#[tokio::test]
+async fn earn_allocate_status() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/Earn/AllocateStatus"))
+        .and(Signed)
+        .and(FormIs(vec![("strategy_id", "ESRFUO3-Q62XD-WIOIL7")]))
+        .respond_with(ok(json!({"pending": true})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    assert!(
+        private_api(&server)
+            .earn_allocate_status("ESRFUO3-Q62XD-WIOIL7")
+            .await
+            .unwrap()
+    );
+}

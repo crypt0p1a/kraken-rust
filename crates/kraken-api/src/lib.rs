@@ -6,7 +6,7 @@
 //! | [`transparency`] | public: PreTrade, PostTrade                       |
 //! | [`account`]      | private: Balance, BalanceEx, CreditLines, TradeBalance, TradeVolume, Ledgers, QueryLedgers, AddExport, ExportStatus, RetrieveExport, RemoveExport, GetApiKeyInfo, ListWalletAccounts |
 //! | [`algo`]         | private: AddStrategy, CancelStrategy, GetOpenStrategies, GetClosedStrategies, QueryStrategies |
-//! | [`earn`]         | private: Earn/Strategies, Earn/Allocations, Earn/Allocate |
+//! | [`earn`]         | private: Earn/Strategies, Earn/Allocations, Earn/Allocate, Earn/AllocateStatus |
 //! | [`trading`]      | private: OpenOrders, ClosedOrders, QueryOrders, OrderAmends, TradesHistory, QueryTrades, OpenPositions, AddOrder, AddOrderBatch, AmendOrder, EditOrder, CancelOrder, CancelAll, CancelAllOrdersAfter, CancelOrderBatch, GetWebSocketsToken |
 //!
 //! Each domain holds its models and its calls, [`PublicApi`] and [`PrivateApi`] being the facades

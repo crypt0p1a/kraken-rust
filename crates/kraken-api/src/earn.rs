@@ -326,6 +326,28 @@ pub(crate) async fn allocate(
     client.call_with("Earn/Allocate", Some(funds)).await
 }
 
+#[derive(Serialize)]
+struct OfStrategy<'a> {
+    strategy_id: &'a str,
+}
+
+#[derive(Deserialize)]
+struct OperationStatus {
+    pending: bool,
+}
+
+/// Whether the last allocation to the strategy is still in progress. Requires the "Earn Funds"
+/// or "Query Funds" permission
+pub(crate) async fn allocate_status(
+    client: &PrivateClient,
+    strategy_id: &str,
+) -> Result<bool, KrakenError> {
+    let status: OperationStatus = client
+        .call_with("Earn/AllocateStatus", Some(&OfStrategy { strategy_id }))
+        .await?;
+    Ok(status.pending)
+}
+
 #[cfg(test)]
 pub(crate) const STRATEGIES: &str = r#"{"items":[
     {"id":"ESRFUO3-Q62XD-WIOIL7","asset":"DOT","lock_type":{"type":"instant","payout_frequency":604800},
@@ -462,6 +484,19 @@ mod tests {
         assert_eq!(
             kraken_network::params::encode(&funds).unwrap(),
             "strategy_id=ESRFUO3-Q62XD-WIOIL7&amount=4.3"
+        );
+    }
+
+    #[test]
+    fn decodes_the_status_of_an_operation() {
+        let status: OperationStatus = serde_json::from_str(r#"{"pending":true}"#).unwrap();
+        assert!(status.pending);
+        assert_eq!(
+            kraken_network::params::encode(&OfStrategy {
+                strategy_id: "ESRFUO3-Q62XD-WIOIL7"
+            })
+            .unwrap(),
+            "strategy_id=ESRFUO3-Q62XD-WIOIL7"
         );
     }
 

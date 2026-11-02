@@ -8,7 +8,7 @@ mod strict;
 
 use kraken_api::Decimal;
 use kraken_api::earn::{EarnAllocations, EarnStrategy, LockType};
-use live::{Presence, decode_strict, private_client};
+use live::{Presence, decode_strict, private_api, private_client};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -65,4 +65,47 @@ async fn earn_allocations_are_decoded_strictly() {
         );
     }
     println!("{} Earn allocations", allocations.items.len());
+}
+
+/// The id of the first strategy available to the account
+async fn a_strategy() -> Option<String> {
+    every_strategy()
+        .await
+        .first()
+        .and_then(|it| it["id"].as_str())
+        .map(str::to_string)
+}
+
+#[derive(Serialize)]
+struct OfStrategy {
+    strategy_id: String,
+}
+
+#[derive(serde::Deserialize)]
+#[allow(dead_code)]
+struct OperationStatus {
+    pending: bool,
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn earn_allocate_status_of_a_strategy() {
+    let Some(strategy_id) = a_strategy().await else {
+        println!("no Earn strategy available to the account");
+        return;
+    };
+    let raw: Value = private_client()
+        .call_with(
+            "Earn/AllocateStatus",
+            Some(&OfStrategy {
+                strategy_id: strategy_id.clone(),
+            }),
+        )
+        .await
+        .unwrap();
+    let _: OperationStatus = decode_strict("Earn/AllocateStatus", &raw);
+    private_api()
+        .earn_allocate_status(&strategy_id)
+        .await
+        .unwrap();
 }

@@ -1206,3 +1206,19 @@ async fn earn_allocate_fixture() {
         .unwrap();
     assert!(started);
 }
+
+#[tokio::test]
+async fn earn_allocate_status_fixture() {
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/Earn/AllocateStatus",
+        "earn_status.json",
+    )
+    .await;
+    let pending = private_api(&server)
+        .earn_allocate_status("ESRFUO3-Q62XD-WIOIL7")
+        .await
+        .unwrap();
+    assert!(!pending);
+}
