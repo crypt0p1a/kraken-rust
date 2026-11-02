@@ -22,4 +22,10 @@ models, no required field missing):
   documentation. Their live contracts, run with the credentials of the CI, check them against
   the real answers (Ledgers and the exports only when the key has their permission)
 
+- `websockets_token.json`, `cancel_order.json`, `cancel_all_orders_after.json`,
+  `cancel_order_batch.json`, `amend_order.json`, `edit_order.json`, `add_order_batch.json`: the
+  documented shapes of the trading answers, synthetic values. The live contracts never change
+  the orders of the account: they validate the new orders (`validate=true`), and cancel, amend
+  or edit orders which don't exist; CancelAll and CancelAllOrdersAfter have none
+
 Update them when Kraken changes its answers, which the live contract tests detect.
