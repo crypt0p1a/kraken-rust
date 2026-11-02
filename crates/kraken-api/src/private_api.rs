@@ -11,9 +11,9 @@ use crate::earn::{
     self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
 use crate::funding::{
-    self, AddressDetails, DepositLimits, FundingAsset, FundingAssets, FundingDirection, FundingFee,
-    FundingFeeRequest, FundingLimitsRequest, FundingMethods, FundingMethodsRequest,
-    FundingNetworks, WithdrawalLimits,
+    self, AddressDetails, ClaimedAddresses, ClaimedAddressesRequest, DepositLimits, FundingAsset,
+    FundingAssets, FundingDirection, FundingFee, FundingFeeRequest, FundingLimitsRequest,
+    FundingMethods, FundingMethodsRequest, FundingNetworks, WithdrawalLimits,
 };
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
@@ -570,5 +570,16 @@ impl PrivateApi {
         account_id: Option<&str>,
     ) -> Result<AddressDetails, KrakenError> {
         funding::deposits::claim_deposit_address(&self.funding, method_id, account_id).await
+    }
+
+    /// A page of the claimed deposit addresses. Requires the "Funds permissions - Query"
+    /// permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-funding-claimed-addresses-v2>
+    pub async fn claimed_deposit_addresses(
+        &self,
+        request: &ClaimedAddressesRequest,
+    ) -> Result<ClaimedAddresses, KrakenError> {
+        funding::deposits::claimed_addresses(&self.funding, request).await
     }
 }

@@ -15,8 +15,8 @@ use kraken_api::account::{
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
 use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
 use kraken_api::funding::{
-    AddressDetails, DepositLimits, FundingAsset, FundingAssets, FundingDirection, FundingFee,
-    FundingFeeRequest, FundingMethods, FundingNetworks, LimitValue, WithdrawalLimits,
+    AddressDetails, ClaimedAddresses, DepositLimits, FundingAsset, FundingAssets, FundingDirection,
+    FundingFee, FundingFeeRequest, FundingMethods, FundingNetworks, LimitValue, WithdrawalLimits,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -1490,4 +1490,32 @@ async fn claim_deposit_address_fixture() {
         address,
         AddressDetails::Crypto { memo: Some(_), .. }
     ));
+}
+
+#[tokio::test]
+async fn claimed_deposit_addresses_fixture() {
+    let page: ClaimedAddresses = decode_strict(
+        "claimed addresses",
+        &funding_fixture("claimed_addresses.json"),
+    );
+    assert!(
+        page.addresses
+            .iter()
+            .any(|it| matches!(it.address_details, AddressDetails::Fiat { .. }))
+    );
+
+    let server = MockServer::start().await;
+    serve_funding(
+        &server,
+        "/funding/v2/deposit/addresses",
+        "claimed_addresses.json",
+    )
+    .await;
+    assert_eq!(
+        private_api(&server)
+            .claimed_deposit_addresses(&Default::default())
+            .await
+            .unwrap(),
+        page
+    );
 }

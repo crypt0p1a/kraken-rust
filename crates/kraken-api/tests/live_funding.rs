@@ -8,8 +8,8 @@ mod live;
 mod strict;
 
 use kraken_api::funding::{
-    DepositLimits, FundingAssets, FundingDirection, FundingFee, FundingMethods, FundingNetworks,
-    WithdrawalLimits,
+    ClaimedAddresses, DepositLimits, FundingAssets, FundingDirection, FundingFee, FundingMethods,
+    FundingNetworks, WithdrawalLimits,
 };
 use kraken_network::FundingMethod;
 use live::{decode_strict, funding_client, private_api, unless_denied};
@@ -140,4 +140,14 @@ async fn withdrawal_limits_of_usdc() {
             "{method:?}"
         );
     }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn claimed_deposit_addresses() {
+    let Some(raw) = get("/funding/v2/deposit/addresses").await else {
+        return;
+    };
+    let page: ClaimedAddresses = decode_strict("claimed addresses", &raw);
+    println!("{} claimed deposit addresses", page.addresses.len());
 }

@@ -5,8 +5,8 @@ mod common;
 
 use common::{QueryIs, SignedFunding, plain, private_api};
 use kraken_api::funding::{
-    AddressDetails, FundingAsset, FundingDirection, FundingFeeRequest, FundingLimitsRequest,
-    FundingMethodsRequest,
+    AddressDetails, ClaimedAddressesRequest, FundingAsset, FundingDirection, FundingFeeRequest,
+    FundingLimitsRequest, FundingMethodsRequest, FundingScope,
 };
 use kraken_api::market::AssetClass;
 use serde_json::json;
@@ -233,4 +233,36 @@ async fn claim_deposit_address() {
             memo: None,
         }
     );
+}
+
+#[tokio::test]
+async fn claimed_deposit_addresses() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/funding/v2/deposit/addresses"))
+        .and(SignedFunding)
+        .and(QueryIs(vec![
+            ("scope[method_id]", "27ede8db"),
+            ("limit", "10"),
+        ]))
+        .respond_with(plain(
+            json!({"addresses": [{"id": "a1", "method_id": "27ede8db",
+            "address_details": {"crypto": {"address": "0x0d5cff23"}}}], "next_cursor": "n"}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let page = private_api(&server)
+        .claimed_deposit_addresses(&ClaimedAddressesRequest {
+            scope: Some(FundingScope::MethodId {
+                method_id: "27ede8db".into(),
+            }),
+            limit: Some(10),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(page.addresses[0].id.as_deref(), Some("a1"));
+    assert_eq!(page.next_cursor.as_deref(), Some("n"));
 }

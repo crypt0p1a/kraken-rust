@@ -1,0 +1,30 @@
+{
+  "addresses": [
+    {
+      "id": "5b8e0c4a-1f2d-4e7a-9c3b-6d0f1a2b3c4d",
+      "method_id": "27ede8db-804b-4d91-8e25-46b7b9668730",
+      "shares_addresses_with_method_id": "a001231f-488e-48c0-b36c-6e0d2c1ee247",
+      "last_used": "2026-07-01T08:31:33Z",
+      "address_details": {
+        "crypto": {
+          "address": "0x0d5cff23d40bcc6b98537c7ad5a839a247f54613"
+        }
+      }
+    },
+    {
+      "id": "9a7c6e5d-4b3a-4c2d-8e1f-0a9b8c7d6e5f",
+      "method_id": "b7c1d5e0-6f0a-4b8e-9d1c-2f6a8e4c0d11",
+      "expire_time": "2026-12-31T00:00:00Z",
+      "address_details": {
+        "fiat": {
+          "iban": "DE89370400440532013000",
+          "bic": "COBADEFFXXX",
+          "bank": "Commerzbank",
+          "name_on_account": "Payward Ltd.",
+          "memo": "ABCD 1234"
+        }
+      }
+    }
+  ],
+  "next_cursor": "gqNrZXm"
+}

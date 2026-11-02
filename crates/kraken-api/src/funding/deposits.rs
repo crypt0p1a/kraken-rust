@@ -1,4 +1,6 @@
+use super::{AssetFilterQuery, FundingScope, ScopeQuery};
 use crate::KrakenError;
+use crate::market::AssetClass;
 use kraken_network::{FundingClient, FundingMethod};
 use serde::{Deserialize, Serialize};
 
@@ -98,6 +100,99 @@ pub(crate) async fn claim_deposit_address(
     Ok(claimed.address_details)
 }
 
+/// A claimed deposit address
+///
+/// <https://docs.kraken.com/api/docs/rest-api/list-funding-claimed-addresses-v2>
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct ClaimedAddress {
+    #[serde(default)]
+    pub id: Option<String>,
+    /// The method of the address: the requested one with a method scope
+    #[serde(default)]
+    pub method_id: Option<String>,
+    /// The method whose address family this one shares: in the example of the documentation,
+    /// not in its schema
+    #[serde(default)]
+    pub shares_addresses_with_method_id: Option<String>,
+    /// RFC 3339
+    #[serde(default)]
+    pub last_used: Option<String>,
+    /// RFC 3339
+    #[serde(default)]
+    pub expire_time: Option<String>,
+    pub address_details: AddressDetails,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/list-funding-claimed-addresses-v2>
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct ClaimedAddresses {
+    #[serde(default)]
+    pub addresses: Vec<ClaimedAddress>,
+    /// To give as `cursor` for the next page: None on the last one
+    #[serde(default)]
+    pub next_cursor: Option<String>,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/list-funding-claimed-addresses-v2>
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct ClaimedAddressesRequest {
+    /// A method or a network
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub scope: Option<FundingScope>,
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub asset_class: Option<AssetClass>,
+    /// Requires `asset_class`
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub asset_name: Option<String>,
+    /// Addresses per page, up to 500
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub limit: Option<u32>,
+    /// The `next_cursor` of the previous page, alone: without the other parameters
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub cursor: Option<String>,
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub account_id: Option<String>,
+}
+
+#[derive(Serialize)]
+struct ClaimedQuery<'a> {
+    #[serde(flatten)]
+    scope: ScopeQuery<'a>,
+    #[serde(flatten)]
+    asset: AssetFilterQuery<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    limit: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cursor: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    account_id: Option<&'a str>,
+}
+
+/// Requires the "Funds permissions - Query" permission
+pub(crate) async fn claimed_addresses(
+    client: &FundingClient,
+    request: &ClaimedAddressesRequest,
+) -> Result<ClaimedAddresses, KrakenError> {
+    let query = ClaimedQuery {
+        scope: ScopeQuery::new(request.scope.as_ref()),
+        asset: AssetFilterQuery::new(request.asset_class, request.asset_name.as_deref())?,
+        limit: request.limit,
+        cursor: request.cursor.as_deref(),
+        account_id: request.account_id.as_deref(),
+    };
+    client
+        .call(
+            FundingMethod::Get,
+            "/funding/v2/deposit/addresses",
+            Some(&query),
+            None::<&()>,
+        )
+        .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,6 +218,49 @@ mod tests {
         };
         assert_eq!(account.iban.as_deref(), Some("DE89370400440532013000"));
         assert_eq!(account.memo.as_deref(), Some("ABCD 1234"));
+    }
+
+    #[test]
+    fn encodes_the_scope_and_the_asset_as_deep_objects() {
+        let request = ClaimedAddressesRequest {
+            scope: Some(FundingScope::NetworkId {
+                network_id: "d9d375da".into(),
+            }),
+            asset_class: Some(AssetClass::Currency),
+            asset_name: Some("USDC".into()),
+            limit: Some(50),
+            ..Default::default()
+        };
+        let query = ClaimedQuery {
+            scope: ScopeQuery::new(request.scope.as_ref()),
+            asset: AssetFilterQuery::new(request.asset_class, request.asset_name.as_deref())
+                .unwrap(),
+            limit: request.limit,
+            cursor: None,
+            account_id: None,
+        };
+        assert_eq!(
+            kraken_network::params::encode(&query).unwrap(),
+            "scope%5Bnetwork_id%5D=d9d375da&asset%5Bclass%5D=currency&asset%5Bname%5D=USDC&limit=50"
+        );
+        assert!(AssetFilterQuery::new(None, Some("USDC")).is_err());
+    }
+
+    #[test]
+    fn decodes_the_claimed_addresses() {
+        // example of the documentation
+        let addresses: ClaimedAddresses = serde_json::from_str(
+            r#"{"addresses":[{"method_id":"27ede8db-804b-4d91-8e25-46b7b9668730",
+            "shares_addresses_with_method_id":"a001231f-488e-48c0-b36c-6e0d2c1ee247",
+            "address_details":{"crypto":{"address":"0x0d5cff23d40bcc6b98537c7ad5a839a247f546"}}}]}"#,
+        )
+        .unwrap();
+        assert!(
+            addresses.addresses[0]
+                .shares_addresses_with_method_id
+                .is_some()
+        );
+        assert_eq!(addresses.next_cursor, None);
     }
 
     #[test]
