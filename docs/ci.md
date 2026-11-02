@@ -25,4 +25,5 @@
 
 Daily and on demand, the live contracts run against the real Kraken API, the private ones with the
 `KRAKEN_API_KEY` / `KRAKEN_API_SECRET` secrets of the repository (Settings → Secrets and variables
-→ Actions).
+→ Actions): `live_market` alone, then `live_account`, `live_trading`, `live_algo`, `live_earn` and
+`live_funding`, which never change the account (see [Rust](rust.md#live-contracts)).

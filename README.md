@@ -9,9 +9,10 @@ Kraken counterpart of the Rust crate of
 dependencies, same rate limiter, same error variants and the same UniFFI facade, so that both
 providers can be merged later.
 
-The endpoints are, for now, the ones `cex-trading-bot` needs from an exchange: tickers, pairs
-info, candles, fees, balances, orders and new orders
-([compared to CEX.IO](docs/kraken-vs-cexio.md)).
+Every endpoint of the Kraken Spot REST API is covered: market data, transparency, account data,
+trading, algorithmic trading (TWAP), Earn, subaccounts and funding (the Funding Beta API, the
+legacy funding endpoints being deprecated by Kraken). See [the endpoints](docs/rust.md#endpoints),
+and the ones `cex-trading-bot` uses [compared to CEX.IO](docs/kraken-vs-cexio.md).
 
 ## Getting started
 

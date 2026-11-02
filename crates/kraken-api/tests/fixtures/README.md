@@ -28,4 +28,13 @@ models, no required field missing):
   the orders of the account: they validate the new orders (`validate=true`), and cancel, amend
   or edit orders which don't exist; CancelAll and CancelAllOrdersAfter have none
 
+- `open_strategies.json`, `query_strategies.json`, `closed_strategies.json`, `add_strategy.json`
+  (algo), `earn_*.json` (Earn), `create_subaccount.json`, `account_transfer.json`
+  (subaccounts): the examples of the documentation, extended, synthetic values
+- the funding answers (`funding_*.json`, `deposit_limits.json`, `withdrawal_limits.json`,
+  `claim_deposit_address.json`, `claimed_addresses.json`, `deposits.json`,
+  `withdrawal_addresses.json`, `create_withdrawal_address.json`, `withdrawals.json`,
+  `create_withdrawal.json`): plain JSON, without the `{"error", "result"}` envelope of the
+  other endpoints, read by `strict::funding_fixture`
+
 Update them when Kraken changes its answers, which the live contract tests detect.

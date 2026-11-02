@@ -33,18 +33,59 @@ let balances = private_api.extended_balance().await?;
 The libraries never read the credentials: an application gives them to `PrivateApi::new` from its
 own secure storage.
 
+## Endpoints
+
+Every endpoint of the Spot REST API, by domain: the public ones on `PublicApi`, the private ones
+on `PrivateApi`.
+
+| Domain | Endpoints |
+|--------|-----------|
+| market data | Time, SystemStatus, MaintenanceSchedule, Assets, AssetPairs, Ticker, OHLC, Depth, GroupedBook, Trades, Spread, Level3 (private) |
+| transparency | PreTrade, PostTrade |
+| account | Balance, BalanceEx, CreditLines, TradeBalance, TradeVolume, Ledgers, QueryLedgers, AddExport, ExportStatus, RetrieveExport, RemoveExport, GetApiKeyInfo, ListWalletAccounts |
+| trading | OpenOrders, ClosedOrders, QueryOrders, OrderAmends, TradesHistory, QueryTrades, OpenPositions, AddOrder, AddOrderBatch, AmendOrder, EditOrder, CancelOrder, CancelAll, CancelAllOrdersAfter, CancelOrderBatch, GetWebSocketsToken |
+| algo (TWAP) | AddStrategy, CancelStrategy, GetOpenStrategies, GetClosedStrategies, QueryStrategies |
+| earn | Strategies, Allocations, Allocate, AllocateStatus, Deallocate, DeallocateStatus |
+| subaccounts | CreateSubaccount, AccountTransfer |
+| funding (Beta) | assets, methods, networks, fees, deposit and withdrawal limits, deposit address (claim, list), deposits, withdrawal addresses (list, create, update, delete), withdrawals (list, create) |
+
+Not supported:
+
+- the legacy funding endpoints of `/0/private` (DepositMethods, Withdraw, WalletTransfer, ...),
+  deprecated by Kraken in favor of the Funding Beta API
+- the `account_id` of the `/0/private` endpoints, targeting a wallet: Kraken doesn't document
+  whether its query string is signed there. The funding endpoints, whose query string is signed,
+  take it
+- the filter by status of the funding deposits: the encoding of its list and range isn't
+  documented
+
+Three clients of `kraken-network` call them: `PublicClient` (`GET /0/public`), `PrivateClient`
+(signed `POST /0/private`, a form or, for the lists of objects, a JSON body; the zip of
+RetrieveExport as bytes) and `FundingClient` (the Funding Beta API: signed GET, POST, PUT and
+DELETE, the nonce in the `API-Nonce` header, JSON answers without envelope).
+
 ## Layout of kraken-api
 
 ```
 src/
-├── market/     public    Time (time.rs), Ticker (ticker.rs), AssetPairs (pairs.rs), OHLC (ohlc.rs)
-├── account/    private   BalanceEx (balance.rs), TradeVolume (fees.rs)
-├── trading/    private   enums (types.rs), Order (order.rs),
-│                         OpenOrders / ClosedOrders / QueryOrders (query.rs), AddOrder (add.rs)
-├── public_api.rs         PublicApi: facade of market
-├── private_api.rs        PrivateApi: facade of account and trading
-├── params.rs             parameters shared by the endpoints
-└── lenient.rs            numbers sent as strings
+├── market/       public    Time, SystemStatus / MaintenanceSchedule (status.rs), Assets, AssetPairs
+│                           (pairs.rs), Ticker, OHLC, Depth / GroupedBook / Level3 (book.rs),
+│                           Trades / Spread (trades.rs)
+├── transparency.rs public  PreTrade, PostTrade
+├── account/      private   balances, credit lines, trade balance, fees, ledgers, exports, API key,
+│                           wallets
+├── trading/      private   orders: queries, trades, positions, amends, new orders and batches,
+│                           edits, cancellations, the WebSocket token
+├── algo.rs       private   the TWAP strategies
+├── earn.rs       private   the Earn strategies and allocations
+├── subaccounts.rs private  the subaccounts of the institutional accounts
+├── funding/      private   the Funding Beta API: assets, methods, networks, fees, limits, deposits,
+│                           withdrawal addresses, withdrawals
+├── public_api.rs           PublicApi: facade of the public endpoints
+├── private_api.rs          PrivateApi: facade of the private endpoints
+├── cursor.rs               the cursor of the paginated answers
+├── params.rs               parameters shared by the endpoints
+└── lenient.rs              numbers sent as strings
 ```
 
 A new endpoint goes in its domain (models + `pub(crate) async fn`), then in its facade, then in
@@ -79,11 +120,11 @@ cargo llvm-cov nextest --workspace --open                                 # cove
 | Level | Where | What |
 |-------|-------|------|
 | unit | `#[cfg(test)]` of each module | every value of the enums, the encoding of every parameter, the arrays of an unexpected size, the required fields missing / null / unreadable, lenient numbers, signature, nonces across threads, rate limiter under concurrency |
-| network | `kraken-network/tests/clients.rs` | the clients against a mocked server ([wiremock](https://docs.rs/wiremock)): GET / POST, body, `API-Sign` recomputed independently, increasing nonces, error mapping |
-| endpoints | `kraken-api/tests/mock_{market,account,trading}.rs` | every call against a mocked Kraken: path, exact parameters, signature, answer decoded |
+| network | `kraken-network/tests/clients.rs` | the clients against a mocked server ([wiremock](https://docs.rs/wiremock)): GET / POST / PUT / DELETE, form and JSON bodies, files, `API-Sign` recomputed independently, increasing nonces, error mapping |
+| endpoints | `kraken-api/tests/mock_{market,account,trading,algo,earn,subaccounts,funding}.rs` | every call against a mocked Kraken: path, exact parameters, signature, answer decoded |
 | fixtures | `kraken-api/tests/fixtures.rs` | the real shapes of the answers (`tests/fixtures`), decoded **strictly** and served end to end |
 | facade | `kraken-ffi/tests/facade.rs` | the UniFFI objects, with a foreign logger |
-| live contracts | `kraken-api/tests/live_{market,account,trading}.rs` | the real Kraken API, see below |
+| live contracts | `kraken-api/tests/live_{market,account,trading,algo,earn,funding}.rs` | the real Kraken API, see below |
 
 ### Live contracts
 
@@ -95,11 +136,22 @@ cargo test -p kraken-api --test live_market -- --ignored --test-threads=1   # re
 cp .env.example .env                                                      # then fill the key and secret
 cargo test -p kraken-api --test live_account -- --ignored --test-threads=1
 cargo test -p kraken-api --test live_trading -- --ignored --test-threads=1
+cargo test -p kraken-api --test live_algo -- --ignored --test-threads=1
+cargo test -p kraken-api --test live_earn -- --ignored --test-threads=1
+cargo test -p kraken-api --test live_funding -- --ignored --test-threads=1
 ```
 
 The key needs the Query Funds, Query Open Orders & Trades, Query Closed Orders & Trades and
-Create & Modify Orders permissions, never Withdraw Funds. The new orders of the live tests are only
-validated by Kraken (`validate=true` is forced): no order is ever placed.
+Create & Modify Orders permissions, never Withdraw Funds (`api_key_info_never_allows_withdrawals`
+checks it). The live contracts never change the account:
+
+- the new orders and strategies are only validated (`validate=true`); the cancellations, amends
+  and edits target orders and strategies which don't exist
+- the calls moving funds or changing the account have none: CancelAll, CancelAllOrdersAfter,
+  AddExport, RemoveExport, Earn Allocate / Deallocate, the subaccounts, the claim of a deposit
+  address, the withdrawal addresses and the withdrawals
+- the contracts needing a permission the key may lack (ledgers, exports, WebSocket token,
+  funding) are skipped on a permission error
 
 ### Strict decoding
 
