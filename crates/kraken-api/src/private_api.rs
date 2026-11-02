@@ -1,4 +1,5 @@
-use crate::account::{self, ExtendedBalance, TradeVolume};
+use crate::Decimal;
+use crate::account::{self, BalanceRequest, ExtendedBalance, TradeVolume};
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, ClosedOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
@@ -39,6 +40,16 @@ impl PrivateApi {
     }
 
     // account
+
+    /// The cash balances, net of the pending withdrawals, keyed by asset (e.g. "XXBT")
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-account-balance>
+    pub async fn balance(
+        &self,
+        request: &BalanceRequest,
+    ) -> Result<HashMap<String, Decimal>, KrakenError> {
+        account::balance::balance(&self.client, request).await
+    }
 
     /// Balances per asset, with the amounts held by the open orders
     ///

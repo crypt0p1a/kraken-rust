@@ -202,3 +202,29 @@ async fn level3_order_book() {
             .all(|it| it.quantity > Decimal::ZERO && !it.order_id.is_empty())
     );
 }
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn balance_matches_the_extended_balance() {
+    let raw: Value = private_client().call("Balance").await.unwrap();
+    // exact decimals sent as strings
+    for (asset, amount) in entries(&raw) {
+        let amount = amount
+            .as_str()
+            .unwrap_or_else(|| panic!("{asset}: {amount}"));
+        let amount =
+            Decimal::from_str_exact(amount).unwrap_or_else(|_| panic!("{asset}: {amount}"));
+        assert!(amount >= Decimal::ZERO, "{asset}: {amount}");
+    }
+
+    let api = private_api();
+    let balances = api.balance(&Default::default()).await.unwrap();
+    let extended = api.extended_balance().await.unwrap();
+    for (asset, amount) in &balances {
+        assert_eq!(
+            extended.get(asset).map(|it| it.balance),
+            Some(*amount),
+            "{asset}"
+        );
+    }
+}

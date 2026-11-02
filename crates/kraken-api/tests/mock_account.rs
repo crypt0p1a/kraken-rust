@@ -4,10 +4,33 @@
 mod common;
 
 use common::{FormIs, Signed, ok, private_api};
+use kraken_api::account::{BalanceRequest, RebaseMultiplier};
 use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer};
+
+#[tokio::test]
+async fn balance() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/Balance"))
+        .and(Signed)
+        .and(FormIs(vec![("rebase_multiplier", "rebased")]))
+        .respond_with(ok(json!({"ZUSD": "2970172.7962", "XXBT": "0.0000000001"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let balances = private_api(&server)
+        .balance(&BalanceRequest {
+            rebase_multiplier: Some(RebaseMultiplier::Rebased),
+        })
+        .await
+        .unwrap();
+    assert_eq!(balances["ZUSD"], dec!(2970172.7962));
+    assert_eq!(balances["XXBT"].to_string(), "0.0000000001");
+}
 
 #[tokio::test]
 async fn extended_balance() {

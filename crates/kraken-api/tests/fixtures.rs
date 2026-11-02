@@ -524,3 +524,21 @@ async fn post_trade_fixture() {
         post
     );
 }
+
+// account
+
+#[tokio::test]
+async fn balance_fixture() {
+    let raw = fixture("balance.json");
+    assert!(raw.as_object().unwrap().values().all(Value::is_string));
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/Balance", "balance.json").await;
+    let balances = private_api(&server)
+        .balance(&Default::default())
+        .await
+        .unwrap();
+    assert_eq!(balances.len(), 6);
+    assert_eq!(balances["ZUSD"], dec!(2970172.7962));
+    assert_eq!(balances["XETH"], Decimal::ZERO);
+}

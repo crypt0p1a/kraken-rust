@@ -5,5 +5,5 @@
 pub(crate) mod balance;
 pub(crate) mod fees;
 
-pub use balance::ExtendedBalance;
+pub use balance::{BalanceRequest, ExtendedBalance, RebaseMultiplier};
 pub use fees::{FeeInfo, TradeVolume, VolumeInputs};
