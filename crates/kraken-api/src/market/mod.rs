@@ -14,7 +14,8 @@ pub(crate) mod time;
 
 pub use assets::{Asset, AssetClass, AssetStatus, AssetsRequest};
 pub use book::{
-    BookLevel, GroupedLevel, GroupedOrderBook, GroupedOrderBookRequest, OrderBook, OrderBookRequest,
+    BookLevel, BookOrder, GroupedLevel, GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook,
+    Level3OrderBookRequest, OrderBook, OrderBookRequest,
 };
 pub use ohlc::{Candle, CandleInterval, Candles, CandlesRequest};
 pub use pairs::{AssetPair, AssetPairStatus, FeeTier};

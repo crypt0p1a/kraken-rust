@@ -7,6 +7,7 @@ mod strict;
 
 use kraken_api::Decimal;
 use kraken_api::account::{ExtendedBalance, FeeInfo, TradeVolume};
+use kraken_api::market::Level3OrderBook;
 use kraken_api::{KrakenError, PrivateApi, RestOptions};
 use live::{Presence, decode_strict, entries, le, private_api, private_client};
 use serde::Serialize;
@@ -170,5 +171,34 @@ async fn trade_volume_of_an_unknown_pair_is_an_error() {
     assert!(
         matches!(&error, KrakenError::Api { body, .. } if body.starts_with("EQuery:")),
         "{error:?}"
+    );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn level3_order_book() {
+    #[derive(Serialize)]
+    struct Params<'a> {
+        pair: &'a str,
+        depth: u32,
+    }
+    let raw: Value = private_client()
+        .call_with(
+            "Level3",
+            Some(&Params {
+                pair: "XBTUSD",
+                depth: 10,
+            }),
+        )
+        .await
+        .unwrap();
+    let book: Level3OrderBook = decode_strict("Level3", &raw);
+    assert!(!book.bids.is_empty() && !book.asks.is_empty());
+    assert!(book.bids[0].price < book.asks[0].price, "crossed book");
+    assert!(
+        book.bids
+            .iter()
+            .chain(&book.asks)
+            .all(|it| it.quantity > Decimal::ZERO && !it.order_id.is_empty())
     );
 }

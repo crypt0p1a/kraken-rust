@@ -1,4 +1,5 @@
 use crate::account::{self, ExtendedBalance, TradeVolume};
+use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, ClosedOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
     QueryOrdersRequest,
@@ -23,6 +24,18 @@ impl PrivateApi {
         Ok(Self {
             client: PrivateClient::new(api_key, &api_secret, options, rate_limiter)?,
         })
+    }
+
+    // market
+
+    /// Level 3 order book of a pair: every order of each price level
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-level-3-order-book>
+    pub async fn level3_order_book(
+        &self,
+        request: &Level3OrderBookRequest,
+    ) -> Result<Level3OrderBook, KrakenError> {
+        market::book::level3_order_book(&self.client, request).await
     }
 
     // account

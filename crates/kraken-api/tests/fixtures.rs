@@ -10,8 +10,8 @@ use kraken_api::Decimal;
 use kraken_api::account::{ExtendedBalance, TradeVolume};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
-    GroupedOrderBook, GroupedOrderBookRequest, OrderBookRequest, ServerTime, SystemState,
-    SystemStatus, Ticker,
+    GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
+    OrderBookRequest, ServerTime, SystemState, SystemStatus, Ticker,
 };
 use kraken_api::trading::{
     ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
@@ -417,4 +417,22 @@ async fn grouped_order_book_fixture() {
         .await
         .unwrap();
     assert_eq!(served, grouped);
+}
+
+#[tokio::test]
+async fn level3_order_book_fixture() {
+    let level3: Level3OrderBook = decode_strict("Level3", &fixture("level3.json"));
+    assert!(!level3.bids.is_empty() && !level3.asks.is_empty());
+    assert!(level3.bids.iter().all(|it| it.order_id.len() == 19));
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/Level3", "level3.json").await;
+    let served = private_api(&server)
+        .level3_order_book(&Level3OrderBookRequest {
+            pair: "YFIEUR".into(),
+            depth: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(served, level3);
 }

@@ -2,10 +2,10 @@
 
 mod common;
 
-use common::{QueryIs, ok, public_api};
+use common::{FormIs, QueryIs, Signed, ok, private_api, public_api};
 use kraken_api::market::{
     AssetClass, AssetStatus, AssetsRequest, CandleInterval, CandlesRequest,
-    GroupedOrderBookRequest, OrderBookRequest, SystemState,
+    GroupedOrderBookRequest, Level3OrderBookRequest, OrderBookRequest, SystemState,
 };
 use rust_decimal_macros::dec;
 use serde_json::json;
@@ -247,4 +247,29 @@ async fn grouped_order_book() {
         .await
         .unwrap();
     assert_eq!(book.bids[0].quantity, dec!(0.0038893));
+}
+
+#[tokio::test]
+async fn level3_order_book_is_signed() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/Level3"))
+        .and(Signed)
+        .and(FormIs(vec![("pair", "XBTUSD"), ("depth", "10")]))
+        .respond_with(ok(json!({"pair": "BTC/USD",
+            "bids": [{"price": "77930.0", "qty": "0.5", "order_id": "O5KJU4-IEQTM-NDMS6W",
+                "timestamp": 1765622008594292000u64}],
+            "asks": []})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let book = private_api(&server)
+        .level3_order_book(&Level3OrderBookRequest {
+            pair: "XBTUSD".into(),
+            depth: Some(10),
+        })
+        .await
+        .unwrap();
+    assert_eq!(book.bids[0].order_id, "O5KJU4-IEQTM-NDMS6W");
 }

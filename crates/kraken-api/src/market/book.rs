@@ -2,7 +2,7 @@ use super::AssetClass;
 use super::keyed::single_pair;
 use crate::KrakenError;
 use crate::lenient::{self, ExactDecimal};
-use kraken_network::PublicClient;
+use kraken_network::{PrivateClient, PublicClient};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -133,6 +133,49 @@ pub(crate) async fn grouped_order_book(
     client.call_with("GroupedBook", Some(request)).await
 }
 
+/// An order of the level 3 order book
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct BookOrder {
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub price: Decimal,
+    #[serde(rename = "qty", deserialize_with = "lenient::decimal")]
+    pub quantity: Decimal,
+    pub order_id: String,
+    /// UTC timestamp, in nanoseconds
+    #[serde(deserialize_with = "lenient::number")]
+    pub timestamp: i64,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/get-level-3-order-book>
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct Level3OrderBook {
+    /// e.g. "BTC/USD"
+    pub pair: String,
+    pub bids: Vec<BookOrder>,
+    pub asks: Vec<BookOrder>,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/get-level-3-order-book>
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct Level3OrderBookRequest {
+    pub pair: String,
+    /// Levels per side: 0 (the whole book), 10, 25, 100, 250 or 1000
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub depth: Option<u32>,
+}
+
+/// Private: requires the "Query open orders & trades" permission
+pub(crate) async fn level3_order_book(
+    client: &PrivateClient,
+    request: &Level3OrderBookRequest,
+) -> Result<Level3OrderBook, KrakenError> {
+    client.call_with("Level3", Some(request)).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,6 +203,15 @@ mod tests {
             grouping: None,
         };
         assert_eq!(encode(&request).unwrap(), "pair=XBTUSD&depth=25");
+    }
+
+    #[test]
+    fn encodes_the_level3_order_book_request() {
+        let request = Level3OrderBookRequest {
+            pair: "XBTUSD".into(),
+            depth: Some(0),
+        };
+        assert_eq!(encode(&request).unwrap(), "pair=XBTUSD&depth=0");
     }
 
     #[test]
@@ -197,5 +249,17 @@ mod tests {
         .unwrap();
         assert_eq!(grouped.grouping, Some(100));
         assert_eq!(grouped.asks[0].quantity, dec!(17.27504303));
+    }
+
+    #[test]
+    fn decodes_the_level3_order_book() {
+        let level3: Level3OrderBook = serde_json::from_str(
+            r#"{"pair":"YFI/EUR","bids":[{"price":"3062.00000","qty":"0.29665800",
+            "order_id":"O5KJU4-IEQTM-NDMS6W","timestamp":1765622008594292000}],"asks":[]}"#,
+        )
+        .unwrap();
+        assert_eq!(level3.bids[0].order_id, "O5KJU4-IEQTM-NDMS6W");
+        assert_eq!(level3.bids[0].timestamp, 1765622008594292000);
+        assert_eq!(level3.bids[0].price, dec!(3062));
     }
 }
