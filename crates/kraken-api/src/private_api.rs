@@ -615,4 +615,23 @@ impl PrivateApi {
     ) -> Result<SavedAddress, KrakenError> {
         funding::addresses::create_withdrawal_address(&self.funding, address, account_id).await
     }
+
+    /// Changes the description of a saved withdrawal address: whether it is verified. Requires
+    /// the "Funds permissions - Add withdrawal addresses" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/update-funding-address>
+    pub async fn update_withdrawal_address(
+        &self,
+        address_id: &str,
+        description: &str,
+        account_id: Option<&str>,
+    ) -> Result<bool, KrakenError> {
+        funding::addresses::update_withdrawal_address(
+            &self.funding,
+            address_id,
+            description,
+            account_id,
+        )
+        .await
+    }
 }

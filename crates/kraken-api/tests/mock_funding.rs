@@ -365,3 +365,29 @@ async fn create_withdrawal_address() {
         Err(kraken_api::KrakenError::InvalidArgument { .. })
     ));
 }
+
+#[tokio::test]
+async fn update_withdrawal_address() {
+    let server = MockServer::start().await;
+    Mock::given(method("PUT"))
+        .and(path("/funding/v1/addresses/AB7J4FF-BGM7G-V2JMIH"))
+        .and(SignedFunding)
+        .and(QueryIs(vec![("account_id", "WX6V-JUKW-KKPB-QE36")]))
+        .and(wiremock::matchers::body_json(
+            json!({"description": "cold wallet"}),
+        ))
+        .respond_with(plain(json!({"verified": true})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let verified = private_api(&server)
+        .update_withdrawal_address(
+            "AB7J4FF-BGM7G-V2JMIH",
+            "cold wallet",
+            Some("WX6V-JUKW-KKPB-QE36"),
+        )
+        .await
+        .unwrap();
+    assert!(verified);
+}

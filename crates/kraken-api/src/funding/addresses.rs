@@ -313,6 +313,35 @@ pub(crate) async fn create_withdrawal_address(
         .await
 }
 
+#[derive(Serialize)]
+struct Description<'a> {
+    description: &'a str,
+}
+
+#[derive(Deserialize)]
+struct Verified {
+    verified: bool,
+}
+
+/// Changes the description of a saved address: whether it is verified. Requires the "Funds
+/// permissions - Add withdrawal addresses" permission
+pub(crate) async fn update_withdrawal_address(
+    client: &FundingClient,
+    address_id: &str,
+    description: &str,
+    account_id: Option<&str>,
+) -> Result<bool, KrakenError> {
+    let answer: Verified = client
+        .call(
+            FundingMethod::Put,
+            &format!("/funding/v1/addresses/{address_id}"),
+            Some(&AccountQuery { account_id }),
+            Some(&Description { description }),
+        )
+        .await?;
+    Ok(answer.verified)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
