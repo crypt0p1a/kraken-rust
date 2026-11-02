@@ -1,10 +1,11 @@
 //! Calls of the Kraken Spot REST API, grouped by domain
 //!
-//! | Module        | Endpoints                                         |
-//! |---------------|---------------------------------------------------|
-//! | [`market`]    | public: Time, Ticker, AssetPairs, OHLC            |
-//! | [`account`]   | private: BalanceEx, TradeVolume                   |
-//! | [`trading`]   | private: OpenOrders, ClosedOrders, QueryOrders, AddOrder |
+//! | Module           | Endpoints                                         |
+//! |------------------|---------------------------------------------------|
+//! | [`market`]       | public: Time, SystemStatus, MaintenanceSchedule, Assets, AssetPairs, Ticker, OHLC, Depth, GroupedBook, Trades, Spread; private: Level3 |
+//! | [`transparency`] | public: PreTrade, PostTrade                       |
+//! | [`account`]      | private: BalanceEx, TradeVolume                   |
+//! | [`trading`]      | private: OpenOrders, ClosedOrders, QueryOrders, AddOrder |
 //!
 //! Each domain holds its models and its calls, [`PublicApi`] and [`PrivateApi`] being the facades
 //! composing them over the clients of `kraken-network`.
