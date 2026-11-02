@@ -1,141 +1,7 @@
-use super::{FundingScope, ScopeQuery};
+use super::{AddressDetails, FundingScope, ScopeQuery};
 use crate::KrakenError;
 use kraken_network::{FundingClient, FundingMethod};
 use serde::{Deserialize, Serialize};
-
-/// The beneficiary of a withdrawal address (travel rule)
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
-pub struct Beneficiary {
-    /// "sender" (the user) or "other"
-    #[serde(default)]
-    pub recipient: Option<String>,
-    /// "individual" or "business"
-    #[serde(default)]
-    pub typ: Option<String>,
-    #[serde(default)]
-    pub last_name: Option<String>,
-    #[serde(default)]
-    pub country: Option<String>,
-    #[serde(default)]
-    pub state_province: Option<String>,
-    #[serde(default)]
-    pub address_1: Option<String>,
-    #[serde(default)]
-    pub address_2: Option<String>,
-    #[serde(default)]
-    pub city: Option<String>,
-    #[serde(default)]
-    pub postal_code: Option<String>,
-    /// The virtual asset service provider of the counterparty
-    #[serde(default)]
-    pub counterparty_vasp_name: Option<String>,
-}
-
-/// A bank account, a card or a payment account of a fiat withdrawal method
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
-pub struct WithdrawalAccount {
-    #[serde(default)]
-    pub account: Option<String>,
-    #[serde(default)]
-    pub account_type: Option<String>,
-    #[serde(default)]
-    pub address: Option<String>,
-    #[serde(default)]
-    pub bank: Option<String>,
-    #[serde(default)]
-    pub bank_code: Option<String>,
-    #[serde(default)]
-    pub bic: Option<String>,
-    #[serde(default)]
-    pub branch: Option<String>,
-    #[serde(default)]
-    pub branch_code: Option<String>,
-    #[serde(default)]
-    pub bank_address: Option<String>,
-    #[serde(default)]
-    pub bsb: Option<String>,
-    #[serde(default)]
-    pub beneficiary: Option<Beneficiary>,
-    #[serde(default)]
-    pub card_number: Option<String>,
-    #[serde(default)]
-    pub card_number_last: Option<String>,
-    #[serde(default)]
-    pub card_type: Option<String>,
-    #[serde(default)]
-    pub cvc: Option<String>,
-    #[serde(default)]
-    pub expire_month: Option<String>,
-    #[serde(default)]
-    pub expire_year: Option<String>,
-    #[serde(default)]
-    pub iban: Option<String>,
-    #[serde(default)]
-    pub masked_iban: Option<String>,
-    #[serde(default)]
-    pub intermediary_address: Option<String>,
-    #[serde(default)]
-    pub intermediary_bank: Option<String>,
-    #[serde(default)]
-    pub intermediary_branch: Option<String>,
-    #[serde(default)]
-    pub intermediary_routing: Option<String>,
-    #[serde(default)]
-    pub intermediary_swift: Option<String>,
-    #[serde(default)]
-    pub memo: Option<String>,
-    #[serde(default)]
-    pub merchant_reference: Option<String>,
-    #[serde(default)]
-    pub name_on_account: Option<String>,
-    #[serde(default)]
-    pub notes: Option<String>,
-    #[serde(default)]
-    pub password: Option<String>,
-    #[serde(default)]
-    pub routing: Option<String>,
-    #[serde(default)]
-    pub sort: Option<String>,
-    #[serde(default)]
-    pub swift: Option<String>,
-    #[serde(default)]
-    pub tag: Option<String>,
-    #[serde(default)]
-    pub third_party_email: Option<String>,
-    #[serde(default)]
-    pub transaction_id: Option<String>,
-    #[serde(default)]
-    pub transit: Option<String>,
-    #[serde(default)]
-    pub username: Option<String>,
-    /// Proves the ownership of the address
-    #[serde(default)]
-    pub signature: Option<String>,
-}
-
-/// Where a withdrawal goes: `{"crypto": {...}}` or `{"fiat": {...}}`
-// a decoded answer, not moved around: no Box, which the bindings can't carry
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
-#[serde(rename_all = "snake_case")]
-pub enum WithdrawalAddressDetails {
-    Crypto {
-        address: String,
-        #[serde(default)]
-        tag: Option<String>,
-        #[serde(default)]
-        memo: Option<String>,
-        #[serde(default)]
-        beneficiary: Option<Beneficiary>,
-    },
-    Fiat {
-        #[serde(flatten)]
-        account: WithdrawalAccount,
-    },
-}
 
 /// A saved withdrawal address
 ///
@@ -147,7 +13,7 @@ pub struct WithdrawalAddress {
     pub address_id: String,
     pub scope: FundingScope,
     #[serde(default)]
-    pub address_details: Option<WithdrawalAddressDetails>,
+    pub address_details: Option<AddressDetails>,
     /// In the example of the documentation, not in its schema
     #[serde(default)]
     pub name: Option<String>,
@@ -415,7 +281,7 @@ mod tests {
             }
         );
         assert_eq!(network.name.as_deref(), Some("Personal Wallet"));
-        let Some(WithdrawalAddressDetails::Fiat { account }) = &method.address_details else {
+        let Some(AddressDetails::Fiat { account }) = &method.address_details else {
             panic!("{method:?}")
         };
         assert_eq!(

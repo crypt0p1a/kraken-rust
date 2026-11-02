@@ -233,6 +233,7 @@ async fn claim_deposit_address() {
             address: "0x0d5cff23".into(),
             tag: Some("123".into()),
             memo: None,
+            beneficiary: None,
         }
     );
 }

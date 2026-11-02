@@ -1,71 +1,9 @@
-use super::{AssetFilterQuery, FundingAmount, FundingScope, ScopeQuery};
+use super::{AddressDetails, AssetFilterQuery, FundingAmount, FundingScope, ScopeQuery};
 use crate::KrakenError;
 use crate::account::RebaseMultiplier;
 use crate::market::AssetClass;
 use kraken_network::{FundingClient, FundingMethod};
 use serde::{Deserialize, Serialize};
-
-/// The bank account of a fiat deposit
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
-pub struct FiatAccount {
-    #[serde(default)]
-    pub account: Option<String>,
-    #[serde(default)]
-    pub account_type: Option<String>,
-    #[serde(default)]
-    pub address: Option<String>,
-    #[serde(default)]
-    pub bank: Option<String>,
-    #[serde(default)]
-    pub bank_code: Option<String>,
-    #[serde(default)]
-    pub bic: Option<String>,
-    #[serde(default)]
-    pub branch: Option<String>,
-    #[serde(default)]
-    pub bank_address: Option<String>,
-    #[serde(default)]
-    pub bsb: Option<String>,
-    #[serde(default)]
-    pub iban: Option<String>,
-    /// To put in the payment
-    #[serde(default)]
-    pub memo: Option<String>,
-    #[serde(default)]
-    pub name_on_account: Option<String>,
-    #[serde(default)]
-    pub routing: Option<String>,
-    #[serde(default)]
-    pub sort: Option<String>,
-    #[serde(default)]
-    pub swift: Option<String>,
-    #[serde(default)]
-    pub tag: Option<String>,
-    #[serde(default)]
-    pub transit: Option<String>,
-}
-
-/// Where to send a deposit: `{"crypto": {...}}` or `{"fiat": {...}}`
-// a decoded answer, not moved around: no Box, which the bindings can't carry
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
-#[serde(rename_all = "snake_case")]
-pub enum AddressDetails {
-    Crypto {
-        address: String,
-        /// Destination tag, for the networks requiring one
-        #[serde(default)]
-        tag: Option<String>,
-        #[serde(default)]
-        memo: Option<String>,
-    },
-    Fiat {
-        #[serde(flatten)]
-        account: FiatAccount,
-    },
-}
 
 #[derive(Serialize)]
 struct AccountQuery<'a> {
