@@ -18,7 +18,7 @@ use kraken_api::funding::{
     AddressDetails, ClaimedAddresses, DepositLimits, Deposits, FundingAsset, FundingAssets,
     FundingDirection, FundingFee, FundingFeeRequest, FundingMethods, FundingNetworks, FundingScope,
     LimitValue, NewWithdrawalAddress, SavedAddress, TransferStatus, WithdrawalAddresses,
-    WithdrawalLimits,
+    WithdrawalLimits, Withdrawals,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -1607,4 +1607,32 @@ async fn create_withdrawal_address_fixture() {
         .await
         .unwrap();
     assert_eq!(served, saved);
+}
+
+#[tokio::test]
+async fn withdrawals_fixture() {
+    let page: Withdrawals = decode_strict("withdrawals", &funding_fixture("withdrawals.json"));
+    // the fee in the asset of the withdrawal
+    for withdrawal in &page.withdrawals {
+        let (amount, fee) = (
+            withdrawal.amount.as_ref().unwrap(),
+            withdrawal.fee.as_ref().unwrap(),
+        );
+        assert_eq!(amount.asset, fee.asset, "{withdrawal:?}");
+    }
+    assert!(
+        page.withdrawals
+            .windows(2)
+            .all(|it| it[0].create_time >= it[1].create_time)
+    );
+
+    let server = MockServer::start().await;
+    serve_funding(&server, "/funding/v1/withdrawals", "withdrawals.json").await;
+    assert_eq!(
+        private_api(&server)
+            .withdrawals(&Default::default())
+            .await
+            .unwrap(),
+        page
+    );
 }

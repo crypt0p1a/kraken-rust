@@ -20,6 +20,7 @@ pub(crate) mod fees;
 pub(crate) mod limits;
 pub(crate) mod methods;
 pub(crate) mod networks;
+pub(crate) mod withdrawals;
 
 pub use addresses::{
     Beneficiary, NewWithdrawalAddress, SavedAddress, WithdrawalAccount, WithdrawalAddress,
@@ -40,6 +41,7 @@ pub use methods::{
     FundingMethods, FundingMethodsRequest, MethodFees, MethodNetwork,
 };
 pub use networks::{FundingNetwork, FundingNetworks, NetworkGroup};
+pub use withdrawals::{Withdrawal, WithdrawalStatus, Withdrawals, WithdrawalsRequest};
 
 /// An asset of the funding API: its class and its name
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

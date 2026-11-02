@@ -7,7 +7,8 @@ use common::{QueryIs, SignedFunding, plain, private_api};
 use kraken_api::funding::{
     AddressDetails, ClaimedAddressesRequest, DepositsRequest, FundingAsset, FundingDirection,
     FundingFeeRequest, FundingLimitsRequest, FundingMethodsRequest, FundingScope,
-    NewWithdrawalAddress, TransferStatus, WithdrawalAddressesRequest,
+    NewWithdrawalAddress, TransferStatus, WithdrawalAddressesRequest, WithdrawalStatus,
+    WithdrawalsRequest,
 };
 use kraken_api::market::AssetClass;
 use serde_json::json;
@@ -411,4 +412,30 @@ async fn delete_withdrawal_address() {
     assert!(deleted);
     // no body
     assert!(server.received_requests().await.unwrap()[0].body.is_empty());
+}
+
+#[tokio::test]
+async fn withdrawals() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/funding/v1/withdrawals"))
+        .and(SignedFunding)
+        .and(QueryIs(vec![("status", "pending"), ("limit", "5")]))
+        .respond_with(plain(
+            json!({"withdrawals": [{"withdrawal_id": "FT1", "method_id": "m",
+            "status": "pending"}]}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let page = private_api(&server)
+        .withdrawals(&WithdrawalsRequest {
+            status: Some(WithdrawalStatus::Pending),
+            limit: Some(5),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(page.withdrawals[0].withdrawal_id, "FT1");
 }

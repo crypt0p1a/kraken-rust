@@ -1,0 +1,70 @@
+{
+  "withdrawals": [
+    {
+      "withdrawal_id": "FTVZiTI-e02T84mm87JmibnObWNdnW",
+      "amount": {
+        "asset": {
+          "class": "currency",
+          "name": "USDC"
+        },
+        "amount": "4.00000000"
+      },
+      "fee": {
+        "asset": {
+          "class": "currency",
+          "name": "USDC"
+        },
+        "amount": "1.00000000"
+      },
+      "method_id": "d4ec4d52-b159-428e-ba64-f45455a978a1",
+      "status": "pending",
+      "create_time": "2026-08-12T10:10:30Z",
+      "address_id": "ABR6SXP-SF6CY-VJMONY"
+    },
+    {
+      "withdrawal_id": "FTa55AO-u7dazcZpBR1nS3Uk42k6LI",
+      "amount": {
+        "asset": {
+          "class": "tokenized_asset",
+          "name": "TSLAx"
+        },
+        "amount": "1.30000000"
+      },
+      "fee": {
+        "asset": {
+          "class": "tokenized_asset",
+          "name": "TSLAx"
+        },
+        "amount": "0.01300000"
+      },
+      "method_id": "5104c28e-9da8-43c8-8194-33d9ea1fbdc0",
+      "status": "pending",
+      "create_time": "2026-08-12T10:07:04Z",
+      "address_id": "ABVXBF7-RC3Z5-WYUBPD"
+    },
+    {
+      "withdrawal_id": "FTq81BZ-k3xLmN2pQr4sTu6vWx8yZa",
+      "amount": {
+        "asset": {
+          "class": "currency",
+          "name": "BTC"
+        },
+        "amount": "0.05000000"
+      },
+      "fee": {
+        "asset": {
+          "class": "currency",
+          "name": "BTC"
+        },
+        "amount": "0.00010000"
+      },
+      "method_id": "6e2a1c4b-0d3f-4a5e-8b7c-9d0e1f2a3b4c",
+      "status": "success",
+      "create_time": "2026-08-01T09:00:00Z",
+      "address_id": "AB7J4FF-BGM7G-V2JMIH",
+      "onchain_transaction": "0d0a8f941a1ee0caeca3396757c847e0a3fa326d6994c320b4f283db99cd5e48",
+      "utxo_vout": "1"
+    }
+  ],
+  "next_cursor": "gqNrZXm-RlRSeFJ2WS1PSHBX"
+}

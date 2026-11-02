@@ -15,7 +15,7 @@ use crate::funding::{
     DepositsRequest, FundingAsset, FundingAssets, FundingDirection, FundingFee, FundingFeeRequest,
     FundingLimitsRequest, FundingMethods, FundingMethodsRequest, FundingNetworks,
     NewWithdrawalAddress, SavedAddress, WithdrawalAddresses, WithdrawalAddressesRequest,
-    WithdrawalLimits,
+    WithdrawalLimits, Withdrawals, WithdrawalsRequest,
 };
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
@@ -645,5 +645,16 @@ impl PrivateApi {
         account_id: Option<&str>,
     ) -> Result<bool, KrakenError> {
         funding::addresses::delete_withdrawal_address(&self.funding, address_id, account_id).await
+    }
+
+    /// A page of the withdrawals, most recent first. Requires the "Funds permissions - Query"
+    /// permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-funding-withdrawals>
+    pub async fn withdrawals(
+        &self,
+        request: &WithdrawalsRequest,
+    ) -> Result<Withdrawals, KrakenError> {
+        funding::withdrawals::withdrawals(&self.funding, request).await
     }
 }
