@@ -19,10 +19,10 @@ use kraken_api::market::{
     SystemStatus, Ticker,
 };
 use kraken_api::trading::{
-    AmendOrder, AmendType, CancelAllAfter, CancelledOrders, ClosedOrdersRequest, NewOrder,
-    NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends, OrderAmendsRequest, OrderReference,
-    OrderSide, OrderStatus, OrderType, Position, QueryOrdersRequest, QueryTradesRequest,
-    TimeInForce, Trade, WebSocketsToken,
+    AmendOrder, AmendType, CancelAllAfter, CancelledOrders, ClosedOrdersRequest, EditOrder,
+    EditedOrder, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends,
+    OrderAmendsRequest, OrderReference, OrderSide, OrderStatus, OrderType, Position,
+    QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade, WebSocketsToken,
 };
 use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
@@ -941,4 +941,23 @@ async fn amend_order_fixture() {
         .await
         .unwrap();
     assert_eq!(amend_id, "TJSMEH-AA67V-YUSQ6O");
+}
+
+#[tokio::test]
+async fn edit_order_fixture() {
+    let edited: EditedOrder = decode_strict("EditOrder", &fixture("edit_order.json"));
+    assert_eq!(edited.status, "ok");
+    assert_ne!(edited.txid, edited.original_txid);
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/EditOrder", "edit_order.json").await;
+    let served = private_api(&server)
+        .edit_order(&EditOrder {
+            txid: "OHYO67-6LP66-HMQ437".into(),
+            pair: "XBTGBP".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(served, edited);
 }

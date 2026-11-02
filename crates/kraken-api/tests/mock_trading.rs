@@ -5,7 +5,7 @@ mod common;
 use common::{FormIs, JsonIs, Signed, SignedJson, ok, orders_fixture, private_api};
 use kraken_api::KrakenError;
 use kraken_api::trading::{
-    AmendOrder, AmendType, CloseTime, ClosedOrdersRequest, NewOrder, OpenOrdersRequest,
+    AmendOrder, AmendType, CloseTime, ClosedOrdersRequest, EditOrder, NewOrder, OpenOrdersRequest,
     OpenPositionsRequest, OrderAmendsRequest, OrderFlag, OrderReference, OrderSide, OrderStatus,
     OrderType, QueryOrdersRequest, QueryTradesRequest, TimeInForce, TradesHistoryRequest,
 };
@@ -506,4 +506,34 @@ async fn amend_order() {
             Err(KrakenError::InvalidArgument { .. })
         ));
     }
+}
+
+#[tokio::test]
+async fn edit_order() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/EditOrder"))
+        .and(Signed)
+        .and(FormIs(vec![
+            ("txid", "OHYO67-6LP66-HMQ437"),
+            ("pair", "XBTGBP"),
+            ("volume", "0.0003"),
+        ]))
+        .respond_with(ok(json!({"status": "ok", "txid": "OFVXHJ-KPQ3B-VS7ELA",
+            "originaltxid": "OHYO67-6LP66-HMQ437", "volume": "0.00030000",
+            "orders_cancelled": 1, "descr": {"order": "buy 0.00030000 XXBTZGBP @ limit 19500.0"}})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let edited = private_api(&server)
+        .edit_order(&EditOrder {
+            txid: "OHYO67-6LP66-HMQ437".into(),
+            pair: "XBTGBP".into(),
+            volume: Some("0.0003".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(edited.txid.as_deref(), Some("OFVXHJ-KPQ3B-VS7ELA"));
 }

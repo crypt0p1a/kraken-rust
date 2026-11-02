@@ -10,10 +10,10 @@ use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::AssetPair;
 use kraken_api::trading::{
-    AmendOrder, AmendType, CloseTime, ClosedOrdersRequest, ConsolidatedPosition, NewOrder,
-    NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends, OrderFlag, OrderReference, OrderSide,
-    OrderStatus, OrderType, Position, QueryTradesRequest, TimeInForce, Trade, TradesHistoryRequest,
-    WebSocketsToken,
+    AmendOrder, AmendType, CloseTime, ClosedOrdersRequest, ConsolidatedPosition, EditOrder,
+    NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends, OrderFlag, OrderReference,
+    OrderSide, OrderStatus, OrderType, Position, QueryTradesRequest, TimeInForce, Trade,
+    TradesHistoryRequest, WebSocketsToken,
 };
 use live::{
     Presence, decode_strict, entries, le, now_seconds, private_api, private_client, public_api,
@@ -876,6 +876,26 @@ async fn amend_an_unknown_order_is_refused() {
         .await;
     match answer {
         Err(KrakenError::Api { body, .. }) => assert!(body.starts_with("EOrder:"), "{body}"),
+        other => panic!("unexpected {other:?}"),
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn edit_an_unknown_order_is_refused() {
+    // validated only, on an order which doesn't exist: nothing is replaced
+    let answer = private_api()
+        .edit_order(&EditOrder {
+            txid: "OAAAAA-AAAAA-AAAAAA".into(),
+            pair: "XBTUSD".into(),
+            volume: Some("1".into()),
+            validate: Some(true),
+            ..Default::default()
+        })
+        .await;
+    match answer {
+        Err(KrakenError::Api { body, .. }) => assert!(body.starts_with("EOrder:"), "{body}"),
+        Ok(edited) => assert_eq!(edited.status, "err", "{edited:?}"),
         other => panic!("unexpected {other:?}"),
     }
 }

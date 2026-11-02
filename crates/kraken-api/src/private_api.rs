@@ -7,9 +7,10 @@ use crate::account::{
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, AmendOrder, CancelAllAfter, CancelledOrders, ClosedOrders, ClosedOrdersRequest,
-    ConsolidatedPosition, NewOrder, NewOrderAnswer, OpenOrdersRequest, OpenPositionsRequest, Order,
-    OrderAmends, OrderAmendsRequest, OrderReference, Position, QueryOrdersRequest,
-    QueryTradesRequest, Trade, TradesHistory, TradesHistoryRequest, WebSocketsToken,
+    ConsolidatedPosition, EditOrder, EditedOrder, NewOrder, NewOrderAnswer, OpenOrdersRequest,
+    OpenPositionsRequest, Order, OrderAmends, OrderAmendsRequest, OrderReference, Position,
+    QueryOrdersRequest, QueryTradesRequest, Trade, TradesHistory, TradesHistoryRequest,
+    WebSocketsToken,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PrivateClient;
@@ -256,6 +257,13 @@ impl PrivateApi {
     /// <https://docs.kraken.com/api/docs/rest-api/amend-order>
     pub async fn amend_order(&self, request: &AmendOrder) -> Result<String, KrakenError> {
         trading::amends::amend_order(&self.client, request).await
+    }
+
+    /// Replaces an open order by a new one, with a new txid: prefer `amend_order`, which keeps it
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/edit-order>
+    pub async fn edit_order(&self, request: &EditOrder) -> Result<EditedOrder, KrakenError> {
+        trading::edit::edit_order(&self.client, request).await
     }
 
     /// The versions of an order, the original one first
