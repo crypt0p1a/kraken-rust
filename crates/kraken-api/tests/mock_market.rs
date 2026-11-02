@@ -5,8 +5,8 @@ mod common;
 use common::{FormIs, QueryIs, Signed, ok, private_api, public_api};
 use kraken_api::market::{
     AssetClass, AssetStatus, AssetsRequest, CandleInterval, CandlesRequest,
-    GroupedOrderBookRequest, Level3OrderBookRequest, OrderBookRequest, RecentTradesRequest,
-    SystemState,
+    GroupedOrderBookRequest, Level3OrderBookRequest, OrderBookRequest, RecentSpreadsRequest,
+    RecentTradesRequest, SystemState,
 };
 use kraken_api::trading::{OrderSide, OrderType};
 use rust_decimal_macros::dec;
@@ -306,4 +306,30 @@ async fn recent_trades() {
     assert_eq!(trades.last, "1793612206575136400");
     assert_eq!(trades.trades[0].side, OrderSide::Sell);
     assert_eq!(trades.trades[0].order_type, OrderType::Market);
+}
+
+#[tokio::test]
+async fn recent_spreads() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/0/public/Spread"))
+        .and(QueryIs(vec![("pair", "XBTUSD"), ("since", "1793611600")]))
+        .respond_with(ok(json!({
+            "XXBTZUSD": [[1793611608, "78058.00000", "78058.10000"]],
+            "last": 1793611608
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let spreads = public_api(&server)
+        .recent_spreads(&RecentSpreadsRequest {
+            pair: "XBTUSD".into(),
+            since: Some(1793611600),
+            asset_class: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(spreads.last, 1793611608);
+    assert_eq!(spreads.spreads[0].ask, dec!(78058.1));
 }

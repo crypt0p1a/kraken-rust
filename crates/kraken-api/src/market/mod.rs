@@ -26,4 +26,6 @@ pub use status::{
 };
 pub use ticker::{PriceLevel, Ticker, TradeLevel, Window, WindowCount};
 pub use time::ServerTime;
-pub use trades::{PublicTrade, RecentTrades, RecentTradesRequest};
+pub use trades::{
+    PublicTrade, RecentSpreads, RecentSpreadsRequest, RecentTrades, RecentTradesRequest, Spread,
+};

@@ -123,6 +123,77 @@ pub(crate) async fn recent_trades(
     decode_trades(client.call_with("Trades", Some(request)).await?)
 }
 
+/// Best bid and ask at a time
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct Spread {
+    /// UTC timestamp, in seconds
+    pub time: i64,
+    pub bid: Decimal,
+    pub ask: Decimal,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/get-recent-spreads>
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct RecentSpreads {
+    pub pair: String,
+    /// Oldest first
+    pub spreads: Vec<Spread>,
+    /// To give as `since` to get the next spreads
+    pub last: i64,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/get-recent-spreads>
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct RecentSpreadsRequest {
+    pub pair: String,
+    /// The `last` of a previous answer
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub since: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub asset_class: Option<AssetClass>,
+}
+
+/// [time, bid, ask]
+#[derive(Deserialize)]
+struct RawSpread(
+    #[serde(deserialize_with = "lenient::number")] i64,
+    ExactDecimal,
+    ExactDecimal,
+);
+
+fn decode_spreads(result: Map<String, Value>) -> Result<RecentSpreads, KrakenError> {
+    let (pair, spreads, last) = single_pair(result)?;
+    let spreads: Vec<RawSpread> = serde_json::from_value(spreads).map_err(KrakenError::decode)?;
+    let last = last
+        .map(|last| lenient::number::<_, i64>(last).map_err(KrakenError::decode))
+        .transpose()?
+        .unwrap_or_default();
+    Ok(RecentSpreads {
+        pair,
+        spreads: spreads
+            .into_iter()
+            .map(|RawSpread(time, bid, ask)| Spread {
+                time,
+                bid: bid.0,
+                ask: ask.0,
+            })
+            .collect(),
+        last,
+    })
+}
+
+pub(crate) async fn recent_spreads(
+    client: &PublicClient,
+    request: &RecentSpreadsRequest,
+) -> Result<RecentSpreads, KrakenError> {
+    decode_spreads(client.call_with("Spread", Some(request)).await?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,6 +212,16 @@ mod tests {
             encode(&request).unwrap(),
             "pair=XBTUSD&since=1793612207465553566&count=3"
         );
+    }
+
+    #[test]
+    fn encodes_the_spreads_request() {
+        let request = RecentSpreadsRequest {
+            pair: "XBTUSD".into(),
+            since: Some(1793611608),
+            asset_class: None,
+        };
+        assert_eq!(encode(&request).unwrap(), "pair=XBTUSD&since=1793611608");
     }
 
     #[test]
@@ -173,5 +254,21 @@ mod tests {
                 .unwrap(),
         );
         assert!(matches!(trades, Err(KrakenError::Decode { .. })));
+    }
+
+    #[test]
+    fn decodes_the_spreads() {
+        let spreads = decode_spreads(
+            serde_json::from_str(
+                r#"{"XXBTZUSD":[[1793611608,"78058.00000","78058.10000"]],"last":1793612207}"#,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(spreads.pair, "XXBTZUSD");
+        assert_eq!(spreads.last, 1793612207);
+        assert_eq!(spreads.spreads[0].bid, dec!(78058));
+        assert_eq!(spreads.spreads[0].ask, dec!(78058.1));
     }
 }

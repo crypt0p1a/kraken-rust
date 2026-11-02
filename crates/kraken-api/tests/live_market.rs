@@ -11,8 +11,8 @@ use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetsRequest, CandleInterval, CandlesRequest,
-    GroupedOrderBook, MaintenanceEvent, OrderBookRequest, RecentTradesRequest, ServerTime,
-    SystemState, SystemStatus, Ticker,
+    GroupedOrderBook, MaintenanceEvent, OrderBookRequest, RecentSpreadsRequest,
+    RecentTradesRequest, ServerTime, SystemState, SystemStatus, Ticker,
 };
 use kraken_api::trading::OrderType;
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
@@ -577,4 +577,26 @@ async fn recent_trades_continue_from_last() {
     // `since` is inclusive: the last trade is sent again
     let last_id = trades.trades.last().unwrap().trade_id;
     assert!(next.trades.iter().all(|it| it.trade_id >= last_id));
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn recent_spreads_are_ordered() {
+    let spreads = public_api()
+        .recent_spreads(&RecentSpreadsRequest {
+            pair: "XBTUSD".into(),
+            since: None,
+            asset_class: None,
+        })
+        .await
+        .unwrap();
+    assert!(!spreads.spreads.is_empty());
+    assert!(spreads.spreads.iter().all(|it| it.bid <= it.ask));
+    assert!(
+        spreads
+            .spreads
+            .windows(2)
+            .all(|it| it[0].time <= it[1].time)
+    );
+    assert!(spreads.last >= spreads.spreads.last().unwrap().time);
 }

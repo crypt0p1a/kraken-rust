@@ -1,7 +1,7 @@
 use crate::market::{
     self, Asset, AssetPair, AssetsRequest, Candles, CandlesRequest, GroupedOrderBook,
-    GroupedOrderBookRequest, MaintenanceEvent, OrderBook, OrderBookRequest, RecentTrades,
-    RecentTradesRequest, ServerTime, SystemStatus, Ticker,
+    GroupedOrderBookRequest, MaintenanceEvent, OrderBook, OrderBookRequest, RecentSpreads,
+    RecentSpreadsRequest, RecentTrades, RecentTradesRequest, ServerTime, SystemStatus, Ticker,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PublicClient;
@@ -93,6 +93,16 @@ impl PublicApi {
         request: &RecentTradesRequest,
     ) -> Result<RecentTrades, KrakenError> {
         market::trades::recent_trades(&self.client, request).await
+    }
+
+    /// The last ~200 best bids and asks of a pair
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-recent-spreads>
+    pub async fn recent_spreads(
+        &self,
+        request: &RecentSpreadsRequest,
+    ) -> Result<RecentSpreads, KrakenError> {
+        market::trades::recent_spreads(&self.client, request).await
     }
 
     /// OHLC candles of a pair, the last one being still open
