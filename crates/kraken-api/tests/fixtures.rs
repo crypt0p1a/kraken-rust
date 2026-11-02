@@ -15,7 +15,8 @@ use kraken_api::account::{
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
 use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
 use kraken_api::funding::{
-    FundingAssets, FundingDirection, FundingFee, FundingFeeRequest, FundingMethods, FundingNetworks,
+    DepositLimits, FundingAsset, FundingAssets, FundingDirection, FundingFee, FundingFeeRequest,
+    FundingMethods, FundingNetworks, LimitValue,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -1403,4 +1404,37 @@ async fn funding_fee_fixture() {
         .await
         .unwrap();
     assert_eq!(served, fee);
+}
+
+#[tokio::test]
+async fn deposit_limits_fixture() {
+    let raw = funding_fixture("deposit_limits.json");
+    let limits: Vec<DepositLimits> = raw["deposit_limits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|it| decode_strict("deposit limits", it))
+        .collect();
+    let counted = &limits[0].limits[1].limit;
+    assert_eq!(counted.limit_type, "attempt");
+    assert!(matches!(counted.maximum, LimitValue::Count { .. }));
+
+    let server = MockServer::start().await;
+    serve_funding(
+        &server,
+        "/funding/v1/limits/deposit/currency/USDC",
+        "deposit_limits.json",
+    )
+    .await;
+    let served = private_api(&server)
+        .deposit_limits(
+            &FundingAsset {
+                class: kraken_api::market::AssetClass::Currency,
+                name: "USDC".into(),
+            },
+            &Default::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(served, limits);
 }

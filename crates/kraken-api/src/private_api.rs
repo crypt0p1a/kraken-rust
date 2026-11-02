@@ -11,8 +11,9 @@ use crate::earn::{
     self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
 use crate::funding::{
-    self, FundingAssets, FundingDirection, FundingFee, FundingFeeRequest, FundingMethods,
-    FundingMethodsRequest, FundingNetworks,
+    self, DepositLimits, FundingAsset, FundingAssets, FundingDirection, FundingFee,
+    FundingFeeRequest, FundingLimitsRequest, FundingMethods, FundingMethodsRequest,
+    FundingNetworks,
 };
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
@@ -533,5 +534,17 @@ impl PrivateApi {
         request: &FundingFeeRequest,
     ) -> Result<FundingFee, KrakenError> {
         funding::fees::funding_fee(&self.funding, method_id, request).await
+    }
+
+    /// The deposit limits of an asset, by funding method. Requires the "Funds permissions - Query"
+    /// permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-funding-deposit-limits>
+    pub async fn deposit_limits(
+        &self,
+        asset: &FundingAsset,
+        request: &FundingLimitsRequest,
+    ) -> Result<Vec<DepositLimits>, KrakenError> {
+        funding::limits::deposit_limits(&self.funding, asset, request).await
     }
 }

@@ -4,7 +4,9 @@
 mod common;
 
 use common::{QueryIs, SignedFunding, plain, private_api};
-use kraken_api::funding::{FundingDirection, FundingFeeRequest, FundingMethodsRequest};
+use kraken_api::funding::{
+    FundingAsset, FundingDirection, FundingFeeRequest, FundingLimitsRequest, FundingMethodsRequest,
+};
 use kraken_api::market::AssetClass;
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -136,4 +138,38 @@ async fn funding_fee() {
         .unwrap();
     assert_eq!(fee.net_amount.amount.to_string(), "4");
     assert_eq!(fee.withdrawal_fee_token, None);
+}
+
+fn usdc() -> FundingAsset {
+    FundingAsset {
+        class: AssetClass::Currency,
+        name: "USDC".into(),
+    }
+}
+
+#[tokio::test]
+async fn deposit_limits() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/funding/v1/limits/deposit/currency/USDC"))
+        .and(SignedFunding)
+        .and(QueryIs(vec![("preferred_asset[name]", "EUR")]))
+        .respond_with(plain(json!({"deposit_limits": [{"method_id": "742656ee",
+            "limits": [{"time_window": "86400", "limit": {"limit_type": "success",
+            "remaining": "9", "maximum": "10"}}]}]})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let limits = private_api(&server)
+        .deposit_limits(
+            &usdc(),
+            &FundingLimitsRequest {
+                preferred_asset_name: Some("EUR".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(limits[0].limits[0].limit.limit_type, "success");
 }
