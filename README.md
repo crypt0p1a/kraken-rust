@@ -246,7 +246,7 @@ the libraries), from the library of the host: they are the same for every platfo
 | Directory | What | Built with |
 |-----------|------|------------|
 | [`platforms/apple`](platforms/apple) | Swift package: Swift bindings, `KrakenFFI.xcframework` (iOS, iOS simulator, macOS) | SwiftPM / Xcode |
-| [`platforms/kotlin-multiplatform`](platforms/kotlin-multiplatform) | Kotlin Multiplatform library, the one of Kotlin: JVM, Android (AAR), iOS, macOS, Linux | Gradle (`:kraken-multiplatform`), [uniffi KMP plugin](https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings) |
+| [`platforms/kotlin-multiplatform`](platforms/kotlin-multiplatform) | Kotlin Multiplatform library, the one of Kotlin: JVM, Android (AAR), iOS, macOS, Linux, Windows | Gradle (`:kraken-multiplatform`), [uniffi KMP plugin](https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings) |
 
 ```sh
 scripts/bindings.sh kotlin              # dist/bindings/kotlin
@@ -267,22 +267,47 @@ The dependencies missing from that catalog are in `gradle/libs.versions.toml` (`
 `ch.ubique.uniffi.plugin` of
 [UbiqueInnovation/uniffi-kotlin-multiplatform-bindings](https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings)
 (uniffi 0.32.0, Gradle ≥ 9.6.1; Kotlin, AGP and the plugin are versioned by the catalog
-`additionals`): it builds `kraken-ffi` with Cargo for every target and generates the bindings of the 3 crates (`generateBindingsForExternalCrates`), in the
-same packages as the Kotlin ones (`uniffi.kraken_api`, ...). The `Decimal`s are the `BigDecimal` of
+`additionals`): it builds `kraken-ffi` with Cargo for every target and generates the bindings of
+the 3 crates (`generateBindingsForExternalCrates`), in the same packages as the Kotlin ones (`uniffi.kraken_api`, ...). The `Decimal`s are the `BigDecimal` of
 [`com.ionspin.kotlin:bignum`](https://github.com/ionspin/kotlin-multiplatform-bignum), available on
 every target (top-level `[custom_types.Decimal]` of `crates/kraken-api/uniffi.toml`, read by this
 generator only).
 
+A single library holds every platform, whatever the host: JVM, Android, iOS, macOS, Linux and
+Windows. It is built on macOS, the only host of the Apple targets, the Linux and Windows libraries
+being cross-compiled:
+
 ```sh
-./gradlew :kraken-multiplatform:jvmTest :kraken-multiplatform:linuxX64Test                 # Linux
-./gradlew :kraken-multiplatform:iosSimulatorArm64Test :kraken-multiplatform:macosArm64Test  # macOS
-./gradlew :kraken-multiplatform:connectedAndroidDeviceTest   # Android device / emulator
-./gradlew :kraken-multiplatform:assemble    # the libraries of every target, the AAR (Android SDK, NDK)
+rustup target add aarch64-apple-darwin x86_64-apple-darwin \
+  aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios \
+  aarch64-linux-android armv7-linux-androideabi x86_64-linux-android \
+  aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu x86_64-pc-windows-gnu
+brew tap messense/macos-cross-toolchains
+brew install x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu mingw-w64
+# the linkers of Linux, in ~/.cargo/config.toml (or CARGO_TARGET_<TRIPLE>_LINKER):
+#   [target.x86_64-unknown-linux-gnu]
+#   linker = "x86_64-linux-gnu-gcc"
+#   [target.aarch64-unknown-linux-gnu]
+#   linker = "aarch64-linux-gnu-gcc"
+# and the Android SDK with an NDK (ANDROID_HOME or local.properties)
+
+./gradlew :kraken-multiplatform:assemble -PreleaseBuild=true
 ```
 
-The AAR holds the library of the ABI of the host only, in debug: `-PreleaseBuild=true` builds the
-release libraries of `arm64-v8a`, `armeabi-v7a` and `x86_64` (`-PandroidAbis=...` picks the ABIs
-of a debug build). The plugin doesn't build the 32-bit `x86`.
+`-PreleaseBuild=true` builds the release libraries of every target: the JVM jar embeds those of
+`darwin-aarch64`, `darwin-x86-64`, `linux-aarch64`, `linux-x86-64` and `win32-x86-64`, the AAR
+those of `arm64-v8a`, `armeabi-v7a` and `x86_64` (the plugin doesn't build the 32-bit `x86`).
+Without it, a debug build only holds the libraries of the host (`-PandroidAbis=...` picks the
+Android ABIs).
+
+```sh
+./gradlew :kraken-multiplatform:jvmTest                                                    # JVM
+./gradlew :kraken-multiplatform:iosSimulatorArm64Test :kraken-multiplatform:macosArm64Test  # macOS
+./gradlew :kraken-multiplatform:linuxX64Test                                               # Linux
+./gradlew :kraken-multiplatform:connectedAndroidDeviceTest       # Android device / emulator
+```
+
+Outside of macOS, the Apple tasks are disabled: Linux can still build and test its own targets.
 
 The common tests run on every target, Android included on a device (options, exact decimals
 through the converter, invalid secret, transport error, logger implemented in Kotlin); the calls

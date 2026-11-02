@@ -220,17 +220,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # the tests on the JVM and Linux, the libraries of every target (Android included: every
-          # ABI with releaseBuild, only the one of the host otherwise)
-          - name: jvm-linux-android
-            os: ubuntu-latest
-            rust-targets: aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
-            tasks: :kraken-multiplatform:jvmTest :kraken-multiplatform:linuxX64Test :kraken-multiplatform:assemble -PreleaseBuild=true
-          # the tests on the iOS simulator and macOS
-          - name: ios-macos
+          # the library of every target, built on macOS: the JVM jar (darwin, linux, win32), the
+          # AAR (every ABI), the klibs of iOS, macOS, Linux and Windows. The tests of the hosts of
+          # the runner: the JVM, the iOS simulator and macOS
+          - name: all-targets
             os: macos-latest
-            rust-targets: aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios x86_64-apple-darwin
-            tasks: :kraken-multiplatform:iosSimulatorArm64Test :kraken-multiplatform:macosArm64Test
+            rust-targets: >-
+              aarch64-apple-darwin x86_64-apple-darwin
+              aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+              aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+              aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu x86_64-pc-windows-gnu
+            tasks: >-
+              :kraken-multiplatform:jvmTest :kraken-multiplatform:iosSimulatorArm64Test
+              :kraken-multiplatform:macosArm64Test :kraken-multiplatform:assemble -PreleaseBuild=true
+          # the tests on Linux, which macOS can build but not run
+          - name: linux
+            os: ubuntu-latest
+            rust-targets: x86_64-unknown-linux-gnu
+            tasks: :kraken-multiplatform:jvmTest :kraken-multiplatform:linuxX64Test
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
@@ -246,9 +253,14 @@ jobs:
           java-version: "21"
       # the wrapper of the repository (gradle/wrapper), validated by setup-gradle
       - uses: gradle/actions/setup-gradle@v4
-      - name: Android NDK
-        if: runner.os == 'Linux'
-        run: echo "ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+      - name: Android NDK, cross compilers of Linux and Windows
+        if: runner.os == 'macOS'
+        run: |
+          echo "ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+          brew tap messense/macos-cross-toolchains
+          brew install x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu mingw-w64
+          echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=x86_64-linux-gnu-gcc" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
       - name: Build and test
         run: ./gradlew ${{ matrix.tasks }} --console=plain
       - name: Test report
@@ -259,7 +271,7 @@ jobs:
           path: platforms/kotlin-multiplatform/build/test-results/**/*.xml
           if-no-files-found: ignore
       - name: Libraries
-        if: runner.os == 'Linux'
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: kraken-multiplatform
