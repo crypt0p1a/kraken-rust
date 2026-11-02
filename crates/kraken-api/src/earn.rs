@@ -326,6 +326,15 @@ pub(crate) async fn allocate(
     client.call_with("Earn/Allocate", Some(funds)).await
 }
 
+/// Starts deallocating funds from a strategy: asynchronous, followed by `deallocate_status`.
+/// Requires the "Earn Funds" permission
+pub(crate) async fn deallocate(
+    client: &PrivateClient,
+    funds: &EarnFunds,
+) -> Result<bool, KrakenError> {
+    client.call_with("Earn/Deallocate", Some(funds)).await
+}
+
 #[derive(Serialize)]
 struct OfStrategy<'a> {
     strategy_id: &'a str,

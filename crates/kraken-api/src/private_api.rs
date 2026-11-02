@@ -434,4 +434,12 @@ impl PrivateApi {
     pub async fn earn_allocate_status(&self, strategy_id: &str) -> Result<bool, KrakenError> {
         earn::allocate_status(&self.client, strategy_id).await
     }
+
+    /// Starts deallocating funds from an Earn strategy: asynchronous, followed by
+    /// `earn_deallocate_status`. Requires the "Earn Funds" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/deallocate-strategy>
+    pub async fn earn_deallocate(&self, funds: &EarnFunds) -> Result<bool, KrakenError> {
+        earn::deallocate(&self.client, funds).await
+    }
 }

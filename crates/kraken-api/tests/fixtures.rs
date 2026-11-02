@@ -1222,3 +1222,18 @@ async fn earn_allocate_status_fixture() {
         .unwrap();
     assert!(!pending);
 }
+
+#[tokio::test]
+async fn earn_deallocate_fixture() {
+    // the same answer as Earn/Allocate
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/Earn/Deallocate", "earn_allocate.json").await;
+    let started = private_api(&server)
+        .earn_deallocate(&EarnFunds {
+            strategy_id: "ESRFUO3-Q62XD-WIOIL7".into(),
+            amount: "1.5".into(),
+        })
+        .await
+        .unwrap();
+    assert!(started);
+}
