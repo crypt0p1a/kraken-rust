@@ -1,0 +1,40 @@
+{
+  "error": [],
+  "result": {
+    "accounts": [
+      {
+        "account_id": "WX6V-JUKW-KKPB-QE36",
+        "flags": {
+          "user_defined": false,
+          "active": true
+        },
+        "status": "active",
+        "type": "main",
+        "name": null
+      },
+      {
+        "account_id": "WQ2K-PLMS-AXJE-7RTD",
+        "flags": {
+          "user_defined": true,
+          "active": true
+        },
+        "status": "active",
+        "type": "spot",
+        "name": "trading bot"
+      },
+      {
+        "account_id": "WB9M-XQZT-LKDA-3PNE",
+        "flags": {
+          "user_defined": true,
+          "active": false
+        },
+        "status": "closed",
+        "type": "spot",
+        "name": "old"
+      }
+    ],
+    "cursor": {
+      "next": null
+    }
+  }
+}

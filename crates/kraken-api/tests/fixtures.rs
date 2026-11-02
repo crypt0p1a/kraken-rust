@@ -7,7 +7,10 @@ mod strict;
 
 use common::{private_api, public_api};
 use kraken_api::Decimal;
-use kraken_api::account::{ApiKeyInfo, CreditLines, ExtendedBalance, TradeBalance, TradeVolume};
+use kraken_api::account::{
+    ApiKeyInfo, CreditLines, ExtendedBalance, TradeBalance, TradeVolume, WalletAccounts,
+    WalletStatus,
+};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -595,5 +598,30 @@ async fn api_key_info_fixture() {
             .await
             .unwrap(),
         info
+    );
+}
+
+#[tokio::test]
+async fn wallet_accounts_fixture() {
+    let wallets: WalletAccounts =
+        decode_strict("ListWalletAccounts", &fixture("wallet_accounts.json"));
+    assert_eq!(wallets.accounts.len(), 3);
+    assert!(
+        wallets
+            .accounts
+            .iter()
+            .all(|it| it.flags.active == (it.status == WalletStatus::Active))
+    );
+
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/ListWalletAccounts",
+        "wallet_accounts.json",
+    )
+    .await;
+    assert_eq!(
+        private_api(&server).wallet_accounts().await.unwrap(),
+        wallets
     );
 }

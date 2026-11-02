@@ -5,7 +5,7 @@ mod common;
 
 use common::{FormIs, Signed, ok, private_api};
 use kraken_api::account::{
-    ApiKeyInfoRequest, BalanceRequest, RebaseMultiplier, TradeBalanceRequest,
+    ApiKeyInfoRequest, BalanceRequest, RebaseMultiplier, TradeBalanceRequest, WalletType,
 };
 use rust_decimal_macros::dec;
 use serde_json::json;
@@ -125,6 +125,27 @@ async fn trade_balance() {
         .unwrap();
     assert_eq!(balance.unrealized_net, dec!(-1.5));
     assert_eq!(balance.margin_level, Some(dec!(885)));
+}
+
+#[tokio::test]
+async fn wallet_accounts() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/ListWalletAccounts"))
+        .and(Signed)
+        .and(FormIs(vec![]))
+        .respond_with(ok(
+            json!({"accounts": [{"account_id": "WX6V-JUKW-KKPB-QE36",
+            "flags": {"user_defined": true, "active": true}, "status": "active", "type": "spot",
+            "name": "bot"}], "cursor": {"next": "abc"}}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let wallets = private_api(&server).wallet_accounts().await.unwrap();
+    assert_eq!(wallets.accounts[0].wallet_type, WalletType::Spot);
+    assert_eq!(wallets.cursor.next.as_deref(), Some("abc"));
 }
 
 #[tokio::test]

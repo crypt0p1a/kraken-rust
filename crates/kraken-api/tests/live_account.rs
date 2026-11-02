@@ -6,7 +6,9 @@ mod live;
 mod strict;
 
 use kraken_api::Decimal;
-use kraken_api::account::{ApiKeyInfo, ExtendedBalance, FeeInfo, TradeBalance, TradeVolume};
+use kraken_api::account::{
+    ApiKeyInfo, ExtendedBalance, FeeInfo, TradeBalance, TradeVolume, WalletAccounts, WalletType,
+};
 use kraken_api::market::Level3OrderBook;
 use kraken_api::{KrakenError, PrivateApi, RestOptions};
 use live::{Presence, decode_strict, entries, env, le, private_api, private_client};
@@ -262,4 +264,19 @@ async fn api_key_info_never_allows_withdrawals() {
         "the API key of the tests can withdraw: {:?}",
         info.permissions
     );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn wallet_accounts_hold_the_main_one() {
+    let raw: Value = private_client().call("ListWalletAccounts").await.unwrap();
+    let wallets: WalletAccounts = decode_strict("ListWalletAccounts", &raw);
+    assert!(
+        wallets
+            .accounts
+            .iter()
+            .any(|it| it.wallet_type == WalletType::Main),
+        "{wallets:?}"
+    );
+    assert!(wallets.accounts.iter().all(|it| !it.account_id.is_empty()));
 }

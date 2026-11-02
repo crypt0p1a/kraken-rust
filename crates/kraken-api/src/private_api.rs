@@ -1,7 +1,7 @@
 use crate::Decimal;
 use crate::account::{
     self, ApiKeyInfo, ApiKeyInfoRequest, BalanceRequest, CreditLines, ExtendedBalance,
-    TradeBalance, TradeBalanceRequest, TradeVolume,
+    TradeBalance, TradeBalanceRequest, TradeVolume, WalletAccounts,
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
@@ -86,6 +86,13 @@ impl PrivateApi {
         request: &TradeBalanceRequest,
     ) -> Result<TradeBalance, KrakenError> {
         account::trade_balance::trade_balance(&self.client, request).await
+    }
+
+    /// The wallets of the account, with the `account_id` of each
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-wallet-accounts>
+    pub async fn wallet_accounts(&self) -> Result<WalletAccounts, KrakenError> {
+        account::wallets::wallet_accounts(&self.client).await
     }
 
     /// 30 days volume, and the current fees of the `pairs`
