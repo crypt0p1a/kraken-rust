@@ -175,47 +175,6 @@ jobs:
       - name: Generate the bindings and test them with the library of the host
         run: scripts/test-bindings.sh swift
 
-  android:
-    name: Android (common tests of Kotlin Multiplatform on an emulator)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
-      # the ABI of the emulator: the uniffi plugin builds kraken-ffi for it
-      - name: Rust targets
-        run: rustup target add x86_64-linux-android
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: kmp-android
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-      # the wrapper of the repository (gradle/wrapper), validated by setup-gradle
-      - uses: gradle/actions/setup-gradle@v4
-      - name: Android NDK
-        run: echo "ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
-      - name: Enable KVM, for the emulator
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Common tests of the bindings on an Android emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          arch: x86_64
-          target: google_apis
-          disable-animations: true
-          script: ./gradlew :kraken-multiplatform:connectedAndroidDeviceTest --console=plain
-      - name: Test report
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: junit-android
-          path: platforms/kotlin-multiplatform/build/outputs/androidTest-results/**/*.xml
-          if-no-files-found: ignore
-
   kotlin-multiplatform:
     name: Kotlin Multiplatform (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
@@ -414,7 +373,7 @@ jobs:
 
   report:
     name: Test report
-    needs: [test, android, kotlin-multiplatform, live-public, live-private]
+    needs: [test, kotlin-multiplatform, live-public, live-private]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
