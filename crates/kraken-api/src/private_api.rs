@@ -6,8 +6,8 @@ use crate::account::{
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
-    self, CancelledOrders, ClosedOrders, ClosedOrdersRequest, ConsolidatedPosition, NewOrder,
-    NewOrderAnswer, OpenOrdersRequest, OpenPositionsRequest, Order, OrderAmends,
+    self, CancelAllAfter, CancelledOrders, ClosedOrders, ClosedOrdersRequest, ConsolidatedPosition,
+    NewOrder, NewOrderAnswer, OpenOrdersRequest, OpenPositionsRequest, Order, OrderAmends,
     OrderAmendsRequest, OrderReference, Position, QueryOrdersRequest, QueryTradesRequest, Trade,
     TradesHistory, TradesHistoryRequest, WebSocketsToken,
 };
@@ -227,6 +227,17 @@ impl PrivateApi {
     /// <https://docs.kraken.com/api/docs/rest-api/cancel-all-orders>
     pub async fn cancel_all(&self) -> Result<CancelledOrders, KrakenError> {
         trading::cancel::cancel_all(&self.client).await
+    }
+
+    /// Dead man's switch: cancels every open order in `timeout` seconds (less than 86400), unless
+    /// called again before. 0 disables it
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/cancel-all-orders-after>
+    pub async fn cancel_all_orders_after(
+        &self,
+        timeout: u32,
+    ) -> Result<CancelAllAfter, KrakenError> {
+        trading::cancel::cancel_all_orders_after(&self.client, timeout).await
     }
 
     /// The versions of an order, the original one first

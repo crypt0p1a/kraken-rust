@@ -417,3 +417,23 @@ async fn cancel_all() {
     assert_eq!(cancelled.count, 4);
     assert_eq!(cancelled.pending, Some(false));
 }
+
+#[tokio::test]
+async fn cancel_all_orders_after() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/CancelAllOrdersAfter"))
+        .and(Signed)
+        .and(FormIs(vec![("timeout", "60")]))
+        .respond_with(ok(json!({"currentTime": "2023-03-24T17:41:56Z",
+            "triggerTime": "2023-03-24T17:42:56Z"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let timer = private_api(&server)
+        .cancel_all_orders_after(60)
+        .await
+        .unwrap();
+    assert_eq!(timer.current_time, "2023-03-24T17:41:56Z");
+}

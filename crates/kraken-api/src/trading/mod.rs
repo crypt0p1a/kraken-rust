@@ -22,7 +22,7 @@ pub(crate) mod websocket;
 
 pub use add::{NewOrder, NewOrderAnswer, NewOrderDescription};
 pub use amends::{AmendType, OrderAmend, OrderAmends, OrderAmendsRequest};
-pub use cancel::{CancelledOrders, OrderReference};
+pub use cancel::{CancelAllAfter, CancelledOrders, OrderReference};
 pub use order::{Order, OrderDescription};
 pub use positions::{ConsolidatedPosition, OpenPositionsRequest, Position};
 pub use query::{

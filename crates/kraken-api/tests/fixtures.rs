@@ -19,9 +19,10 @@ use kraken_api::market::{
     SystemStatus, Ticker,
 };
 use kraken_api::trading::{
-    AmendType, CancelledOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest,
-    Order, OrderAmends, OrderAmendsRequest, OrderReference, OrderSide, OrderStatus, OrderType,
-    Position, QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade, WebSocketsToken,
+    AmendType, CancelAllAfter, CancelledOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer,
+    OpenOrdersRequest, Order, OrderAmends, OrderAmendsRequest, OrderReference, OrderSide,
+    OrderStatus, OrderType, Position, QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade,
+    WebSocketsToken,
 };
 use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
@@ -878,4 +879,28 @@ async fn cancel_all_fixture() {
     serve(&server, "/0/private/CancelAll", "cancel_order.json").await;
     let cancelled = private_api(&server).cancel_all().await.unwrap();
     assert_eq!(cancelled.count, 2);
+}
+
+#[tokio::test]
+async fn cancel_all_orders_after_fixture() {
+    let timer: CancelAllAfter = decode_strict(
+        "CancelAllOrdersAfter",
+        &fixture("cancel_all_orders_after.json"),
+    );
+    assert!(timer.current_time < timer.trigger_time);
+
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/CancelAllOrdersAfter",
+        "cancel_all_orders_after.json",
+    )
+    .await;
+    assert_eq!(
+        private_api(&server)
+            .cancel_all_orders_after(60)
+            .await
+            .unwrap(),
+        timer
+    );
 }

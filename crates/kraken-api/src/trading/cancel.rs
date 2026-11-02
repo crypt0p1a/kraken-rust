@@ -52,6 +52,37 @@ pub(crate) async fn cancel_all(client: &PrivateClient) -> Result<CancelledOrders
     client.call("CancelAll").await
 }
 
+/// The dead man's switch
+///
+/// <https://docs.kraken.com/api/docs/rest-api/cancel-all-orders-after>
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct CancelAllAfter {
+    /// RFC 3339: when the request was received
+    #[serde(rename = "currentTime")]
+    pub current_time: String,
+    /// RFC 3339: when every open order will be cancelled, unless the timer is extended or
+    /// disabled. "0" once disabled
+    #[serde(rename = "triggerTime")]
+    pub trigger_time: String,
+}
+
+#[derive(Serialize)]
+struct Timeout {
+    timeout: u32,
+}
+
+/// Cancels every open order in `timeout` seconds (less than 86400), unless called again: 0
+/// disables the timer
+pub(crate) async fn cancel_all_orders_after(
+    client: &PrivateClient,
+    timeout: u32,
+) -> Result<CancelAllAfter, KrakenError> {
+    client
+        .call_with("CancelAllOrdersAfter", Some(&Timeout { timeout }))
+        .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -77,6 +108,20 @@ mod tests {
             .unwrap(),
             "cl_ord_id=mgr1+buy"
         );
+    }
+
+    #[test]
+    fn encodes_the_timeout() {
+        assert_eq!(encode(&Timeout { timeout: 60 }).unwrap(), "timeout=60");
+    }
+
+    #[test]
+    fn decodes_the_timer() {
+        let timer: CancelAllAfter = serde_json::from_str(
+            r#"{"currentTime":"2023-03-24T17:41:56Z","triggerTime":"2023-03-24T17:42:56Z"}"#,
+        )
+        .unwrap();
+        assert_eq!(timer.trigger_time, "2023-03-24T17:42:56Z");
     }
 
     #[test]
