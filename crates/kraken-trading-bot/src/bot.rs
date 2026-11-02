@@ -9,6 +9,7 @@ use crate::ledger::{self, Balances};
 use crate::notify::{self, OrderChange, OrderEvent};
 use crate::order::BotOrder;
 use crate::pair::PairRules;
+use crate::rebuild;
 use crate::storage::{ActionRecord, ManagerState, Storage, TickerRecord, VirtualManager};
 use crate::strategy::{self, Action, Decision};
 use crate::sync::{self, SyncReport};
@@ -336,6 +337,7 @@ impl<E: Exchange> Bot<E> {
 
     pub async fn tick(&mut self) -> BotResult<TickReport> {
         self.ticks += 1;
+        self.rebuild_virtual_managers().await?;
         let mut managers = self.managers()?;
         // the pairs of the managers sharing one are already known
         if managers
@@ -388,6 +390,35 @@ impl<E: Exchange> Bot<E> {
         managers.retain(|it| !matches!(outcomes.get(&it.id), Some(Outcome::Deleted(_))));
         self.notify_daily_summary(&markets, &managers).await?;
         Ok(TickReport { sync, outcomes })
+    }
+
+    /// Once per database: the virtual managers found in the orders of Kraken it doesn't know,
+    /// lost with a previous database. Before any virtual manager is added, not to reuse their ids
+    async fn rebuild_virtual_managers(&self) -> BotResult<()> {
+        let Some(virtuals) = &self.config.virtual_managers else {
+            return Ok(());
+        };
+        if self.storage.state(rebuild::REBUILT)?.is_some() {
+            return Ok(());
+        }
+        let rebuilt = rebuild::rebuild(
+            &self.exchange,
+            &self.storage,
+            &self.config,
+            virtuals,
+            now_millis(),
+        )
+        .await?;
+        if !rebuilt.is_empty() {
+            tracing::warn!(
+                rebuilt = rebuilt.len(),
+                holding = rebuilt.iter().filter(|it| it.holds).count(),
+                "virtual managers rebuilt from the orders of Kraken"
+            );
+        }
+        self.storage
+            .set_state(rebuild::REBUILT, &self.exchange.now().to_string())?;
+        Ok(())
     }
 
     /// Per quote asset: what the account has available that no manager owns. The quote of the
@@ -529,6 +560,12 @@ impl<E: Exchange> Bot<E> {
 
         match action {
             Action::Wait => Ok(Outcome::Waited),
+            // closing, with nothing left to sell: a virtual manager is done
+            Action::Idle(reason)
+                if self.is_virtual(manager) && manager.mode == ManagerMode::Closing =>
+            {
+                self.delete_virtual(manager, format!("{reason}, nothing left to sell"))
+            }
             Action::Idle(reason) => self.idle(manager, reason),
             Action::Sell { amount, price } => {
                 self.place(manager, market, OrderSide::Sell, amount, price, &balances)
@@ -563,12 +600,7 @@ impl<E: Exchange> Bot<E> {
     /// The account can't pay for the buy of the manager, which holds nothing: a virtual manager is
     /// deleted after `STARVED_TICKS` ticks in a row, its money going back to the margin
     fn starve(&self, manager: &ManagerConfig, reason: String) -> BotResult<Outcome> {
-        let is_virtual = self
-            .config
-            .virtual_managers
-            .as_ref()
-            .is_some_and(|it| it.is_virtual(manager.id));
-        if !is_virtual {
+        if !self.is_virtual(manager) {
             return self.idle(manager, reason);
         }
 
@@ -586,7 +618,18 @@ impl<E: Exchange> Bot<E> {
             return self.idle(manager, format!("{reason} ({count}/{STARVED_TICKS})"));
         }
 
-        let reason = format!("{reason}, {count} ticks in a row");
+        self.delete_virtual(manager, format!("{reason}, {count} ticks in a row"))
+    }
+
+    fn is_virtual(&self, manager: &ManagerConfig) -> bool {
+        self.config
+            .virtual_managers
+            .as_ref()
+            .is_some_and(|it| it.is_virtual(manager.id))
+    }
+
+    /// Deletes a virtual manager which holds nothing: its id is never reused
+    fn delete_virtual(&self, manager: &ManagerConfig, reason: String) -> BotResult<Outcome> {
         let at = now_millis();
         self.storage
             .delete_virtual_manager(manager.id, at, &reason)?;

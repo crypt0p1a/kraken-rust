@@ -62,6 +62,7 @@ With a `virtual_managers` section, the money of the account no manager uses isn'
 virtual_managers:
   min_virtual_id: 1000000  # first id of the virtual managers
   max: 5                   # most virtual managers at the same time (5 by default)
+  fallback_sell_above: 1.5 # see the rebuild below (1.5 by default)
 ```
 
 - **The margin**, per quote currency: what the account has available, minus what each manager
@@ -78,6 +79,16 @@ virtual_managers:
   instance: a virtual manager buys only when it holds nothing, so it's deleted with nothing but
   its quote, which goes back to the margin. One which holds a position waits for its sale. The
   managers of the YAML file are never deleted.
+- **Rebuilt** when the database doesn't know them, lost for instance: at the first tick, the bot
+  searches every order of the account (open and closed) for the userrefs of virtual managers. The
+  id tells the copied manager, the prices of the orders check its parameters: the budget from the
+  first buy, `sell_above` from the last sell and the cost of what it sold, `buy_below` from the
+  last buy and the price of the market when it was placed (the public trades of Kraken). A
+  parameter the orders contradict, the copied manager having changed, is taken from the orders.
+  A virtual manager which holds nothing (no open order, nothing to sell) is rebuilt deleted, its
+  id staying taken. One whose copied manager is gone is rebuilt `closing`: it ends its open
+  order, sells what it holds, then is deleted. Without its copied manager nor any sell, it sells
+  for what its buy cost + `fallback_sell_above`% (1.5 by default), fees included.
 - They are stored in the `virtual_managers` table of the database, deleted ones included.
 
 ## Running it
@@ -159,6 +170,8 @@ docker run --rm -v kraken-rust_kraken-bot-data:/data -it keinos/sqlite3 sqlite3 
 - `scenarios.rs`: the bot tick after tick on a simulated Kraken (fills, expiry, partial fills,
   closing managers, missing funds, orphans, restart without database, refused orders, dry run,
   600 ticks of a random market where every cycle makes money, only limit orders)
-- `virtual_managers.rs`: the virtual managers on a simulated Kraken
+- `virtual_managers.rs`: the virtual managers on a simulated Kraken (added with the margin,
+  deleted without money or once closed, rebuilt after the loss of the database)
 - `kraken_wiring.rs`: the requests sent to a mocked Kraken
-- `live_dry_run.rs`: one tick on the real Kraken, as a dry run
+- `live_dry_run.rs`: one tick on the real Kraken, as a dry run, the history of the account
+  searched for virtual managers

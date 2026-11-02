@@ -63,6 +63,7 @@ fn decode(id: i32) -> VirtualId {
     VirtualManagersConfig {
         min_virtual_id: MIN,
         max: 5,
+        fallback_sell_above: d("1.5"),
     }
     .decode(id)
     .unwrap()
@@ -333,4 +334,221 @@ async fn never_deletes_a_manager_of_the_file() {
             "{outcome:?}"
         );
     }
+}
+
+/// The same Kraken, a new database
+async fn restart(bot: Bot<SimulatedExchange>, managers: &str) -> Bot<SimulatedExchange> {
+    let mut bot = Bot::new(
+        bot.into_exchange(),
+        Storage::open_in_memory().unwrap(),
+        config("virtual_managers: {min_virtual_id: 1000000}", managers),
+    )
+    .with_seed(7);
+    bot.prepare().await.unwrap();
+    bot
+}
+
+/// VIRTUAL bought at -1% of 50000, and is selling at +1.5%
+async fn selling_virtual_manager() -> Bot<SimulatedExchange> {
+    let mut bot = with_a_virtual_manager().await;
+    bot.exchange().set_price(BTC, d("49000"));
+    let report = bot.tick().await.unwrap();
+    assert!(
+        matches!(
+            report.outcomes[&VIRTUAL],
+            Outcome::Placed {
+                side: OrderSide::Sell,
+                ..
+            }
+        ),
+        "{report:?}"
+    );
+    bot
+}
+
+fn rebuilt(bot: &Bot<SimulatedExchange>) -> ManagerConfig {
+    let found = virtuals(bot);
+    assert_eq!(found.len(), 1, "{found:?}");
+    found[0].clone()
+}
+
+#[tokio::test]
+async fn rebuilds_a_virtual_manager_lost_with_the_database() {
+    let bot = selling_virtual_manager().await;
+    let before = rebuilt(&bot);
+
+    let mut bot = restart(bot, ONE).await;
+    let report = bot.tick().await.unwrap();
+
+    assert_eq!(rebuilt(&bot), before);
+    // its sell found again, waited for
+    assert_eq!(report.outcomes[&VIRTUAL], Outcome::Waited);
+    assert_eq!(bot.storage().orders_of(VIRTUAL).unwrap().len(), 2);
+    let actions = bot.storage().actions_of(VIRTUAL, 1).unwrap();
+    assert_eq!(actions[0].kind, "virtual_rebuilt");
+}
+
+#[tokio::test]
+async fn the_orders_win_over_a_copied_manager_which_changed() {
+    let bot = selling_virtual_manager().await;
+    let mut bot = restart(
+        bot,
+        "\n  - {id: 1, pair: XBTUSD, budget: 50, buy_below: 2, sell_above: 3}",
+    )
+    .await;
+    bot.tick().await.unwrap();
+
+    let manager = rebuilt(&bot);
+    assert_eq!(
+        (manager.budget, manager.buy_below, manager.sell_above),
+        (d("30"), d("1"), d("1.5"))
+    );
+    assert_eq!(
+        manager.mode,
+        kraken_trading_bot::config::ManagerMode::Active
+    );
+}
+
+#[tokio::test]
+async fn a_virtual_manager_whose_copied_manager_is_gone_closes() {
+    let bot = selling_virtual_manager().await;
+    let mut bot = restart(
+        bot,
+        "\n  - {id: 2, pair: ETHUSD, budget: 20, buy_below: 2, sell_above: 3}",
+    )
+    .await;
+    bot.tick().await.unwrap();
+
+    let manager = bot
+        .storage()
+        .virtual_managers()
+        .unwrap()
+        .into_iter()
+        .find(|it| it.config.id == VIRTUAL)
+        .unwrap()
+        .config;
+    assert_eq!(
+        manager.mode,
+        kraken_trading_bot::config::ManagerMode::Closing
+    );
+    assert_eq!(
+        (manager.pair.as_str(), manager.budget, manager.sell_above),
+        ("XBTUSD", d("30"), d("1.5"))
+    );
+}
+
+#[tokio::test]
+async fn a_lost_virtual_manager_which_held_nothing_keeps_its_id() {
+    let bot = with_a_virtual_manager().await;
+    // its buy expires unfilled: it held nothing
+    bot.exchange().advance(13.0 * 3600.0);
+
+    let mut bot = restart(bot, ONE).await;
+    bot.tick().await.unwrap();
+
+    let ids = bot.storage().virtual_ids().unwrap();
+    // rebuilt deleted, then a new one added after it
+    assert_eq!(ids, vec![VIRTUAL, 1_001_001]);
+    assert_eq!(
+        virtuals(&bot).iter().map(|it| it.id).collect::<Vec<_>>(),
+        vec![1_001_001]
+    );
+}
+
+#[tokio::test]
+async fn searches_the_orders_of_kraken_once_per_database() {
+    let bot = selling_virtual_manager().await;
+    let mut bot = restart(bot, ONE).await;
+    bot.tick().await.unwrap();
+    bot.tick().await.unwrap();
+    assert_eq!(bot.storage().virtual_ids().unwrap(), vec![VIRTUAL]);
+}
+
+#[tokio::test]
+async fn a_closing_virtual_manager_is_deleted_once_it_sold_everything() {
+    let bot = selling_virtual_manager().await;
+    let mut bot = restart(
+        bot,
+        "\n  - {id: 2, pair: ETHUSD, budget: 20, buy_below: 2, sell_above: 3}",
+    )
+    .await;
+    // closing: it waits for its sell
+    assert_eq!(outcome(&mut bot, VIRTUAL).await, Outcome::Waited);
+
+    // sold: it doesn't buy again, and is gone
+    let sell_price = bot
+        .storage()
+        .orders_of(VIRTUAL)
+        .unwrap()
+        .into_iter()
+        .find(|it| it.side == OrderSide::Sell)
+        .unwrap()
+        .limit_price
+        .unwrap();
+    bot.exchange().set_price(BTC, sell_price);
+    let outcome = outcome(&mut bot, VIRTUAL).await;
+    assert!(matches!(outcome, Outcome::Deleted(_)), "{outcome:?}");
+    assert!(
+        bot.storage()
+            .virtual_managers()
+            .unwrap()
+            .iter()
+            .all(|it| it.config.id != VIRTUAL)
+    );
+}
+
+#[tokio::test]
+async fn without_a_sell_nor_its_copied_manager_it_sells_at_the_fallback() {
+    // its buy open, its copied manager gone: nothing but the buy says what it was about
+    let bot = with_a_virtual_manager().await;
+    let mut bot = Bot::new(
+        bot.into_exchange(),
+        Storage::open_in_memory().unwrap(),
+        config(
+            "virtual_managers: {min_virtual_id: 1000000, fallback_sell_above: 2}",
+            "\n  - {id: 2, pair: ETHUSD, budget: 20, buy_below: 2, sell_above: 3}",
+        ),
+    )
+    .with_seed(7);
+    bot.prepare().await.unwrap();
+
+    // closing, the budget of its buy: it lets the buy end
+    assert_eq!(outcome(&mut bot, VIRTUAL).await, Outcome::Waited);
+    let manager = bot
+        .storage()
+        .virtual_managers()
+        .unwrap()
+        .into_iter()
+        .find(|it| it.config.id == VIRTUAL)
+        .unwrap()
+        .config;
+    assert_eq!(
+        manager.mode,
+        kraken_trading_bot::config::ManagerMode::Closing
+    );
+    assert_eq!(manager.sell_above, d("2"));
+    assert_eq!(manager.budget.round_dp(1), d("30"));
+
+    // filled: sold for what it cost + 2%, fees deducted
+    bot.exchange().set_price(BTC, d("49000"));
+    let (amount, price) = match outcome(&mut bot, VIRTUAL).await {
+        Outcome::Placed {
+            side: OrderSide::Sell,
+            amount,
+            price,
+            ..
+        } => (amount, price),
+        other => panic!("a sell expected, got {other:?}"),
+    };
+    let cost = bot
+        .storage()
+        .orders_of(VIRTUAL)
+        .unwrap()
+        .iter()
+        .filter(|it| it.side == OrderSide::Buy)
+        .map(|it| it.cost + it.fee)
+        .sum::<Decimal>();
+    let brought = amount * price * (Decimal::ONE - d("0.0025"));
+    assert!(brought >= cost * d("1.02"), "{brought} for {cost}");
+    assert!(brought < cost * d("1.021"), "{brought} for {cost}");
 }
