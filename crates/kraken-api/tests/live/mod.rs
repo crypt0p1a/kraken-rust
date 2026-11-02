@@ -76,6 +76,17 @@ pub fn private_client() -> PrivateClient {
     .unwrap()
 }
 
+/// The answer of a call, or None when the API key of the tests lacks its permission
+pub fn unless_denied<T>(context: &str, answer: Result<T, kraken_api::KrakenError>) -> Option<T> {
+    match answer {
+        Err(kraken_api::KrakenError::Api { body, .. }) if body.contains("Permission denied") => {
+            println!("{context}: skipped, the API key lacks the permission ({body})");
+            None
+        }
+        answer => Some(answer.unwrap()),
+    }
+}
+
 pub fn now_seconds() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

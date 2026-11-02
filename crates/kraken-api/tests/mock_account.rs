@@ -5,7 +5,8 @@ mod common;
 
 use common::{FormIs, Signed, ok, private_api};
 use kraken_api::account::{
-    ApiKeyInfoRequest, BalanceRequest, RebaseMultiplier, TradeBalanceRequest, WalletType,
+    ApiKeyInfoRequest, BalanceRequest, LedgerFilter, LedgerType, LedgersRequest, RebaseMultiplier,
+    TradeBalanceRequest, WalletType,
 };
 use rust_decimal_macros::dec;
 use serde_json::json;
@@ -146,6 +147,33 @@ async fn wallet_accounts() {
     let wallets = private_api(&server).wallet_accounts().await.unwrap();
     assert_eq!(wallets.accounts[0].wallet_type, WalletType::Spot);
     assert_eq!(wallets.cursor.next.as_deref(), Some("abc"));
+}
+
+#[tokio::test]
+async fn ledgers() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/Ledgers"))
+        .and(Signed)
+        .and(FormIs(vec![("asset", "XXBT"), ("type", "deposit")]))
+        .respond_with(ok(json!({"count": 1, "ledger": {"LMKZCZ-Z3GVL-CXKK4H": {
+            "refid": "FTzhVSJ-qQ2NJR2vmIhMzZm3DjE5Gr", "time": 1688444262.8888,
+            "type": "deposit", "subtype": "", "aclass": "currency", "asset": "XXBT",
+            "amount": "0.5", "fee": "0", "balance": "0.5"}}})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let ledgers = private_api(&server)
+        .ledgers(&LedgersRequest {
+            assets: vec!["XXBT".into()],
+            entry_type: Some(LedgerFilter::Deposit),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(ledgers.entries[0].id, "LMKZCZ-Z3GVL-CXKK4H");
+    assert_eq!(ledgers.entries[0].entry_type, LedgerType::Deposit);
 }
 
 #[tokio::test]

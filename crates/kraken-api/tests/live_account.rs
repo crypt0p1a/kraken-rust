@@ -7,11 +7,12 @@ mod strict;
 
 use kraken_api::Decimal;
 use kraken_api::account::{
-    ApiKeyInfo, ExtendedBalance, FeeInfo, TradeBalance, TradeVolume, WalletAccounts, WalletType,
+    ApiKeyInfo, ExtendedBalance, FeeInfo, LedgerEntry, LedgerType, TradeBalance, TradeVolume,
+    WalletAccounts, WalletType,
 };
 use kraken_api::market::Level3OrderBook;
 use kraken_api::{KrakenError, PrivateApi, RestOptions};
-use live::{Presence, decode_strict, entries, env, le, private_api, private_client};
+use live::{Presence, decode_strict, entries, env, le, private_api, private_client, unless_denied};
 use serde::Serialize;
 use serde_json::Value;
 use std::sync::Arc;
@@ -279,4 +280,39 @@ async fn wallet_accounts_hold_the_main_one() {
         "{wallets:?}"
     );
     assert!(wallets.accounts.iter().all(|it| !it.account_id.is_empty()));
+}
+
+#[derive(Serialize)]
+struct LedgersParams {
+    without_count: bool,
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn ledgers_with_the_permission() {
+    let Some(raw) = unless_denied(
+        "Ledgers",
+        private_client()
+            .call_with::<_, Value>(
+                "Ledgers",
+                Some(&LedgersParams {
+                    without_count: false,
+                }),
+            )
+            .await,
+    ) else {
+        return;
+    };
+    let mut presence = Presence::default();
+    for (id, value) in entries(&raw["ledger"]) {
+        presence.record(value);
+        let entry: LedgerEntry = decode_strict(&format!("Ledgers {id}"), value);
+        assert_ne!(entry.entry_type, LedgerType::Unknown, "{id}: {value}");
+        assert!(entry.fee >= Decimal::ZERO, "{id}");
+    }
+    presence.print("Ledgers");
+
+    let page = private_api().ledgers(&Default::default()).await.unwrap();
+    assert!(page.entries.len() <= 50);
+    assert!(page.entries.windows(2).all(|it| it[0].time >= it[1].time));
 }

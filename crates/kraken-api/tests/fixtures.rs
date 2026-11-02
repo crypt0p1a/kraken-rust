@@ -8,8 +8,8 @@ mod strict;
 use common::{private_api, public_api};
 use kraken_api::Decimal;
 use kraken_api::account::{
-    ApiKeyInfo, CreditLines, ExtendedBalance, TradeBalance, TradeVolume, WalletAccounts,
-    WalletStatus,
+    ApiKeyInfo, CreditLines, ExtendedBalance, LedgerEntry, LedgerType, TradeBalance, TradeVolume,
+    WalletAccounts, WalletStatus,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -727,4 +727,32 @@ async fn open_positions_fixture() {
     assert_eq!(served.len(), 3);
     assert_eq!(served[0].txid, "TYMRFG-URRG5-2ZTQSD");
     assert!(served.windows(2).all(|it| it[0].time >= it[1].time));
+}
+
+#[tokio::test]
+async fn ledgers_fixture() {
+    let result = fixture("ledgers.json");
+    let entries: HashMap<String, LedgerEntry> = each("Ledgers", &result["ledger"]);
+    assert_eq!(result["count"], 5);
+    // the two entries of a trade share its refid
+    let trade = entries
+        .values()
+        .filter(|it| it.refid == "TJKLXX-PGMUI-4NTLXU")
+        .count();
+    assert_eq!(trade, 2);
+    assert!(
+        entries
+            .values()
+            .any(|it| it.entry_type == LedgerType::Unknown)
+    );
+    assert!(entries.values().any(|it| it.amount_token.is_some()));
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/Ledgers", "ledgers.json").await;
+    let page = private_api(&server)
+        .ledgers(&Default::default())
+        .await
+        .unwrap();
+    assert_eq!(page.count, Some(5));
+    assert!(page.entries.windows(2).all(|it| it[0].time >= it[1].time));
 }
