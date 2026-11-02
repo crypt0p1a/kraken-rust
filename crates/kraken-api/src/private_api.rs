@@ -113,6 +113,13 @@ impl PrivateApi {
         account::exports::export_status(&self.client, report).await
     }
 
+    /// The zip archive of a processed report. Requires the "Export data" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/retrieve-export>
+    pub async fn retrieve_export(&self, id: &str) -> Result<Vec<u8>, KrakenError> {
+        account::exports::retrieve_export(&self.client, id).await
+    }
+
     /// A page of 50 ledger entries at most, most recent first. Requires the "Query ledger entries"
     /// permission
     ///

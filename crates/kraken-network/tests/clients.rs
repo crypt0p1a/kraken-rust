@@ -254,3 +254,80 @@ fn rejects_an_invalid_secret() {
     );
     assert!(matches!(client, Err(KrakenError::InvalidArgument { .. })));
 }
+
+#[derive(Serialize)]
+struct ReportId {
+    id: &'static str,
+}
+
+#[tokio::test]
+async fn private_files_are_returned_byte_for_byte() {
+    // a zip header, then bytes which aren't UTF-8
+    let file: Vec<u8> = vec![0x50, 0x4b, 0x03, 0x04, 0xff, 0xfe, 0x00, 0x80];
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/RetrieveExport"))
+        .and(header("API-Key", API_KEY))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(file.clone()))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let bytes = private_client(&server)
+        .call_bytes("RetrieveExport", Some(&ReportId { id: "TCJA" }))
+        .await
+        .unwrap();
+    assert_eq!(bytes, file);
+
+    let request = &server.received_requests().await.unwrap()[0];
+    let body = std::str::from_utf8(&request.body).unwrap();
+    assert_eq!(body, format!("nonce={}&id=TCJA", nonce(request)));
+    assert_eq!(
+        request.headers.get("API-Sign").unwrap().to_str().unwrap(),
+        expected_signature(request)
+    );
+}
+
+#[tokio::test]
+async fn private_files_map_the_failures() {
+    let server = MockServer::start().await;
+    let respond = |template: ResponseTemplate| {
+        Mock::given(method("POST"))
+            .and(path("/0/private/RetrieveExport"))
+            .respond_with(template)
+            .up_to_n_times(1)
+    };
+    let call = || async {
+        private_client(&server)
+            .call_bytes("RetrieveExport", Some(&ReportId { id: "TCJA" }))
+            .await
+    };
+
+    respond(ResponseTemplate::new(200).set_body_json(json!({"error": ["EExport:Unknown export"]})))
+        .mount(&server)
+        .await;
+    assert_eq!(
+        call().await,
+        Err(KrakenError::Api {
+            status: 200,
+            body: "EExport:Unknown export".into()
+        })
+    );
+    server.reset().await;
+
+    respond(ResponseTemplate::new(503).set_body_string("unavailable"))
+        .mount(&server)
+        .await;
+    assert_eq!(
+        call().await,
+        Err(KrakenError::Network {
+            status: 503,
+            body: "unavailable".into()
+        })
+    );
+    server.reset().await;
+
+    // JSON where a file was expected
+    respond(ok(json!({"id": "TCJA"}))).mount(&server).await;
+    assert!(matches!(call().await, Err(KrakenError::Decode { .. })));
+}

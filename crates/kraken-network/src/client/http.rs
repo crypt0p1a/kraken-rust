@@ -35,11 +35,21 @@ impl HttpClient {
         tag: &str,
         request: impl FnOnce() -> reqwest::RequestBuilder,
     ) -> Result<(u16, String), KrakenError> {
+        let (status, body) = self.send_bytes(tag, request).await?;
+        Ok((status, String::from_utf8_lossy(&body).into_owned()))
+    }
+
+    /// [`HttpClient::send`], the body as it was received: the binary answers (zip reports)
+    pub async fn send_bytes(
+        &self,
+        tag: &str,
+        request: impl FnOnce() -> reqwest::RequestBuilder,
+    ) -> Result<(u16, Vec<u8>), KrakenError> {
         self.rate_limiter
             .enqueue(tag, async {
                 let response = request().send().await?;
                 let status = response.status().as_u16();
-                Ok((status, response.text().await?))
+                Ok((status, response.bytes().await?.to_vec()))
             })
             .await
     }

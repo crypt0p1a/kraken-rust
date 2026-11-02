@@ -7,8 +7,8 @@ mod strict;
 
 use kraken_api::Decimal;
 use kraken_api::account::{
-    ApiKeyInfo, Export, ExportStatus, ExtendedBalance, FeeInfo, LedgerEntry, LedgerType,
-    QueryLedgersRequest, TradeBalance, TradeVolume, WalletAccounts, WalletType,
+    ApiKeyInfo, Export, ExportReport, ExportStatus, ExtendedBalance, FeeInfo, LedgerEntry,
+    LedgerType, QueryLedgersRequest, TradeBalance, TradeVolume, WalletAccounts, WalletType,
 };
 use kraken_api::market::Level3OrderBook;
 use kraken_api::{KrakenError, PrivateApi, RestOptions};
@@ -370,4 +370,29 @@ async fn export_status_with_the_permission() {
             assert_ne!(export.status, ExportStatus::Unknown, "{value}");
         }
     }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn retrieve_a_processed_export() {
+    let api = private_api();
+    for report in [ExportReport::Trades, ExportReport::Ledgers] {
+        let Some(exports) = unless_denied("RetrieveExport", api.export_status(report).await) else {
+            return;
+        };
+        let Some(export) = exports
+            .iter()
+            .find(|it| it.status == ExportStatus::Processed && it.error.is_none())
+        else {
+            continue;
+        };
+        let zip = api.retrieve_export(&export.id).await.unwrap();
+        assert!(
+            zip.starts_with(b"PK"),
+            "not a zip archive: {:?}",
+            &zip[..zip.len().min(16)]
+        );
+        return;
+    }
+    println!("RetrieveExport: no processed report on the account");
 }

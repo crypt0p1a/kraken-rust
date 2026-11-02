@@ -12,7 +12,7 @@ use kraken_api::account::{
 use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};
-use wiremock::{Mock, MockServer};
+use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
 async fn api_key_info() {
@@ -201,6 +201,27 @@ async fn export_status() {
         .await
         .unwrap();
     assert_eq!(exports[0].status, ExportStatus::Queued);
+}
+
+#[tokio::test]
+async fn retrieve_export() {
+    let zip: Vec<u8> = vec![
+        0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ];
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/RetrieveExport"))
+        .and(Signed)
+        .and(FormIs(vec![("id", "TCJA")]))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(zip.clone()))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    assert_eq!(
+        private_api(&server).retrieve_export("TCJA").await.unwrap(),
+        zip
+    );
 }
 
 #[tokio::test]

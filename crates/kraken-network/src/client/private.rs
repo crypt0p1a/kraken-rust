@@ -43,13 +43,41 @@ impl PrivateClient {
         method: &str,
         params: Option<&I>,
     ) -> Result<O, KrakenError> {
+        let (status, body) = self.send(method, params).await?;
+        decode(status, &String::from_utf8_lossy(&body))
+    }
+
+    /// Calls `method` answering a file (e.g. the zip of RetrieveExport), returns its bytes. Its
+    /// errors are still answered in JSON: `{"error": [...]}`
+    pub async fn call_bytes<I: Serialize + ?Sized>(
+        &self,
+        method: &str,
+        params: Option<&I>,
+    ) -> Result<Vec<u8>, KrakenError> {
+        let (status, body) = self.send(method, params).await?;
+        if status != 200 || body.first() == Some(&b'{') {
+            let text = String::from_utf8_lossy(&body);
+            // an error, or JSON where a file was expected
+            decode::<serde_json::Value>(status, &text)?;
+            return Err(KrakenError::Decode {
+                reason: format!("expected a file, got {text}"),
+            });
+        }
+        Ok(body)
+    }
+
+    /// The signed request: the status and the body of the answer
+    async fn send<I: Serialize + ?Sized>(
+        &self,
+        method: &str,
+        params: Option<&I>,
+    ) -> Result<(u16, Vec<u8>), KrakenError> {
         let path = format!("/0/private/{method}");
         let url = format!("{}{path}", self.inner.host);
         let params = params.map(encode).transpose()?.unwrap_or_default();
 
-        let (status, text) = self
-            .inner
-            .send(&path, || {
+        self.inner
+            .send_bytes(&path, || {
                 // created in the queue: the calls are sent in the order of their nonces
                 let nonce = next_nonce();
                 let body = match params.is_empty() {
@@ -65,8 +93,6 @@ impl PrivateClient {
                     .header("API-Sign", self.secret.sign(&path, nonce, &body))
                     .body(body)
             })
-            .await?;
-
-        decode(status, &text)
+            .await
     }
 }

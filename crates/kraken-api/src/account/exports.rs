@@ -155,6 +155,19 @@ pub(crate) async fn export_status(
         .await
 }
 
+#[derive(Serialize)]
+struct Id<'a> {
+    id: &'a str,
+}
+
+/// The zip archive of a processed report. Requires the "Export data" permission
+pub(crate) async fn retrieve_export(
+    client: &PrivateClient,
+    id: &str,
+) -> Result<Vec<u8>, KrakenError> {
+    client.call_bytes("RetrieveExport", Some(&Id { id })).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,6 +233,11 @@ mod tests {
             serde_json::from_value::<ExportStatus>("Archived".into()).unwrap(),
             ExportStatus::Unknown
         );
+    }
+
+    #[test]
+    fn encodes_the_identifier() {
+        assert_eq!(encode(&Id { id: "TCJA" }).unwrap(), "id=TCJA");
     }
 
     #[test]
