@@ -357,6 +357,18 @@ pub(crate) async fn allocate_status(
     Ok(status.pending)
 }
 
+/// Whether the last deallocation from the strategy is still in progress. Requires the "Earn
+/// Funds" or "Query Funds" permission
+pub(crate) async fn deallocate_status(
+    client: &PrivateClient,
+    strategy_id: &str,
+) -> Result<bool, KrakenError> {
+    let status: OperationStatus = client
+        .call_with("Earn/DeallocateStatus", Some(&OfStrategy { strategy_id }))
+        .await?;
+    Ok(status.pending)
+}
+
 #[cfg(test)]
 pub(crate) const STRATEGIES: &str = r#"{"items":[
     {"id":"ESRFUO3-Q62XD-WIOIL7","asset":"DOT","lock_type":{"type":"instant","payout_frequency":604800},

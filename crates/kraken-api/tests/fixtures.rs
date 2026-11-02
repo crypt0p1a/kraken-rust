@@ -1237,3 +1237,19 @@ async fn earn_deallocate_fixture() {
         .unwrap();
     assert!(started);
 }
+
+#[tokio::test]
+async fn earn_deallocate_status_fixture() {
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/Earn/DeallocateStatus",
+        "earn_status.json",
+    )
+    .await;
+    let pending = private_api(&server)
+        .earn_deallocate_status("ESRFUO3-Q62XD-WIOIL7")
+        .await
+        .unwrap();
+    assert!(!pending);
+}

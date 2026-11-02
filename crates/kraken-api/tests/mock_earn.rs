@@ -141,3 +141,23 @@ async fn earn_deallocate() {
             .unwrap()
     );
 }
+
+#[tokio::test]
+async fn earn_deallocate_status() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/Earn/DeallocateStatus"))
+        .and(Signed)
+        .and(FormIs(vec![("strategy_id", "ESRFUO3-Q62XD-WIOIL7")]))
+        .respond_with(ok(json!({"pending": false})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    assert!(
+        !private_api(&server)
+            .earn_deallocate_status("ESRFUO3-Q62XD-WIOIL7")
+            .await
+            .unwrap()
+    );
+}

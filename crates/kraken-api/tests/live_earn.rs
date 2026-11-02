@@ -109,3 +109,26 @@ async fn earn_allocate_status_of_a_strategy() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn earn_deallocate_status_of_a_strategy() {
+    let Some(strategy_id) = a_strategy().await else {
+        println!("no Earn strategy available to the account");
+        return;
+    };
+    let raw: Value = private_client()
+        .call_with(
+            "Earn/DeallocateStatus",
+            Some(&OfStrategy {
+                strategy_id: strategy_id.clone(),
+            }),
+        )
+        .await
+        .unwrap();
+    let _: OperationStatus = decode_strict("Earn/DeallocateStatus", &raw);
+    private_api()
+        .earn_deallocate_status(&strategy_id)
+        .await
+        .unwrap();
+}

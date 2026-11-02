@@ -442,4 +442,12 @@ impl PrivateApi {
     pub async fn earn_deallocate(&self, funds: &EarnFunds) -> Result<bool, KrakenError> {
         earn::deallocate(&self.client, funds).await
     }
+
+    /// Whether the last deallocation from an Earn strategy is still in progress. Requires the
+    /// "Earn Funds" or "Query Funds" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-deallocate-strategy-status>
+    pub async fn earn_deallocate_status(&self, strategy_id: &str) -> Result<bool, KrakenError> {
+        earn::deallocate_status(&self.client, strategy_id).await
+    }
 }
