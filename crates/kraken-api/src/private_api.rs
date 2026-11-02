@@ -1,8 +1,8 @@
 use crate::Decimal;
 use crate::account::{
-    self, ApiKeyInfo, ApiKeyInfoRequest, BalanceRequest, CreditLines, ExtendedBalance, LedgerEntry,
-    Ledgers, LedgersRequest, QueryLedgersRequest, TradeBalance, TradeBalanceRequest, TradeVolume,
-    WalletAccounts,
+    self, ApiKeyInfo, ApiKeyInfoRequest, BalanceRequest, CreditLines, ExportRequest,
+    ExtendedBalance, LedgerEntry, Ledgers, LedgersRequest, QueryLedgersRequest, TradeBalance,
+    TradeBalanceRequest, TradeVolume, WalletAccounts,
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
@@ -95,6 +95,14 @@ impl PrivateApi {
     /// <https://docs.kraken.com/api/docs/rest-api/list-wallet-accounts>
     pub async fn wallet_accounts(&self) -> Result<WalletAccounts, KrakenError> {
         account::wallets::wallet_accounts(&self.client).await
+    }
+
+    /// Requests a report of the trades or of the ledgers, returns its identifier. Requires the
+    /// "Export data" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/add-export>
+    pub async fn add_export(&self, request: &ExportRequest) -> Result<String, KrakenError> {
+        account::exports::add_export(&self.client, request).await
     }
 
     /// A page of 50 ledger entries at most, most recent first. Requires the "Query ledger entries"

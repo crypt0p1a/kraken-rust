@@ -8,8 +8,8 @@ mod strict;
 use common::{private_api, public_api};
 use kraken_api::Decimal;
 use kraken_api::account::{
-    ApiKeyInfo, CreditLines, ExtendedBalance, LedgerEntry, LedgerType, QueryLedgersRequest,
-    TradeBalance, TradeVolume, WalletAccounts, WalletStatus,
+    ApiKeyInfo, CreditLines, ExportReport, ExportRequest, ExtendedBalance, LedgerEntry, LedgerType,
+    QueryLedgersRequest, TradeBalance, TradeVolume, WalletAccounts, WalletStatus,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -775,4 +775,31 @@ async fn query_ledgers_fixture() {
     for entry in &served {
         assert_eq!(entry.refid, entries[&entry.id].refid);
     }
+}
+
+// exports
+
+#[tokio::test]
+async fn add_export_fixture() {
+    let result = fixture("add_export.json");
+    assert_eq!(
+        result.as_object().unwrap().len(),
+        1,
+        "only the id: {result}"
+    );
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/AddExport", "add_export.json").await;
+    let id = private_api(&server)
+        .add_export(&ExportRequest {
+            report: ExportReport::Ledgers,
+            format: None,
+            description: "ledgers".into(),
+            fields: vec![],
+            start_time: None,
+            end_time: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(id, "TCJA");
 }

@@ -5,8 +5,9 @@ mod common;
 
 use common::{FormIs, Signed, ok, private_api};
 use kraken_api::account::{
-    ApiKeyInfoRequest, BalanceRequest, LedgerFilter, LedgerType, LedgersRequest,
-    QueryLedgersRequest, RebaseMultiplier, TradeBalanceRequest, WalletType,
+    ApiKeyInfoRequest, BalanceRequest, ExportFormat, ExportReport, ExportRequest, LedgerFilter,
+    LedgerType, LedgersRequest, QueryLedgersRequest, RebaseMultiplier, TradeBalanceRequest,
+    WalletType,
 };
 use rust_decimal_macros::dec;
 use serde_json::json;
@@ -147,6 +148,37 @@ async fn wallet_accounts() {
     let wallets = private_api(&server).wallet_accounts().await.unwrap();
     assert_eq!(wallets.accounts[0].wallet_type, WalletType::Spot);
     assert_eq!(wallets.cursor.next.as_deref(), Some("abc"));
+}
+
+#[tokio::test]
+async fn add_export() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/AddExport"))
+        .and(Signed)
+        .and(FormIs(vec![
+            ("report", "trades"),
+            ("format", "CSV"),
+            ("description", "my_trades_1"),
+            ("starttm", "1688169600"),
+        ]))
+        .respond_with(ok(json!({"id": "TCJA"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let id = private_api(&server)
+        .add_export(&ExportRequest {
+            report: ExportReport::Trades,
+            format: Some(ExportFormat::Csv),
+            description: "my_trades_1".into(),
+            fields: vec![],
+            start_time: Some(1688169600),
+            end_time: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(id, "TCJA");
 }
 
 #[tokio::test]
