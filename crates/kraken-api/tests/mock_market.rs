@@ -3,7 +3,7 @@
 mod common;
 
 use common::{QueryIs, ok, public_api};
-use kraken_api::market::{CandleInterval, CandlesRequest};
+use kraken_api::market::{CandleInterval, CandlesRequest, SystemState};
 use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -122,4 +122,21 @@ async fn candles() {
     assert_eq!(candles.last, 1688671200);
     assert!(candles.candles[0].is_closed);
     assert!(!candles.candles[1].is_closed);
+}
+
+#[tokio::test]
+async fn system_status() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/0/public/SystemStatus"))
+        .and(QueryIs(vec![]))
+        .respond_with(ok(
+            json!({"status": "post_only", "timestamp": "2026-11-02T09:36:47Z"}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let status = public_api(&server).system_status().await.unwrap();
+    assert_eq!(status.status, SystemState::PostOnly);
 }

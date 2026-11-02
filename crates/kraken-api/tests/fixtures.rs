@@ -9,7 +9,8 @@ use common::{private_api, public_api};
 use kraken_api::Decimal;
 use kraken_api::account::{ExtendedBalance, TradeVolume};
 use kraken_api::market::{
-    AssetPair, AssetPairStatus, CandleInterval, CandlesRequest, ServerTime, Ticker,
+    AssetPair, AssetPairStatus, CandleInterval, CandlesRequest, ServerTime, SystemState,
+    SystemStatus, Ticker,
 };
 use kraken_api::trading::{
     ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
@@ -283,4 +284,16 @@ async fn private_calls_read_the_real_shapes() {
         .await
         .unwrap();
     assert!(answer.txids.is_empty());
+}
+
+// market data
+
+#[tokio::test]
+async fn system_status_fixture() {
+    let status: SystemStatus = decode_strict("SystemStatus", &fixture("system_status.json"));
+    assert_eq!(status.status, SystemState::Online);
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/public/SystemStatus", "system_status.json").await;
+    assert_eq!(public_api(&server).system_status().await.unwrap(), status);
 }

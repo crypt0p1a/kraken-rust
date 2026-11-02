@@ -10,7 +10,8 @@ mod strict;
 use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::{
-    AssetPair, AssetPairStatus, CandleInterval, CandlesRequest, ServerTime, Ticker,
+    AssetPair, AssetPairStatus, CandleInterval, CandlesRequest, ServerTime, SystemState,
+    SystemStatus, Ticker,
 };
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
 use rust_decimal_macros::dec;
@@ -417,4 +418,19 @@ async fn maps_the_errors_of_unknown_pairs() {
             .await,
         Err(unknown())
     );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn system_status() {
+    let raw: Value = public_client().call("SystemStatus").await.unwrap();
+    let status: SystemStatus = decode_strict("SystemStatus", &raw);
+    assert_ne!(status.status, SystemState::Unknown, "{raw}");
+    assert!(status.timestamp.ends_with('Z'), "{status:?}");
+    for event in &status.upcoming_maintenance {
+        assert!(
+            event.expected_start_utc < event.expected_end_utc,
+            "{event:?}"
+        );
+    }
 }
