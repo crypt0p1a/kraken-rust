@@ -67,7 +67,7 @@ kotlin {
     }
 
     // Kotlin/Native: every target, whatever the host. Built on macOS, the only host of the Apple
-    // targets: the Linux and Windows libraries are cross-compiled (see the README)
+    // targets: the Linux and Windows libraries are cross-compiled (docs/toolchains.md)
     iosArm64()
     iosSimulatorArm64()
     iosX64()

@@ -9,7 +9,7 @@
 #   android  cargo-ndk and an NDK (ANDROID_NDK_HOME, or the latest of $ANDROID_HOME/ndk)
 #   ios      macOS with Xcode
 #   macos    macOS
-#   linux    a C cross compiler for the targets other than the host (ring), see the README
+#   linux    a C cross compiler for the targets other than the host (ring), see docs/toolchains.md
 #   windows  MSVC on Windows (x86_64 / aarch64-pc-windows-msvc), or mingw-w64 (x86_64-pc-windows-gnu)
 set -euo pipefail
 
