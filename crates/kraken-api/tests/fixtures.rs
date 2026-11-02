@@ -12,7 +12,7 @@ use kraken_api::account::{
     LedgerType, QueryLedgersRequest, RemoveExportType, TradeBalance, TradeVolume, WalletAccounts,
     WalletStatus,
 };
-use kraken_api::algo::Strategy;
+use kraken_api::algo::{ClosedStrategies, Strategy, StrategyStatus};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -1051,4 +1051,33 @@ async fn query_strategies_fixture() {
         .await
         .unwrap();
     assert!(served.iter().all(|it| strategies[&it.strategy_id] == *it));
+}
+
+#[tokio::test]
+async fn closed_strategies_fixture() {
+    let page: ClosedStrategies =
+        decode_strict("GetClosedStrategies", &fixture("closed_strategies.json"));
+    assert!(page.next_cursor.is_some());
+    // a fully executed strategy filled its whole volume
+    let closed = page
+        .strategies
+        .iter()
+        .find(|it| it.status == StrategyStatus::Closed)
+        .unwrap();
+    assert_eq!(closed.details.filled_volume, closed.details.volume);
+
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/GetClosedStrategies",
+        "closed_strategies.json",
+    )
+    .await;
+    assert_eq!(
+        private_api(&server)
+            .closed_strategies(&Default::default())
+            .await
+            .unwrap(),
+        page
+    );
 }

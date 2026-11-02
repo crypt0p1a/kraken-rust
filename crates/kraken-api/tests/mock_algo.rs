@@ -3,7 +3,7 @@
 mod common;
 
 use common::{FormIs, Signed, ok, private_api};
-use kraken_api::algo::{StrategyStatus, StrategyType};
+use kraken_api::algo::{ClosedStrategiesRequest, StrategyStatus, StrategyType};
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer};
@@ -60,4 +60,31 @@ async fn query_strategies() {
         .unwrap();
     assert_eq!(strategies.len(), 1, "the unknown id is omitted");
     assert_eq!(strategies[0].status, StrategyStatus::Open);
+}
+
+#[tokio::test]
+async fn closed_strategies() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/GetClosedStrategies"))
+        .and(Signed)
+        .and(FormIs(vec![("status", "expired"), ("limit", "1")]))
+        .respond_with(ok(
+            json!({"closed": [twap("ASPBVCI-6MKBA-QE4VF6", "expired")],
+            "next_cursor": "abc"}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let page = private_api(&server)
+        .closed_strategies(&ClosedStrategiesRequest {
+            status: Some(StrategyStatus::Expired),
+            limit: Some(1),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(page.strategies[0].status, StrategyStatus::Expired);
+    assert_eq!(page.next_cursor.as_deref(), Some("abc"));
 }

@@ -7,7 +7,7 @@ mod live;
 mod strict;
 
 use kraken_api::Decimal;
-use kraken_api::algo::{Strategy, StrategyStatus};
+use kraken_api::algo::{ClosedStrategies, ClosedStrategiesRequest, Strategy, StrategyStatus};
 use live::{decode_strict, entries, private_api, private_client};
 use serde_json::Value;
 
@@ -79,5 +79,47 @@ async fn query_strategies_finds_the_open_ones() {
     assert_eq!(queried.len(), ids.len());
     for strategy in &queried {
         check_strategy(&strategy.strategy_id, strategy);
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn closed_strategies_are_paginated() {
+    #[derive(serde::Serialize)]
+    struct Params {
+        limit: u32,
+    }
+    let raw: Value = private_client()
+        .call_with("GetClosedStrategies", Some(&Params { limit: 2 }))
+        .await
+        .unwrap();
+    let page: ClosedStrategies = decode_strict("GetClosedStrategies", &raw);
+    for strategy in &page.strategies {
+        check_strategy(&strategy.strategy_id, strategy);
+        assert!(
+            matches!(
+                strategy.status,
+                StrategyStatus::Closed | StrategyStatus::Expired | StrategyStatus::Cancelled
+            ),
+            "{strategy:?}"
+        );
+    }
+    let Some(cursor) = page.next_cursor.clone() else {
+        return;
+    };
+    let next = private_api()
+        .closed_strategies(&ClosedStrategiesRequest {
+            limit: Some(2),
+            cursor: Some(cursor),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    for strategy in &next.strategies {
+        assert!(
+            page.strategies
+                .iter()
+                .all(|it| it.strategy_id != strategy.strategy_id)
+        );
     }
 }

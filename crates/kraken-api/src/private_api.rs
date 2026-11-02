@@ -4,7 +4,7 @@ use crate::account::{
     ExportRequest, ExtendedBalance, LedgerEntry, Ledgers, LedgersRequest, QueryLedgersRequest,
     RemoveExportType, TradeBalance, TradeBalanceRequest, TradeVolume, WalletAccounts,
 };
-use crate::algo::{self, Strategy, StrategyType};
+use crate::algo::{self, ClosedStrategies, ClosedStrategiesRequest, Strategy, StrategyType};
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, AddOrderBatch, AmendOrder, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
@@ -364,5 +364,15 @@ impl PrivateApi {
         strategy_ids: &[String],
     ) -> Result<Vec<Strategy>, KrakenError> {
         algo::query_strategies(&self.client, strategy_ids).await
+    }
+
+    /// A page of the closed, expired and cancelled strategies, most recent first
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-closed-strategies>
+    pub async fn closed_strategies(
+        &self,
+        request: &ClosedStrategiesRequest,
+    ) -> Result<ClosedStrategies, KrakenError> {
+        algo::closed_strategies(&self.client, request).await
     }
 }

@@ -1,7 +1,7 @@
 //! Private algorithmic trading: the TWAP strategies, which execute a volume evenly over a period
 //! as market or limit child orders
 
-use crate::trading::{OrderSide, OrderType};
+use crate::trading::{CloseTime, OrderSide, OrderType};
 use crate::{KrakenError, lenient};
 use kraken_network::PrivateClient;
 use kraken_network::params::comma_separated;
@@ -139,6 +139,62 @@ pub(crate) async fn query_strategies(
     Ok(listed(answer.strategies))
 }
 
+/// <https://docs.kraken.com/api/docs/rest-api/get-closed-strategies>
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct ClosedStrategiesRequest {
+    /// e.g. "forex": every class when missing. Repeat it on the next pages
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub asset_class: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub strategy_type: Option<StrategyType>,
+    /// Closed, expired or cancelled: the three when missing
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub status: Option<StrategyStatus>,
+    /// UTC timestamp in seconds (inclusive)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub start: Option<i64>,
+    /// UTC timestamp in seconds (inclusive, the whole second)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub end: Option<i64>,
+    /// Which times `start` and `end` apply to
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub query_time_mode: Option<CloseTime>,
+    /// Strategies per page
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub limit: Option<u32>,
+    /// The `next_cursor` of the previous page
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub cursor: Option<String>,
+}
+
+/// A page of the closed, expired and cancelled strategies
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct ClosedStrategies {
+    /// Most recent first, by closing time (by opening time with the `open` time mode)
+    #[serde(rename = "closed", default)]
+    pub strategies: Vec<Strategy>,
+    /// To give as `cursor` for the next page: None on the last one
+    #[serde(default)]
+    pub next_cursor: Option<String>,
+}
+
+pub(crate) async fn closed_strategies(
+    client: &PrivateClient,
+    request: &ClosedStrategiesRequest,
+) -> Result<ClosedStrategies, KrakenError> {
+    client.call_with("GetClosedStrategies", Some(request)).await
+}
+
 #[cfg(test)]
 pub(crate) const SAMPLE: &str = r#"{
     "ASPBVCI-6MKBA-QE4VF6":{"strategy_id":"ASPBVCI-6MKBA-QE4VF6","status":"pending",
@@ -201,6 +257,26 @@ mod tests {
         assert_eq!(open.details.avg_price, Some(dec!(67050.10)));
         assert_eq!(open.details.price, Some(dec!(67000)));
         assert_eq!(open.details.start_time, 1781166400);
+    }
+
+    #[test]
+    fn encodes_every_filter_of_the_closed_strategies() {
+        let request = ClosedStrategiesRequest {
+            asset_class: Some("forex".into()),
+            strategy_type: Some(StrategyType::Twap),
+            status: Some(StrategyStatus::Cancelled),
+            start: Some(1781160000),
+            end: Some(1781180000),
+            query_time_mode: Some(CloseTime::Open),
+            limit: Some(2),
+            cursor: Some("Q0xPU0VEOjE3ODExNzAwMDA6QVNNQkE2NA".into()),
+        };
+        assert_eq!(
+            encode(&request).unwrap(),
+            "asset_class=forex&strategy_type=twap&status=cancelled&start=1781160000\
+             &end=1781180000&query_time_mode=open&limit=2&cursor=Q0xPU0VEOjE3ODExNzAwMDA6QVNNQkE2NA"
+        );
+        assert_eq!(encode(&ClosedStrategiesRequest::default()).unwrap(), "");
     }
 
     #[test]
