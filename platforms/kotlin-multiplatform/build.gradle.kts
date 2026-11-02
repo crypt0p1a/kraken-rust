@@ -9,7 +9,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 //   ./gradlew :kraken-multiplatform:jvmTest                 the tests on the JVM (library of the host)
 //   ./gradlew :kraken-multiplatform:linuxX64Test            Kotlin/Native on Linux x86_64
 //   ./gradlew :kraken-multiplatform:iosSimulatorArm64Test   Kotlin/Native on the iOS simulator (macOS)
-//   ./gradlew :kraken-multiplatform:assemble                the libraries of every target
+//   ./gradlew :kraken-multiplatform:connectedAndroidDeviceTest   the common tests on Android (device / emulator)
+//   ./gradlew :kraken-multiplatform:assemble                the libraries of every target, the AAR
 plugins {
     alias(additionals.plugins.kotlin.multiplatform)
     alias(additionals.plugins.android.kotlin.multiplatform.library)
@@ -43,6 +44,19 @@ kotlin {
         minSdk = additionals.versions.minSdkVersion.get().toInt()
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
+        }
+
+        // JNA and the bindings are called by reflection: the rules of the apps using the AAR
+        optimization {
+            consumerKeepRules.publish = true
+            consumerKeepRules.file("consumer-rules.pro")
+        }
+
+        // the common tests on a device / emulator: ./gradlew :kraken-multiplatform:connectedAndroidDeviceTest
+        withDeviceTestBuilder {
+            sourceSetTreeName = "test"
+        }.configure {
+            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         }
     }
 
@@ -82,6 +96,9 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(additionals.okhttp.mockwebserver)
+        }
+        getByName("androidDeviceTest").dependencies {
+            implementation(additionals.androidx.test.runner)
         }
     }
 }

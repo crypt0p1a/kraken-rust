@@ -23,8 +23,8 @@ import uniffi.kraken_network.KrakenException
 import uniffi.kraken_network.RestOptions
 
 /**
- * The Kotlin bindings of kraken-ffi, called against a local mocked Kraken: on the JVM
- * (platforms/kotlin) and on Android (platforms/android, instrumented tests)
+ * The Kotlin bindings of kraken-ffi, called against a local mocked Kraken, on the JVM. Android and
+ * the other targets: platforms/kotlin-multiplatform
  */
 class KrakenBindingsTest {
     companion object {

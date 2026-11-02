@@ -245,22 +245,18 @@ the libraries), from the library of the host: they are the same for every platfo
 
 | Directory | What | Built with |
 |-----------|------|------------|
-| [`platforms/android`](platforms/android) | Android library (AAR): Kotlin bindings, `libkraken_ffi.so` of the 4 ABIs, JNA | Gradle (`:kraken-android`), Android SDK |
 | [`platforms/apple`](platforms/apple) | Swift package: Swift bindings, `KrakenFFI.xcframework` (iOS, iOS simulator, macOS) | SwiftPM / Xcode |
-| [`platforms/kotlin`](platforms/kotlin) | the tests of the Kotlin bindings on the JVM, shared with Android | Gradle (`:kraken-kotlin`) |
-| [`platforms/kotlin-multiplatform`](platforms/kotlin-multiplatform) | Kotlin Multiplatform library: JVM, Android, iOS, macOS, Linux | Gradle (`:kraken-multiplatform`), [uniffi KMP plugin](https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings) |
+| [`platforms/kotlin`](platforms/kotlin) | the tests of the Kotlin bindings on the JVM | Gradle (`:kraken-kotlin`) |
+| [`platforms/kotlin-multiplatform`](platforms/kotlin-multiplatform) | Kotlin Multiplatform library, the one of Kotlin: JVM, Android (AAR), iOS, macOS, Linux | Gradle (`:kraken-multiplatform`), [uniffi KMP plugin](https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings) |
 
 ```sh
 scripts/bindings.sh kotlin              # dist/bindings/kotlin
 scripts/bindings.sh swift               # platforms/apple/Sources, dist/bindings/swift/include
 scripts/bindings.sh xcframework         # platforms/apple/KrakenFFI.xcframework (after build.sh ios macos)
-
-scripts/build.sh android && scripts/bindings.sh kotlin
-./gradlew :kraken-android:assembleRelease     # platforms/android/build/outputs/aar/kraken-android-release.aar
 ```
 
 The Gradle build lives at the root (`settings.gradle`, `build.gradle`, the wrapper `./gradlew`) and
-includes `platforms/kotlin`, `platforms/android` and `platforms/kotlin-multiplatform`. It is based on
+includes `platforms/kotlin` and `platforms/kotlin-multiplatform`. It is based on
 [the-inkwell/gradle-tools](https://github.com/the-inkwell/gradle-tools), like the other projects:
 its commit is `GRADLE_EXTENDED_VERSION_USED` in `gradle.properties`, its catalog `additionals`
 (Kotlin, AGP, SDK levels, test libraries) and its `kt-plugins` are downloaded in `gradle/extended`.
@@ -281,11 +277,17 @@ generator only).
 ```sh
 ./gradlew :kraken-multiplatform:jvmTest :kraken-multiplatform:linuxX64Test                 # Linux
 ./gradlew :kraken-multiplatform:iosSimulatorArm64Test :kraken-multiplatform:macosArm64Test  # macOS
+./gradlew :kraken-multiplatform:connectedAndroidDeviceTest   # Android device / emulator
 ./gradlew :kraken-multiplatform:assemble    # the libraries of every target, the AAR (Android SDK, NDK)
 ```
 
-The common tests run on every target (options, exact decimals through the converter, invalid
-secret, transport error, logger implemented in Kotlin); the calls to a mocked Kraken run on the JVM.
+The AAR holds the library of the ABI of the host only, in debug: `-PreleaseBuild=true` builds the
+release libraries of `arm64-v8a`, `armeabi-v7a` and `x86_64` (`-PandroidAbis=...` picks the ABIs
+of a debug build). The plugin doesn't build the 32-bit `x86`.
+
+The common tests run on every target, Android included on a device (options, exact decimals
+through the converter, invalid secret, transport error, logger implemented in Kotlin); the calls
+to a mocked Kraken run on the JVM.
 
 In Swift, the C declarations of the 3 crates are a single module, `KrakenFFI` (the
 `ffi_module_name` of their `uniffi.toml`), and the Swift sources a single one, `Kraken`.
@@ -297,7 +299,7 @@ ways, signed private call, errors, invalid secret, logger implemented in the for
 scripts/test-bindings.sh kotlin    # JVM, library of the host
 scripts/test-bindings.sh swift     # macOS through the XCFramework, Linux through the .so
 scripts/test-bindings.sh ios       # iOS simulator (macOS, Xcode)
-scripts/test-bindings.sh android   # Android device or emulator (adb, Android SDK, cargo-ndk)
+scripts/test-bindings.sh android   # Android device or emulator, through Kotlin Multiplatform (adb, Android SDK, NDK)
 ```
 
 ## Usage

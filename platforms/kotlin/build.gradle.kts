@@ -1,7 +1,7 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 // The Kotlin bindings of kraken-ffi (scripts/bindings.sh kotlin) tested on the JVM, with the library
-// of the host. The same tests run on Android: platforms/android
+// of the host. Android and the other targets: platforms/kotlin-multiplatform
 //
 //   ./gradlew :kraken-kotlin:test
 plugins {
