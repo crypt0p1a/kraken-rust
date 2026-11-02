@@ -20,11 +20,11 @@ use crate::funding::{
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
 use crate::trading::{
-    self, AddOrderBatch, AmendOrder, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
-    ClosedOrders, ClosedOrdersRequest, ConsolidatedPosition, EditOrder, EditedOrder, NewOrder,
-    NewOrderAnswer, OpenOrdersRequest, OpenPositionsRequest, Order, OrderAmends,
-    OrderAmendsRequest, OrderReference, Position, QueryOrdersRequest, QueryTradesRequest, Trade,
-    TradesHistory, TradesHistoryRequest, WebSocketsToken,
+    self, AmendOrder, BatchOrderAnswer, CancelAllAfter, CancelledOrders, ClosedOrders,
+    ClosedOrdersRequest, ConsolidatedPosition, EditOrder, EditedOrder, NewOrder, NewOrderAnswer,
+    OpenOrdersRequest, OpenPositionsRequest, Order, OrderAmends, OrderAmendsRequest,
+    OrderReference, Position, QueryOrdersRequest, QueryTradesRequest, Trade, TradesHistory,
+    TradesHistoryRequest, WebSocketsToken,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::{FundingClient, PrivateClient};
@@ -355,14 +355,15 @@ impl PrivateApi {
     }
 
     /// Places 2 to 15 orders of a pair, validated as a whole: the answer of each order, in the
-    /// order of the request
+    /// order of the request. Their pair, asset class, deadline, validation and broker, which are
+    /// the ones of the batch, must be the same
     ///
     /// <https://docs.kraken.com/api/docs/rest-api/add-order-batch>
     pub async fn add_order_batch(
         &self,
-        request: &AddOrderBatch,
+        orders: &[NewOrder],
     ) -> Result<Vec<BatchOrderAnswer>, KrakenError> {
-        trading::batch::add_order_batch(&self.client, request).await
+        trading::batch::add_order_batch(&self.client, orders).await
     }
 
     // algo

@@ -10,10 +10,10 @@ use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::AssetPair;
 use kraken_api::trading::{
-    AddOrderBatch, AmendOrder, AmendType, BatchOrder, CloseTime, ClosedOrdersRequest,
-    ConsolidatedPosition, EditOrder, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
-    OrderAmends, OrderFlag, OrderReference, OrderSide, OrderStatus, OrderType, Position,
-    QueryTradesRequest, TimeInForce, Trade, TradesHistoryRequest, WebSocketsToken,
+    AmendOrder, AmendType, CloseTime, ClosedOrdersRequest, ConsolidatedPosition, EditOrder,
+    NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends, OrderFlag, OrderReference,
+    OrderSide, OrderStatus, OrderType, Position, QueryTradesRequest, TimeInForce, Trade,
+    TradesHistoryRequest, WebSocketsToken,
 };
 use live::{
     Presence, decode_strict, entries, le, now_seconds, private_api, private_client, public_api,
@@ -913,36 +913,19 @@ async fn edit_an_unknown_order_is_refused() {
 async fn validates_a_batch_of_orders() {
     // validated only: nothing is placed
     let market = market("XBTUSD").await;
-    let order = |side, price: Decimal| BatchOrder {
-        side,
-        order_type: OrderType::Limit,
-        volume: market.volume(price),
-        display_volume: None,
-        price: Some(market.price(price)),
-        price2: None,
-        trigger: None,
-        leverage: None,
-        reduce_only: None,
-        self_trade_prevention: None,
-        oflags: Some(vec![OrderFlag::Post]),
-        time_in_force: None,
-        start_time: None,
-        expire_time: None,
-        cl_ord_id: None,
-        userref: None,
-    };
-    let request = AddOrderBatch {
-        pair: market.pair.altname.clone(),
-        orders: vec![
-            order(OrderSide::Buy, market.bid * dec!(0.5)),
-            order(OrderSide::Sell, market.ask * dec!(1.5)),
-        ],
-        asset_class: None,
-        deadline: None,
-        validate: Some(true),
-        broker: None,
-    };
-    let answers = private_api().add_order_batch(&request).await.unwrap();
+    let orders = [
+        market.order(
+            OrderSide::Buy,
+            OrderType::Limit,
+            Some(market.bid * dec!(0.5)),
+        ),
+        market.order(
+            OrderSide::Sell,
+            OrderType::Limit,
+            Some(market.ask * dec!(1.5)),
+        ),
+    ];
+    let answers = private_api().add_order_batch(&orders).await.unwrap();
     assert_eq!(answers.len(), 2, "{answers:?}");
     for answer in &answers {
         assert_eq!(answer.txid, None, "validated only: {answer:?}");

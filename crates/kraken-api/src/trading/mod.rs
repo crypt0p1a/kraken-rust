@@ -4,7 +4,7 @@
 //! - `order`: the order model returned by the queries
 //! - `query`: open, closed and queried orders
 //! - `add`: new orders
-//! - `batch`: batches of new orders
+//! - `batch`: batches of new orders, sent as a list of [`NewOrder`]
 //! - `trades`: the trades (fills) of the account
 //! - `amends`: the versions of an amended order
 //! - `cancel`: the cancellations of open orders
@@ -26,7 +26,7 @@ pub(crate) mod websocket;
 
 pub use add::{NewOrder, NewOrderAnswer, NewOrderDescription};
 pub use amends::{AmendOrder, AmendType, OrderAmend, OrderAmends, OrderAmendsRequest};
-pub use batch::{AddOrderBatch, BatchOrder, BatchOrderAnswer};
+pub use batch::BatchOrderAnswer;
 pub use cancel::{CancelAllAfter, CancelledOrders, OrderReference};
 pub use edit::{EditOrder, EditedOrder, EditedOrderDescription};
 pub use order::{Order, OrderDescription};

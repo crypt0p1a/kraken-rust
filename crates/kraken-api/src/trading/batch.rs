@@ -1,102 +1,43 @@
-use super::{
-    NewOrderDescription, OrderFlag, OrderSide, OrderType, SelfTradePrevention, TimeInForce, Trigger,
-};
+use super::{NewOrder, NewOrderDescription};
 use crate::KrakenError;
-use crate::market::AssetClass;
 use kraken_network::PrivateClient;
-use kraken_network::params::opt_comma_separated;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde_json::{Map, Value};
 
-/// An order of a batch: the pair is the one of the batch
-///
-/// The amounts and prices are strings, to keep the precision given by the caller
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
-pub struct BatchOrder {
-    #[serde(rename = "type")]
-    pub side: OrderSide,
-    #[serde(rename = "ordertype")]
-    pub order_type: OrderType,
-    /// In the base currency
-    pub volume: String,
-    /// Volume shown in the book, for the iceberg orders
-    #[serde(rename = "displayvol", skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub display_volume: Option<String>,
-    /// Limit price, or trigger price of the stop / take profit orders
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub price: Option<String>,
-    /// Limit price of the stop-loss-limit / take-profit-limit orders
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub price2: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub trigger: Option<Trigger>,
-    /// e.g. "2:1": none when missing
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub leverage: Option<String>,
-    /// Only reduces an open margin position
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub reduce_only: Option<bool>,
-    #[serde(rename = "stptype", skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub self_trade_prevention: Option<SelfTradePrevention>,
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "opt_comma_separated"
-    )]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub oflags: Option<Vec<OrderFlag>>,
-    /// GTC when missing
-    #[serde(rename = "timeinforce", skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub time_in_force: Option<TimeInForce>,
-    /// `0` (now), `<UTC timestamp in seconds>` or `+<seconds from now>`
-    #[serde(rename = "starttm", skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub start_time: Option<String>,
-    /// Required by GTD: `<UTC timestamp in seconds>` or `+<seconds from now>`
-    #[serde(rename = "expiretm", skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub expire_time: Option<String>,
-    /// Client identifier: a UUID, or up to 18 ASCII characters. Exclusive with `userref`
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub cl_ord_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub userref: Option<i32>,
-}
+/// The parameters of a batch, not of its orders: they must be the same for every order
+const BATCH_FIELDS: [&str; 5] = ["pair", "asset_class", "deadline", "validate", "broker"];
 
-/// 2 to 15 orders of a pair, validated as a whole: one invalid order rejects the batch
-///
-/// <https://docs.kraken.com/api/docs/rest-api/add-order-batch>
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
-pub struct AddOrderBatch {
-    /// Alternate name of the pair, e.g. "XBTUSD"
-    pub pair: String,
-    pub orders: Vec<BatchOrder>,
-    /// [`AssetClass::TokenizedAsset`] for the xStocks
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub asset_class: Option<AssetClass>,
-    /// RFC 3339: the orders are rejected after it
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub deadline: Option<String>,
-    /// Validates the orders without placing them
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub validate: Option<bool>,
-    /// IIBAN of the broker (partner) of the orders
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
-    pub broker: Option<String>,
+/// The JSON body of a batch: `{"pair", ..., "orders": [{...}, ...]}`, the parameters of the
+/// batch being taken out of its orders
+fn batch_body(orders: &[NewOrder]) -> Result<Map<String, Value>, KrakenError> {
+    if !(2..=15).contains(&orders.len()) {
+        return Err(KrakenError::InvalidArgument {
+            reason: format!("a batch holds 2 to 15 orders, not {}", orders.len()),
+        });
+    }
+    let mut body = Map::new();
+    let mut listed = Vec::with_capacity(orders.len());
+    for (index, order) in orders.iter().enumerate() {
+        let Value::Object(mut order) = serde_json::to_value(order).map_err(KrakenError::decode)?
+        else {
+            unreachable!("an order serializes to an object")
+        };
+        for field in BATCH_FIELDS {
+            let value = order.remove(field);
+            if index == 0 {
+                if let Some(value) = value {
+                    body.insert(field.into(), value);
+                }
+            } else if value.as_ref() != body.get(field) {
+                return Err(KrakenError::InvalidArgument {
+                    reason: format!("the orders of a batch share their {field}"),
+                });
+            }
+        }
+        listed.push(Value::Object(order));
+    }
+    body.insert("orders".into(), Value::Array(listed));
+    Ok(body)
 }
 
 /// An order of the batch, in the order of the request
@@ -121,66 +62,69 @@ struct BatchAnswer {
 /// Sent in JSON, the only way to send a list of orders
 pub(crate) async fn add_order_batch(
     client: &PrivateClient,
-    request: &AddOrderBatch,
+    orders: &[NewOrder],
 ) -> Result<Vec<BatchOrderAnswer>, KrakenError> {
-    let answer: BatchAnswer = client.call_json("AddOrderBatch", request).await?;
+    let answer: BatchAnswer = client
+        .call_json("AddOrderBatch", &batch_body(orders)?)
+        .await?;
     Ok(answer.orders)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::trading::{
+        OrderFlag, OrderSide, OrderType, SelfTradePrevention, TimeInForce, Trigger,
+    };
     use serde_json::json;
 
-    pub(crate) fn limit(side: OrderSide, volume: &str, price: &str) -> BatchOrder {
-        BatchOrder {
+    fn limit(side: OrderSide, price: &str) -> NewOrder {
+        NewOrder {
+            pair: "XBTUSD".into(),
             side,
             order_type: OrderType::Limit,
-            volume: volume.into(),
-            display_volume: None,
+            volume: "1.2".into(),
             price: Some(price.into()),
             price2: None,
-            trigger: None,
-            leverage: None,
-            reduce_only: None,
-            self_trade_prevention: None,
             oflags: None,
             time_in_force: None,
             start_time: None,
             expire_time: None,
             cl_ord_id: None,
             userref: None,
+            display_volume: None,
+            asset_class: None,
+            trigger: None,
+            leverage: None,
+            reduce_only: None,
+            self_trade_prevention: None,
+            deadline: Some("2026-11-02T10:00:00Z".into()),
+            broker: None,
+            validate: Some(true),
         }
     }
 
     #[test]
-    fn encodes_the_batch_in_json() {
-        let request = AddOrderBatch {
-            pair: "XBTUSD".into(),
-            orders: vec![
-                BatchOrder {
-                    oflags: Some(vec![OrderFlag::Post, OrderFlag::Fciq]),
-                    time_in_force: Some(TimeInForce::Gtd),
-                    expire_time: Some("+3600".into()),
-                    cl_ord_id: Some("mgr1_buy_1".into()),
-                    ..limit(OrderSide::Buy, "1.2", "28300.0")
-                },
-                BatchOrder {
-                    order_type: OrderType::StopLossLimit,
-                    price2: Some("27000.0".into()),
-                    trigger: Some(Trigger::Index),
-                    self_trade_prevention: Some(SelfTradePrevention::CancelBoth),
-                    reduce_only: Some(false),
-                    ..limit(OrderSide::Sell, "1.2", "27100.0")
-                },
-            ],
-            asset_class: None,
-            deadline: Some("2026-11-02T10:00:00Z".into()),
-            validate: Some(true),
-            broker: None,
-        };
+    fn takes_the_parameters_of_the_batch_out_of_its_orders() {
+        let orders = [
+            NewOrder {
+                oflags: Some(vec![OrderFlag::Post, OrderFlag::Fciq]),
+                time_in_force: Some(TimeInForce::Gtd),
+                expire_time: Some("+3600".into()),
+                cl_ord_id: Some("mgr1_buy_1".into()),
+                ..limit(OrderSide::Buy, "28300.0")
+            },
+            NewOrder {
+                order_type: OrderType::StopLossLimit,
+                price2: Some("27000.0".into()),
+                trigger: Some(Trigger::Index),
+                self_trade_prevention: Some(SelfTradePrevention::CancelBoth),
+                reduce_only: Some(false),
+                ..limit(OrderSide::Sell, "27100.0")
+            },
+        ];
         assert_eq!(
-            serde_json::to_value(&request).unwrap(),
+            Value::Object(batch_body(&orders).unwrap()),
             json!({"pair": "XBTUSD", "deadline": "2026-11-02T10:00:00Z", "validate": true,
             "orders": [
                 {"type": "buy", "ordertype": "limit", "volume": "1.2", "price": "28300.0",
@@ -190,6 +134,24 @@ mod tests {
                     "price": "27100.0", "price2": "27000.0", "trigger": "index",
                     "reduce_only": false, "stptype": "cancel-both"}
             ]})
+        );
+    }
+
+    #[test]
+    fn refuses_the_orders_of_different_batches() {
+        let other_pair = NewOrder {
+            pair: "ETHUSD".into(),
+            ..limit(OrderSide::Sell, "1")
+        };
+        assert!(batch_body(&[limit(OrderSide::Buy, "1"), other_pair]).is_err());
+        let not_validated = NewOrder {
+            validate: None,
+            ..limit(OrderSide::Sell, "1")
+        };
+        assert!(batch_body(&[limit(OrderSide::Buy, "1"), not_validated]).is_err());
+        assert!(
+            batch_body(&[limit(OrderSide::Buy, "1")]).is_err(),
+            "a single order"
         );
     }
 

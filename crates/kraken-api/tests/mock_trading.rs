@@ -5,10 +5,9 @@ mod common;
 use common::{FormIs, JsonIs, Signed, SignedJson, ok, orders_fixture, private_api};
 use kraken_api::KrakenError;
 use kraken_api::trading::{
-    AddOrderBatch, AmendOrder, AmendType, BatchOrder, CloseTime, ClosedOrdersRequest, EditOrder,
-    NewOrder, OpenOrdersRequest, OpenPositionsRequest, OrderAmendsRequest, OrderFlag,
-    OrderReference, OrderSide, OrderStatus, OrderType, QueryOrdersRequest, QueryTradesRequest,
-    TimeInForce, TradesHistoryRequest,
+    AmendOrder, AmendType, CloseTime, ClosedOrdersRequest, EditOrder, NewOrder, OpenOrdersRequest,
+    OpenPositionsRequest, OrderAmendsRequest, OrderFlag, OrderReference, OrderSide, OrderStatus,
+    OrderType, QueryOrdersRequest, QueryTradesRequest, TimeInForce, TradesHistoryRequest,
 };
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -547,24 +546,17 @@ async fn edit_order() {
     assert_eq!(edited.txid.as_deref(), Some("OFVXHJ-KPQ3B-VS7ELA"));
 }
 
-fn batch_limit(side: OrderSide, price: &str) -> BatchOrder {
-    BatchOrder {
+fn batch_limit(side: OrderSide) -> NewOrder {
+    NewOrder {
         side,
-        order_type: OrderType::Limit,
         volume: "0.5".into(),
-        display_volume: None,
-        price: Some(price.into()),
-        price2: None,
-        trigger: None,
-        leverage: None,
-        reduce_only: None,
-        self_trade_prevention: None,
         oflags: Some(vec![OrderFlag::Post]),
         time_in_force: None,
-        start_time: None,
         expire_time: None,
         cl_ord_id: None,
         userref: Some(7),
+        validate: Some(true),
+        ..limit_buy()
     }
 }
 
@@ -591,17 +583,16 @@ async fn add_order_batch_is_signed_json() {
         .await;
 
     let answers = private_api(&server)
-        .add_order_batch(&AddOrderBatch {
-            pair: "XBTUSD".into(),
-            orders: vec![
-                batch_limit(OrderSide::Buy, "27000.0"),
-                batch_limit(OrderSide::Sell, "33000.0"),
-            ],
-            asset_class: None,
-            deadline: None,
-            validate: Some(true),
-            broker: None,
-        })
+        .add_order_batch(&[
+            NewOrder {
+                price: Some("27000.0".into()),
+                ..batch_limit(OrderSide::Buy)
+            },
+            NewOrder {
+                price: Some("33000.0".into()),
+                ..batch_limit(OrderSide::Sell)
+            },
+        ])
         .await
         .unwrap();
     assert_eq!(answers.len(), 2);

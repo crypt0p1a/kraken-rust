@@ -28,10 +28,10 @@ use kraken_api::market::{
 };
 use kraken_api::subaccounts::{AccountTransfer, NewSubaccount, TransferResult};
 use kraken_api::trading::{
-    AddOrderBatch, AmendOrder, AmendType, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
-    ClosedOrdersRequest, EditOrder, EditedOrder, NewOrder, NewOrderAnswer, OpenOrdersRequest,
-    Order, OrderAmends, OrderAmendsRequest, OrderReference, OrderSide, OrderStatus, OrderType,
-    Position, QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade, WebSocketsToken,
+    AmendOrder, AmendType, BatchOrderAnswer, CancelAllAfter, CancelledOrders, ClosedOrdersRequest,
+    EditOrder, EditedOrder, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends,
+    OrderAmendsRequest, OrderReference, OrderSide, OrderStatus, OrderType, Position,
+    QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade, WebSocketsToken,
 };
 use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
@@ -60,6 +60,33 @@ fn each<T: serde::de::DeserializeOwned>(context: &str, value: &Value) -> HashMap
             )
         })
         .collect()
+}
+
+/// A limit order of 0.0001 XBTUSD, validated only
+fn limit_order(side: OrderSide, price: &str) -> NewOrder {
+    NewOrder {
+        pair: "XBTUSD".into(),
+        side,
+        order_type: OrderType::Limit,
+        volume: "0.0001".into(),
+        price: Some(price.into()),
+        price2: None,
+        oflags: None,
+        time_in_force: None,
+        start_time: None,
+        expire_time: None,
+        cl_ord_id: None,
+        userref: None,
+        validate: Some(true),
+        display_volume: None,
+        asset_class: None,
+        trigger: None,
+        leverage: None,
+        reduce_only: None,
+        self_trade_prevention: None,
+        deadline: None,
+        broker: None,
+    }
 }
 
 // strict decoding
@@ -284,29 +311,7 @@ async fn private_calls_read_the_real_shapes() {
     assert!(api.order("OAAAAA-BBBBB-ZZZZZ9").await.unwrap().is_none());
 
     let answer = api
-        .new_order(&NewOrder {
-            pair: "XBTUSD".into(),
-            side: OrderSide::Buy,
-            order_type: OrderType::Limit,
-            volume: "0.0001".into(),
-            price: Some("38000.0".into()),
-            price2: None,
-            oflags: None,
-            time_in_force: None,
-            start_time: None,
-            expire_time: None,
-            cl_ord_id: None,
-            userref: None,
-            validate: Some(true),
-            display_volume: None,
-            asset_class: None,
-            trigger: None,
-            leverage: None,
-            reduce_only: None,
-            self_trade_prevention: None,
-            deadline: None,
-            broker: None,
-        })
+        .new_order(&limit_order(OrderSide::Buy, "38000.0"))
         .await
         .unwrap();
     assert!(answer.txids.is_empty());
@@ -998,14 +1003,10 @@ async fn add_order_batch_fixture() {
     let server = MockServer::start().await;
     serve(&server, "/0/private/AddOrderBatch", "add_order_batch.json").await;
     let served = private_api(&server)
-        .add_order_batch(&AddOrderBatch {
-            pair: "XBTUSD".into(),
-            orders: vec![],
-            asset_class: None,
-            deadline: None,
-            validate: None,
-            broker: None,
-        })
+        .add_order_batch(&[
+            limit_order(OrderSide::Buy, "38000.0"),
+            limit_order(OrderSide::Sell, "42000.0"),
+        ])
         .await
         .unwrap();
     assert_eq!(served, answers);
