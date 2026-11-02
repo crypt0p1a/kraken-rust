@@ -22,8 +22,8 @@ pub(crate) mod methods;
 pub(crate) mod networks;
 
 pub use addresses::{
-    Beneficiary, WithdrawalAccount, WithdrawalAddress, WithdrawalAddressDetails,
-    WithdrawalAddresses, WithdrawalAddressesRequest,
+    Beneficiary, NewWithdrawalAddress, SavedAddress, WithdrawalAccount, WithdrawalAddress,
+    WithdrawalAddressDetails, WithdrawalAddresses, WithdrawalAddressesRequest,
 };
 pub use assets::{FundingAssets, FundingDirection, NamedAsset};
 pub use deposits::{

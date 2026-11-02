@@ -6,8 +6,8 @@ mod common;
 use common::{QueryIs, SignedFunding, plain, private_api};
 use kraken_api::funding::{
     AddressDetails, ClaimedAddressesRequest, DepositsRequest, FundingAsset, FundingDirection,
-    FundingFeeRequest, FundingLimitsRequest, FundingMethodsRequest, FundingScope, TransferStatus,
-    WithdrawalAddressesRequest,
+    FundingFeeRequest, FundingLimitsRequest, FundingMethodsRequest, FundingScope,
+    NewWithdrawalAddress, TransferStatus, WithdrawalAddressesRequest,
 };
 use kraken_api::market::AssetClass;
 use serde_json::json;
@@ -328,4 +328,40 @@ async fn withdrawal_addresses() {
         .await
         .unwrap();
     assert!(page.addresses[0].verified);
+}
+
+#[tokio::test]
+async fn create_withdrawal_address() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/funding/v1/addresses"))
+        .and(SignedFunding)
+        .and(wiremock::matchers::body_json(json!({"scope": {"method_id": "67b765fd"},
+            "address_details": {"crypto": {"address": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"}}})))
+        .respond_with(plain(json!({"address_id": "AB7J4FF-BGM7G-V2JMIH", "verified": false})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let api = private_api(&server);
+    let mut address = NewWithdrawalAddress {
+        scope: FundingScope::MethodId {
+            method_id: "67b765fd".into(),
+        },
+        address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh".into(),
+        tag: None,
+        memo: None,
+        description: None,
+    };
+    let saved = api.create_withdrawal_address(&address, None).await.unwrap();
+    assert_eq!(saved.address_id, "AB7J4FF-BGM7G-V2JMIH");
+    assert!(!saved.verified);
+
+    // a tag and a memo: refused before any request
+    address.tag = Some("1".into());
+    address.memo = Some("2".into());
+    assert!(matches!(
+        api.create_withdrawal_address(&address, None).await,
+        Err(kraken_api::KrakenError::InvalidArgument { .. })
+    ));
 }

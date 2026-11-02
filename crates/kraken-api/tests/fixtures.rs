@@ -16,8 +16,9 @@ use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, 
 use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
 use kraken_api::funding::{
     AddressDetails, ClaimedAddresses, DepositLimits, Deposits, FundingAsset, FundingAssets,
-    FundingDirection, FundingFee, FundingFeeRequest, FundingMethods, FundingNetworks, LimitValue,
-    TransferStatus, WithdrawalAddresses, WithdrawalLimits,
+    FundingDirection, FundingFee, FundingFeeRequest, FundingMethods, FundingNetworks, FundingScope,
+    LimitValue, NewWithdrawalAddress, SavedAddress, TransferStatus, WithdrawalAddresses,
+    WithdrawalLimits,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -1574,4 +1575,36 @@ async fn withdrawal_addresses_fixture() {
             .unwrap(),
         page
     );
+}
+
+#[tokio::test]
+async fn create_withdrawal_address_fixture() {
+    let saved: SavedAddress = decode_strict(
+        "create address",
+        &funding_fixture("create_withdrawal_address.json"),
+    );
+
+    let server = MockServer::start().await;
+    serve_funding(
+        &server,
+        "/funding/v1/addresses",
+        "create_withdrawal_address.json",
+    )
+    .await;
+    let served = private_api(&server)
+        .create_withdrawal_address(
+            &NewWithdrawalAddress {
+                scope: FundingScope::NetworkId {
+                    network_id: "d9d375da".into(),
+                },
+                address: "0xBef7B36845cA31045E86D0B46DBCac4e675277B4".into(),
+                tag: None,
+                memo: None,
+                description: None,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    assert_eq!(served, saved);
 }

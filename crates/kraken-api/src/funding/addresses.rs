@@ -219,9 +219,122 @@ pub(crate) async fn withdrawal_addresses(
         .await
 }
 
+/// A crypto withdrawal address to save
+///
+/// <https://docs.kraken.com/api/docs/rest-api/create-funding-address>
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct NewWithdrawalAddress {
+    /// The method, network or network group the address is used with
+    pub scope: FundingScope,
+    pub address: String,
+    /// Destination tag, on the blockchains allowing one: not with `memo`
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub tag: Option<String>,
+    /// Memo, on the blockchains allowing one: not with `tag`
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub memo: Option<String>,
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub description: Option<String>,
+}
+
+#[derive(Serialize)]
+struct CryptoAddress<'a> {
+    address: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tag: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    memo: Option<&'a str>,
+}
+
+#[derive(Serialize)]
+struct NewAddressDetails<'a> {
+    crypto: CryptoAddress<'a>,
+}
+
+/// The JSON body: `{"scope": {...}, "address_details": {"crypto": {...}}, "description"}`
+#[derive(Serialize)]
+struct NewAddressBody<'a> {
+    scope: &'a FundingScope,
+    address_details: NewAddressDetails<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<&'a str>,
+}
+
+impl<'a> From<&'a NewWithdrawalAddress> for NewAddressBody<'a> {
+    fn from(address: &'a NewWithdrawalAddress) -> Self {
+        NewAddressBody {
+            scope: &address.scope,
+            address_details: NewAddressDetails {
+                crypto: CryptoAddress {
+                    address: &address.address,
+                    tag: address.tag.as_deref(),
+                    memo: address.memo.as_deref(),
+                },
+            },
+            description: address.description.as_deref(),
+        }
+    }
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/create-funding-address>
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct SavedAddress {
+    pub address_id: String,
+    /// Verified, ready to be used
+    pub verified: bool,
+}
+
+#[derive(Serialize)]
+struct AccountQuery<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    account_id: Option<&'a str>,
+}
+
+/// Requires the "Funds permissions - Add withdrawal addresses" permission
+pub(crate) async fn create_withdrawal_address(
+    client: &FundingClient,
+    address: &NewWithdrawalAddress,
+    account_id: Option<&str>,
+) -> Result<SavedAddress, KrakenError> {
+    if address.tag.is_some() && address.memo.is_some() {
+        return Err(KrakenError::InvalidArgument {
+            reason: "an address takes a tag or a memo, not both".into(),
+        });
+    }
+    client
+        .call(
+            FundingMethod::Post,
+            "/funding/v1/addresses",
+            Some(&AccountQuery { account_id }),
+            Some(&NewAddressBody::from(address)),
+        )
+        .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn encodes_a_new_address() {
+        let address = NewWithdrawalAddress {
+            scope: FundingScope::NetworkId {
+                network_id: "d9d375da".into(),
+            },
+            address: "0xBef7B36845cA31045E86D0B46DBCac4e675277B4".into(),
+            tag: None,
+            memo: Some("4721".into()),
+            description: Some("cold wallet".into()),
+        };
+        assert_eq!(
+            serde_json::to_value(NewAddressBody::from(&address)).unwrap(),
+            serde_json::json!({"scope": {"network_id": "d9d375da"},
+                "address_details": {"crypto": {"address": "0xBef7B36845cA31045E86D0B46DBCac4e675277B4",
+                "memo": "4721"}}, "description": "cold wallet"})
+        );
+    }
 
     #[test]
     fn decodes_the_addresses_of_every_scope() {

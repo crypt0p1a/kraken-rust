@@ -14,7 +14,8 @@ use crate::funding::{
     self, AddressDetails, ClaimedAddresses, ClaimedAddressesRequest, DepositLimits, Deposits,
     DepositsRequest, FundingAsset, FundingAssets, FundingDirection, FundingFee, FundingFeeRequest,
     FundingLimitsRequest, FundingMethods, FundingMethodsRequest, FundingNetworks,
-    WithdrawalAddresses, WithdrawalAddressesRequest, WithdrawalLimits,
+    NewWithdrawalAddress, SavedAddress, WithdrawalAddresses, WithdrawalAddressesRequest,
+    WithdrawalLimits,
 };
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
@@ -601,5 +602,17 @@ impl PrivateApi {
         request: &WithdrawalAddressesRequest,
     ) -> Result<WithdrawalAddresses, KrakenError> {
         funding::addresses::withdrawal_addresses(&self.funding, request).await
+    }
+
+    /// Saves a crypto withdrawal address. Requires the "Funds permissions - Add withdrawal
+    /// addresses" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/create-funding-address>
+    pub async fn create_withdrawal_address(
+        &self,
+        address: &NewWithdrawalAddress,
+        account_id: Option<&str>,
+    ) -> Result<SavedAddress, KrakenError> {
+        funding::addresses::create_withdrawal_address(&self.funding, address, account_id).await
     }
 }
