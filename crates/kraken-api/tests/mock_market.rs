@@ -140,3 +140,25 @@ async fn system_status() {
     let status = public_api(&server).system_status().await.unwrap();
     assert_eq!(status.status, SystemState::PostOnly);
 }
+
+#[tokio::test]
+async fn maintenance_schedule() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/0/public/MaintenanceSchedule"))
+        .and(QueryIs(vec![]))
+        .respond_with(ok(json!({"events": [{"event_id": 34,
+            "title": "REST API infrastructure upgrade",
+            "expected_start_utc": "2026-05-14T02:00:00Z", "expected_end_utc": "2026-05-14T02:30:00Z",
+            "time_to_start_s": 236940, "phase": "announced",
+            "affected_services": ["spot_rest", "spot_ws"], "order_submission": "allowed",
+            "recommended_action": "continue", "cancel_before_utc": "2026-05-14T01:55:00Z",
+            "source_url": "https://status.kraken.com/incidents/d3f8h1xpqv62"}]})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let events = public_api(&server).maintenance_schedule().await.unwrap();
+    assert_eq!(events[0].event_id, 34);
+    assert_eq!(events[0].affected_services, ["spot_rest", "spot_ws"]);
+}

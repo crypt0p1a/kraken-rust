@@ -173,8 +173,24 @@ pub struct SystemStatus {
     pub emergency: Vec<Incident>,
 }
 
+/// <https://docs.kraken.com/api/docs/rest-api/get-maintenance-schedule>
+#[derive(Deserialize)]
+struct MaintenanceSchedule {
+    /// Missing when there is none
+    #[serde(default)]
+    events: Vec<MaintenanceEvent>,
+}
+
 pub(crate) async fn system_status(client: &PublicClient) -> Result<SystemStatus, KrakenError> {
     client.call("SystemStatus").await
+}
+
+/// The maintenances of the next 7 days, soonest first
+pub(crate) async fn maintenance_schedule(
+    client: &PublicClient,
+) -> Result<Vec<MaintenanceEvent>, KrakenError> {
+    let schedule: MaintenanceSchedule = client.call("MaintenanceSchedule").await?;
+    Ok(schedule.events)
 }
 
 #[cfg(test)]
@@ -261,5 +277,12 @@ mod tests {
                 phase
             );
         }
+    }
+
+    #[test]
+    fn an_empty_schedule_has_no_events() {
+        // what Kraken answers when nothing is scheduled
+        let schedule: MaintenanceSchedule = serde_json::from_str("{}").unwrap();
+        assert!(schedule.events.is_empty());
     }
 }

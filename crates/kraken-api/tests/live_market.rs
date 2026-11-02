@@ -10,8 +10,8 @@ mod strict;
 use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::{
-    AssetPair, AssetPairStatus, CandleInterval, CandlesRequest, ServerTime, SystemState,
-    SystemStatus, Ticker,
+    AssetPair, AssetPairStatus, CandleInterval, CandlesRequest, MaintenanceEvent, ServerTime,
+    SystemState, SystemStatus, Ticker,
 };
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
 use rust_decimal_macros::dec;
@@ -433,4 +433,27 @@ async fn system_status() {
             "{event:?}"
         );
     }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn maintenance_schedule() {
+    #[derive(serde::Deserialize)]
+    struct Schedule {
+        #[serde(default)]
+        events: Vec<Value>,
+    }
+    let raw: Value = public_client().call("MaintenanceSchedule").await.unwrap();
+    let schedule: Schedule = decode_strict("MaintenanceSchedule", &raw);
+    for event in &schedule.events {
+        let event: MaintenanceEvent = decode_strict("MaintenanceSchedule event", event);
+        assert!(
+            event.expected_start_utc < event.expected_end_utc,
+            "{event:?}"
+        );
+    }
+    assert_eq!(
+        public_api().maintenance_schedule().await.unwrap().len(),
+        schedule.events.len()
+    );
 }

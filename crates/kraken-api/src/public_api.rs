@@ -1,4 +1,6 @@
-use crate::market::{self, AssetPair, Candles, CandlesRequest, ServerTime, SystemStatus, Ticker};
+use crate::market::{
+    self, AssetPair, Candles, CandlesRequest, MaintenanceEvent, ServerTime, SystemStatus, Ticker,
+};
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PublicClient;
 use std::collections::HashMap;
@@ -28,6 +30,13 @@ impl PublicApi {
     /// <https://docs.kraken.com/api/docs/rest-api/get-system-status>
     pub async fn system_status(&self) -> Result<SystemStatus, KrakenError> {
         market::status::system_status(&self.client).await
+    }
+
+    /// The maintenances of the next 7 days, soonest first
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-maintenance-schedule>
+    pub async fn maintenance_schedule(&self) -> Result<Vec<MaintenanceEvent>, KrakenError> {
+        market::status::maintenance_schedule(&self.client).await
     }
 
     /// Tickers of the pairs (e.g. "XBTUSD"), keyed by their Kraken name (e.g. "XXBTZUSD")

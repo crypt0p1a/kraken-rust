@@ -297,3 +297,29 @@ async fn system_status_fixture() {
     serve(&server, "/0/public/SystemStatus", "system_status.json").await;
     assert_eq!(public_api(&server).system_status().await.unwrap(), status);
 }
+
+#[tokio::test]
+async fn maintenance_schedule_fixture() {
+    // nothing scheduled when the answer was recorded: no `events` at all
+    assert!(
+        fixture("maintenance_schedule.json")
+            .as_object()
+            .unwrap()
+            .is_empty()
+    );
+
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/public/MaintenanceSchedule",
+        "maintenance_schedule.json",
+    )
+    .await;
+    assert!(
+        public_api(&server)
+            .maintenance_schedule()
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
