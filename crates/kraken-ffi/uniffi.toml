@@ -1,0 +1,5 @@
+# the C declarations of every crate are in a single module, the one of the XCFramework: KrakenFFI
+# (scripts/bindings.sh), each crate keeping its own header
+[bindings.swift]
+ffi_module_name = "KrakenFFI"
+ffi_module_filename = "kraken_ffiFFI"
