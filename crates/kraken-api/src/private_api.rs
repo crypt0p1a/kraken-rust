@@ -2,7 +2,7 @@ use crate::Decimal;
 use crate::account::{
     self, ApiKeyInfo, ApiKeyInfoRequest, BalanceRequest, CreditLines, Export, ExportReport,
     ExportRequest, ExtendedBalance, LedgerEntry, Ledgers, LedgersRequest, QueryLedgersRequest,
-    TradeBalance, TradeBalanceRequest, TradeVolume, WalletAccounts,
+    RemoveExportType, TradeBalance, TradeBalanceRequest, TradeVolume, WalletAccounts,
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
@@ -118,6 +118,18 @@ impl PrivateApi {
     /// <https://docs.kraken.com/api/docs/rest-api/retrieve-export>
     pub async fn retrieve_export(&self, id: &str) -> Result<Vec<u8>, KrakenError> {
         account::exports::retrieve_export(&self.client, id).await
+    }
+
+    /// Cancels a queued or processing report, or deletes a processed one: whether it was removed.
+    /// Requires the "Export data" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/remove-export>
+    pub async fn remove_export(
+        &self,
+        id: &str,
+        removal: RemoveExportType,
+    ) -> Result<bool, KrakenError> {
+        account::exports::remove_export(&self.client, id, removal).await
     }
 
     /// A page of 50 ledger entries at most, most recent first. Requires the "Query ledger entries"

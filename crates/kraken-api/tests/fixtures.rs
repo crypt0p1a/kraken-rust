@@ -9,7 +9,8 @@ use common::{private_api, public_api};
 use kraken_api::Decimal;
 use kraken_api::account::{
     ApiKeyInfo, CreditLines, Export, ExportReport, ExportRequest, ExtendedBalance, LedgerEntry,
-    LedgerType, QueryLedgersRequest, TradeBalance, TradeVolume, WalletAccounts, WalletStatus,
+    LedgerType, QueryLedgersRequest, RemoveExportType, TradeBalance, TradeVolume, WalletAccounts,
+    WalletStatus,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -824,5 +825,17 @@ async fn export_status_fixture() {
             .await
             .unwrap(),
         exports
+    );
+}
+
+#[tokio::test]
+async fn remove_export_fixture() {
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/RemoveExport", "remove_export.json").await;
+    assert!(
+        private_api(&server)
+            .remove_export("TCJA", RemoveExportType::Cancel)
+            .await
+            .unwrap()
     );
 }

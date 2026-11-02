@@ -168,6 +168,45 @@ pub(crate) async fn retrieve_export(
     client.call_bytes("RetrieveExport", Some(&Id { id })).await
 }
 
+/// How to remove a report
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[serde(rename_all = "lowercase")]
+pub enum RemoveExportType {
+    /// A queued or processing report
+    Cancel,
+    /// A processed report
+    Delete,
+}
+
+#[derive(Serialize)]
+struct Removal<'a> {
+    id: &'a str,
+    #[serde(rename = "type")]
+    removal: RemoveExportType,
+}
+
+/// `{"delete": true}` or `{"cancel": true}`, depending on the removal
+#[derive(Deserialize)]
+struct Removed {
+    #[serde(default)]
+    delete: Option<bool>,
+    #[serde(default)]
+    cancel: Option<bool>,
+}
+
+/// Whether the report was removed. Requires the "Export data" permission
+pub(crate) async fn remove_export(
+    client: &PrivateClient,
+    id: &str,
+    removal: RemoveExportType,
+) -> Result<bool, KrakenError> {
+    let removed: Removed = client
+        .call_with("RemoveExport", Some(&Removal { id, removal }))
+        .await?;
+    Ok(removed.delete.or(removed.cancel).unwrap_or(false))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,6 +277,34 @@ mod tests {
     #[test]
     fn encodes_the_identifier() {
         assert_eq!(encode(&Id { id: "TCJA" }).unwrap(), "id=TCJA");
+    }
+
+    #[test]
+    fn encodes_the_removal() {
+        assert_eq!(
+            encode(&Removal {
+                id: "TCJA",
+                removal: RemoveExportType::Cancel
+            })
+            .unwrap(),
+            "id=TCJA&type=cancel"
+        );
+        assert_eq!(
+            encode(&Removal {
+                id: "TCJA",
+                removal: RemoveExportType::Delete
+            })
+            .unwrap(),
+            "id=TCJA&type=delete"
+        );
+    }
+
+    #[test]
+    fn decodes_both_removals() {
+        let deleted: Removed = serde_json::from_str(r#"{"delete":true}"#).unwrap();
+        assert_eq!(deleted.delete.or(deleted.cancel), Some(true));
+        let cancelled: Removed = serde_json::from_str(r#"{"cancel":false}"#).unwrap();
+        assert_eq!(cancelled.delete.or(cancelled.cancel), Some(false));
     }
 
     #[test]

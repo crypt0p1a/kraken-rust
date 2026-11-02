@@ -14,7 +14,9 @@ pub(crate) mod wallets;
 pub use api_key::{ApiKeyInfo, ApiKeyInfoRequest};
 pub use balance::{BalanceRequest, ExtendedBalance, RebaseMultiplier};
 pub use credit::{CreditLimits, CreditLineAsset, CreditLines};
-pub use exports::{Export, ExportFormat, ExportReport, ExportRequest, ExportStatus};
+pub use exports::{
+    Export, ExportFormat, ExportReport, ExportRequest, ExportStatus, RemoveExportType,
+};
 pub use fees::{FeeInfo, TradeVolume, VolumeInputs};
 pub use ledgers::{
     LedgerEntry, LedgerFilter, LedgerType, Ledgers, LedgersRequest, QueryLedgersRequest,

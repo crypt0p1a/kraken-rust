@@ -7,7 +7,7 @@ use common::{FormIs, Signed, ok, private_api};
 use kraken_api::account::{
     ApiKeyInfoRequest, BalanceRequest, ExportFormat, ExportReport, ExportRequest, ExportStatus,
     LedgerFilter, LedgerType, LedgersRequest, QueryLedgersRequest, RebaseMultiplier,
-    TradeBalanceRequest, WalletType,
+    RemoveExportType, TradeBalanceRequest, WalletType,
 };
 use rust_decimal_macros::dec;
 use serde_json::json;
@@ -221,6 +221,26 @@ async fn retrieve_export() {
     assert_eq!(
         private_api(&server).retrieve_export("TCJA").await.unwrap(),
         zip
+    );
+}
+
+#[tokio::test]
+async fn remove_export() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/RemoveExport"))
+        .and(Signed)
+        .and(FormIs(vec![("id", "TCJA"), ("type", "delete")]))
+        .respond_with(ok(json!({"delete": true})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    assert!(
+        private_api(&server)
+            .remove_export("TCJA", RemoveExportType::Delete)
+            .await
+            .unwrap()
     );
 }
 
