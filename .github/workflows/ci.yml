@@ -251,6 +251,61 @@ jobs:
           name: kraken-android-aar
           path: platforms/android/build/outputs/aar/*.aar
 
+  kotlin-multiplatform:
+    name: Kotlin Multiplatform (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # the tests on the JVM and Linux, the libraries of every target (Android included)
+          - name: jvm-linux-android
+            os: ubuntu-latest
+            rust-targets: aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+            tasks: jvmTest linuxX64Test assemble
+          # the tests on the iOS simulator and macOS
+          - name: ios-macos
+            os: macos-latest
+            rust-targets: aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios x86_64-apple-darwin
+            tasks: iosSimulatorArm64Test macosArm64Test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust targets
+        shell: bash
+        run: rustup target add ${{ matrix.rust-targets }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: kmp-${{ matrix.name }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      # the uniffi plugin needs Gradle >= 9.6.1
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.1"
+      - name: Android NDK
+        if: runner.os == 'Linux'
+        run: echo "ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+      - name: Build and test
+        run: gradle -p platforms/kotlin-multiplatform ${{ matrix.tasks }} --console=plain
+      - name: Test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-kmp-${{ matrix.name }}
+          path: platforms/kotlin-multiplatform/build/test-results/**/*.xml
+          if-no-files-found: ignore
+      - name: Libraries
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kraken-multiplatform
+          path: |
+            platforms/kotlin-multiplatform/build/libs/
+            platforms/kotlin-multiplatform/build/outputs/aar/
+
   apple:
     name: Apple (XCFramework, tests on macOS and on the iOS simulator)
     runs-on: macos-latest
@@ -380,7 +435,7 @@ jobs:
 
   report:
     name: Test report
-    needs: [test, bindings-kotlin, android, live-public, live-private]
+    needs: [test, bindings-kotlin, android, kotlin-multiplatform, live-public, live-private]
     if: always()
     runs-on: ubuntu-latest
     permissions:
