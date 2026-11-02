@@ -1,0 +1,39 @@
+// The Gradle build of the Kotlin library of kraken-ffi:
+//
+//   :kraken-multiplatform   platforms/kotlin-multiplatform, the Kotlin Multiplatform library: JVM,
+//                           Android, iOS, macOS, Linux (UbiqueInnovation/uniffi-kotlin-multiplatform-bindings)
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
+def commonProps = new Properties()
+new File(rootProject.projectDir, "gradle.properties").withInputStream { commonProps.load(it) }
+ext.GRADLE_EXTENDED_VERSION_USED = commonProps.getProperty("GRADLE_EXTENDED_VERSION_USED")
+
+apply from: "https://raw.githubusercontent.com/the-inkwell/gradle-tools/${ext.GRADLE_EXTENDED_VERSION_USED}/extended.gradle"
+
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    versionCatalogs {
+        additionals {
+            from(files(gradle.extended.files.catalog))
+        }
+    }
+}
+
+includeBuild "gradle/extended/${ext.GRADLE_EXTENDED_VERSION_USED}/kt-plugins"
+
+rootProject.name = "kraken-rust"
+
+include(":kraken-multiplatform")
+project(":kraken-multiplatform").projectDir = file("platforms/kotlin-multiplatform")

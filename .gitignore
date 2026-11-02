@@ -19,3 +19,11 @@
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+# Gradle
+.gradle
+.kotlin
+**/build
+/local.properties
+# downloaded from the-inkwell/gradle-tools by settings.gradle
+/gradle/extended

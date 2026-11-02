@@ -1,0 +1,7 @@
+# The dependencies of this repository missing from the catalog "additionals" of gradle-tools
+[versions]
+bignum = "0.3.10"
+
+[libraries]
+# the exact decimals of every target of Kotlin Multiplatform: the type of kraken_api.Decimal
+bignum = { module = "com.ionspin.kotlin:bignum", version.ref = "bignum" }
