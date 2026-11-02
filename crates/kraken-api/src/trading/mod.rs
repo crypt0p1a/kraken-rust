@@ -7,6 +7,7 @@
 //! - `trades`: the trades (fills) of the account
 //! - `amends`: the versions of an amended order
 //! - `positions`: the open margin positions
+//! - `websocket`: the token of the private WebSocket feeds
 
 pub(crate) mod add;
 pub(crate) mod amends;
@@ -15,6 +16,7 @@ pub(crate) mod positions;
 pub(crate) mod query;
 pub(crate) mod trades;
 mod types;
+pub(crate) mod websocket;
 
 pub use add::{NewOrder, NewOrderAnswer, NewOrderDescription};
 pub use amends::{AmendType, OrderAmend, OrderAmends, OrderAmendsRequest};
@@ -27,3 +29,4 @@ pub use trades::{
     QueryTradesRequest, Trade, TradeHistoryType, TradesHistory, TradesHistoryRequest,
 };
 pub use types::{OrderFlag, OrderSide, OrderStatus, OrderType, TimeInForce};
+pub use websocket::WebSocketsToken;

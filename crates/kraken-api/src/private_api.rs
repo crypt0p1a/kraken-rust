@@ -9,6 +9,7 @@ use crate::trading::{
     self, ClosedOrders, ClosedOrdersRequest, ConsolidatedPosition, NewOrder, NewOrderAnswer,
     OpenOrdersRequest, OpenPositionsRequest, Order, OrderAmends, OrderAmendsRequest, Position,
     QueryOrdersRequest, QueryTradesRequest, Trade, TradesHistory, TradesHistoryRequest,
+    WebSocketsToken,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PrivateClient;
@@ -267,5 +268,13 @@ impl PrivateApi {
         docalcs: Option<bool>,
     ) -> Result<Vec<ConsolidatedPosition>, KrakenError> {
         trading::positions::open_positions_by_market(&self.client, docalcs).await
+    }
+
+    /// The token of the private feeds of the WebSocket API. Requires the "WebSocket interface -
+    /// On" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-websockets-token>
+    pub async fn websockets_token(&self) -> Result<WebSocketsToken, KrakenError> {
+        trading::websocket::websockets_token(&self.client).await
     }
 }

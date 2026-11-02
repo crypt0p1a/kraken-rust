@@ -360,3 +360,22 @@ async fn open_positions_by_market() {
     assert_eq!(positions[0].positions, 2);
     assert_eq!(positions[0].leverage, "n/a");
 }
+
+#[tokio::test]
+async fn websockets_token() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/GetWebSocketsToken"))
+        .and(Signed)
+        .and(FormIs(vec![]))
+        .respond_with(ok(
+            json!({"token": "1Dwc4lzSwNWOAwkMdqhssNNFhs1ed606d1WcF3XfEMw",
+            "expires": 900}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let token = private_api(&server).websockets_token().await.unwrap();
+    assert_eq!(token.expires, 900);
+}

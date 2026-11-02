@@ -12,7 +12,7 @@ use kraken_api::market::AssetPair;
 use kraken_api::trading::{
     AmendType, CloseTime, ClosedOrdersRequest, ConsolidatedPosition, NewOrder, NewOrderAnswer,
     OpenOrdersRequest, Order, OrderAmends, OrderFlag, OrderSide, OrderStatus, OrderType, Position,
-    QueryTradesRequest, TimeInForce, Trade, TradesHistoryRequest,
+    QueryTradesRequest, TimeInForce, Trade, TradesHistoryRequest, WebSocketsToken,
 };
 use live::{
     Presence, decode_strict, entries, le, now_seconds, private_api, private_client, public_api,
@@ -805,4 +805,18 @@ async fn open_positions_are_decoded_strictly() {
             .len(),
         consolidated.len()
     );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn websockets_token_with_the_permission() {
+    let Some(raw) = live::unless_denied(
+        "GetWebSocketsToken",
+        private_client().call::<Value>("GetWebSocketsToken").await,
+    ) else {
+        return;
+    };
+    let token: WebSocketsToken = decode_strict("GetWebSocketsToken", &raw);
+    assert!(!token.token.is_empty());
+    assert!(token.expires > 0 && token.expires <= 900, "{token:?}");
 }

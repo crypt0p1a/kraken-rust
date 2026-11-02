@@ -21,7 +21,7 @@ use kraken_api::market::{
 use kraken_api::trading::{
     AmendType, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
     OrderAmends, OrderAmendsRequest, OrderSide, OrderStatus, OrderType, Position,
-    QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade,
+    QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade, WebSocketsToken,
 };
 use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
@@ -837,5 +837,23 @@ async fn remove_export_fixture() {
             .remove_export("TCJA", RemoveExportType::Cancel)
             .await
             .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn websockets_token_fixture() {
+    let token: WebSocketsToken =
+        decode_strict("GetWebSocketsToken", &fixture("websockets_token.json"));
+
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/GetWebSocketsToken",
+        "websockets_token.json",
+    )
+    .await;
+    assert_eq!(
+        private_api(&server).websockets_token().await.unwrap(),
+        token
     );
 }
