@@ -240,6 +240,16 @@ impl PrivateApi {
         trading::cancel::cancel_all_orders_after(&self.client, timeout).await
     }
 
+    /// Cancels up to 50 open orders
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/cancel-order-batch>
+    pub async fn cancel_order_batch(
+        &self,
+        orders: &[OrderReference],
+    ) -> Result<CancelledOrders, KrakenError> {
+        trading::cancel::cancel_order_batch(&self.client, orders).await
+    }
+
     /// The versions of an order, the original one first
     ///
     /// <https://docs.kraken.com/api/docs/rest-api/get-order-amends>

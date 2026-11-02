@@ -904,3 +904,26 @@ async fn cancel_all_orders_after_fixture() {
         timer
     );
 }
+
+#[tokio::test]
+async fn cancel_order_batch_fixture() {
+    // example of the documentation: no `pending`
+    let cancelled: CancelledOrders =
+        decode_strict("CancelOrderBatch", &fixture("cancel_order_batch.json"));
+    assert_eq!(cancelled.pending, None);
+
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/CancelOrderBatch",
+        "cancel_order_batch.json",
+    )
+    .await;
+    let served = private_api(&server)
+        .cancel_order_batch(&[OrderReference::Txid {
+            txid: "OG5V2Y-RYKVL-DT3V3B".into(),
+        }])
+        .await
+        .unwrap();
+    assert_eq!(served, cancelled);
+}

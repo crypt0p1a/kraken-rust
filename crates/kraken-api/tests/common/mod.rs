@@ -90,6 +90,51 @@ impl Match for Signed {
     }
 }
 
+/// A private call with a JSON body like Kraken accepts it: the nonce in the body, API-Key and a
+/// valid API-Sign over the exact bytes sent
+pub struct SignedJson;
+
+impl Match for SignedJson {
+    fn matches(&self, request: &Request) -> bool {
+        let header = |name: &str| {
+            request
+                .headers
+                .get(name)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string)
+        };
+        let Ok(body) = serde_json::from_slice::<Value>(&request.body) else {
+            return false;
+        };
+        let Some(nonce) = body["nonce"].as_u64() else {
+            return false;
+        };
+
+        let digest = Sha256::digest([nonce.to_string().as_bytes(), &request.body].concat());
+        let mut mac = Hmac::<Sha512>::new_from_slice(&BASE64.decode(API_SECRET).unwrap()).unwrap();
+        mac.update(request.url.path().as_bytes());
+        mac.update(&digest);
+        let expected = BASE64.encode(mac.finalize().into_bytes());
+
+        header("API-Key").as_deref() == Some(API_KEY)
+            && header("API-Sign") == Some(expected)
+            && header("Content-Type").as_deref() == Some("application/json")
+    }
+}
+
+/// The JSON body is exactly this object, besides the nonce
+pub struct JsonIs(pub Value);
+
+impl Match for JsonIs {
+    fn matches(&self, request: &Request) -> bool {
+        let Ok(Value::Object(mut body)) = serde_json::from_slice::<Value>(&request.body) else {
+            return false;
+        };
+        body.remove("nonce");
+        Value::Object(body) == self.0
+    }
+}
+
 /// The body holds exactly these parameters, besides the nonce
 pub struct FormIs(pub Vec<(&'static str, &'static str)>);
 

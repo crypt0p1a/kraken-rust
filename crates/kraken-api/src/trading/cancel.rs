@@ -83,6 +83,43 @@ pub(crate) async fn cancel_all_orders_after(
         .await
 }
 
+/// The orders of a batch: txids and userrefs in `orders`, client identifiers in `cl_ord_ids`
+#[derive(Serialize)]
+struct Batch {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    orders: Vec<serde_json::Value>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cl_ord_ids: Vec<String>,
+}
+
+impl Batch {
+    fn new(references: &[OrderReference]) -> Self {
+        let mut batch = Batch {
+            orders: vec![],
+            cl_ord_ids: vec![],
+        };
+        for reference in references {
+            match reference {
+                OrderReference::Txid { txid } => batch.orders.push(txid.as_str().into()),
+                OrderReference::Userref { userref } => batch.orders.push((*userref).into()),
+                OrderReference::ClOrdId { cl_ord_id } => batch.cl_ord_ids.push(cl_ord_id.clone()),
+            }
+        }
+        batch
+    }
+}
+
+/// Up to 50 orders, sent in JSON: a list of identifiers as in the example of the documentation,
+/// whose schema describes a list of objects instead
+pub(crate) async fn cancel_order_batch(
+    client: &PrivateClient,
+    orders: &[OrderReference],
+) -> Result<CancelledOrders, KrakenError> {
+    client
+        .call_json("CancelOrderBatch", &Batch::new(orders))
+        .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,6 +159,28 @@ mod tests {
         )
         .unwrap();
         assert_eq!(timer.trigger_time, "2023-03-24T17:42:56Z");
+    }
+
+    #[test]
+    fn splits_the_batch() {
+        let batch = Batch::new(&[
+            OrderReference::Txid {
+                txid: "OG5V2Y-RYKVL-DT3V3B".into(),
+            },
+            OrderReference::Userref { userref: 42 },
+            OrderReference::ClOrdId {
+                cl_ord_id: "mgr1_buy_1".into(),
+            },
+        ]);
+        assert_eq!(
+            serde_json::to_value(&batch).unwrap(),
+            serde_json::json!({"orders": ["OG5V2Y-RYKVL-DT3V3B", 42], "cl_ord_ids": ["mgr1_buy_1"]})
+        );
+        let only_txids = Batch::new(&[OrderReference::Txid { txid: "A".into() }]);
+        assert_eq!(
+            serde_json::to_value(&only_txids).unwrap(),
+            serde_json::json!({"orders": ["A"]})
+        );
     }
 
     #[test]

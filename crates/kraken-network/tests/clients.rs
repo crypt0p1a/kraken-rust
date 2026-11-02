@@ -331,3 +331,62 @@ async fn private_files_map_the_failures() {
     respond(ok(json!({"id": "TCJA"}))).mount(&server).await;
     assert!(matches!(call().await, Err(KrakenError::Decode { .. })));
 }
+
+#[derive(Serialize)]
+struct Batch {
+    orders: Vec<&'static str>,
+    cl_ord_ids: Vec<&'static str>,
+}
+
+#[tokio::test]
+async fn private_json_calls_sign_their_json_body() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/CancelOrderBatch"))
+        .and(header("API-Key", API_KEY))
+        .and(header("Content-Type", "application/json"))
+        .respond_with(ok(json!({"count": 2})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let answer: Value = private_client(&server)
+        .call_json(
+            "CancelOrderBatch",
+            &Batch {
+                orders: vec!["OG5V2Y-RYKVL-DT3V3B", "OP5V2Y-RYKVL-ET3V3B"],
+                cl_ord_ids: vec!["mgr1 buy"],
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(answer, json!({"count": 2}));
+
+    let request = &server.received_requests().await.unwrap()[0];
+    let body: Value = serde_json::from_slice(&request.body).unwrap();
+    let nonce = body["nonce"].as_u64().unwrap();
+    assert_eq!(
+        body,
+        json!({"nonce": nonce, "orders": ["OG5V2Y-RYKVL-DT3V3B", "OP5V2Y-RYKVL-ET3V3B"],
+            "cl_ord_ids": ["mgr1 buy"]})
+    );
+    // API-Sign over the exact bytes sent: path + SHA256(nonce + body)
+    let digest = Sha256::digest([nonce.to_string().as_bytes(), &request.body].concat());
+    let mut mac = Hmac::<Sha512>::new_from_slice(&BASE64.decode(API_SECRET).unwrap()).unwrap();
+    mac.update(request.url.path().as_bytes());
+    mac.update(&digest);
+    assert_eq!(
+        request.headers.get("API-Sign").unwrap().to_str().unwrap(),
+        BASE64.encode(mac.finalize().into_bytes())
+    );
+}
+
+#[tokio::test]
+async fn private_json_calls_take_an_object() {
+    let server = MockServer::start().await;
+    let answer = private_client(&server)
+        .call_json::<_, Value>("CancelOrderBatch", &vec!["OG5V2Y-RYKVL-DT3V3B"])
+        .await;
+    assert!(matches!(answer, Err(KrakenError::InvalidArgument { .. })));
+    assert!(server.received_requests().await.unwrap().is_empty());
+}

@@ -836,3 +836,29 @@ async fn cancel_an_unknown_order_is_refused() {
         other => panic!("unexpected {other:?}"),
     }
 }
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn cancel_a_batch_of_unknown_orders() {
+    // no order of the account is touched: these orders don't exist. Kraken reading the shape of
+    // the batch, its error is about the orders, not about the arguments
+    let answer = private_api()
+        .cancel_order_batch(&[
+            OrderReference::Txid {
+                txid: "OAAAAA-AAAAA-AAAAAA".into(),
+            },
+            OrderReference::Txid {
+                txid: "OBBBBB-BBBBB-BBBBBB".into(),
+            },
+        ])
+        .await;
+    match answer {
+        // nothing to cancel
+        Ok(cancelled) => assert_eq!(cancelled.count, 0, "{cancelled:?}"),
+        Err(KrakenError::Api { body, .. }) => {
+            assert!(!body.contains("Invalid arguments"), "{body}");
+            assert!(body.starts_with("EOrder:"), "{body}");
+        }
+        other => panic!("unexpected {other:?}"),
+    }
+}

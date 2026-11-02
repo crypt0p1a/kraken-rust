@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{FormIs, Signed, ok, orders_fixture, private_api};
+use common::{FormIs, JsonIs, Signed, SignedJson, ok, orders_fixture, private_api};
 use kraken_api::KrakenError;
 use kraken_api::trading::{
     AmendType, CloseTime, ClosedOrdersRequest, NewOrder, OpenOrdersRequest, OpenPositionsRequest,
@@ -436,4 +436,32 @@ async fn cancel_all_orders_after() {
         .await
         .unwrap();
     assert_eq!(timer.current_time, "2023-03-24T17:41:56Z");
+}
+
+#[tokio::test]
+async fn cancel_order_batch_is_signed_json() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/CancelOrderBatch"))
+        .and(SignedJson)
+        .and(JsonIs(json!({"orders": ["OG5V2Y-RYKVL-DT3V3B", 45],
+            "cl_ord_ids": ["mgr1_buy_1"]})))
+        .respond_with(ok(json!({"count": 3})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let cancelled = private_api(&server)
+        .cancel_order_batch(&[
+            OrderReference::Txid {
+                txid: "OG5V2Y-RYKVL-DT3V3B".into(),
+            },
+            OrderReference::Userref { userref: 45 },
+            OrderReference::ClOrdId {
+                cl_ord_id: "mgr1_buy_1".into(),
+            },
+        ])
+        .await
+        .unwrap();
+    assert_eq!(cancelled.count, 3);
 }
