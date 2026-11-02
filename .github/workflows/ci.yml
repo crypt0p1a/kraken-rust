@@ -393,7 +393,7 @@ jobs:
         if: env.KRAKEN_API_KEY != ''
         run: >-
           cargo nextest run --locked --profile live --run-ignored only
-          -p kraken-api --test live_account --test live_trading --test live_algo
+          -p kraken-api --test live_account --test live_trading --test live_algo --test live_earn
           -p kraken-trading-bot --test live_dry_run
       - name: Test report
         if: always()

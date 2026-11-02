@@ -1,0 +1,78 @@
+{
+  "error": [],
+  "result": {
+    "items": [
+      {
+        "id": "ESRFUO3-Q62XD-WIOIL7",
+        "asset": "DOT",
+        "lock_type": {
+          "type": "instant",
+          "payout_frequency": 604800
+        },
+        "apr_estimate": {
+          "low": "8.0000",
+          "high": "12.0000"
+        },
+        "user_min_allocation": "0.01",
+        "allocation_fee": "0.0000",
+        "deallocation_fee": "0.0000",
+        "auto_compound": {
+          "type": "enabled"
+        },
+        "yield_source": {
+          "type": "staking"
+        },
+        "can_allocate": true,
+        "can_deallocate": true,
+        "allocation_restriction_info": []
+      },
+      {
+        "id": "ESMWVX6-JAPVY-23L3CV",
+        "asset": "ETH",
+        "lock_type": {
+          "type": "bonded",
+          "bonding_period": 604800,
+          "bonding_period_variable": false,
+          "bonding_rewards": false,
+          "exit_queue_period": 0,
+          "payout_frequency": 604800,
+          "unbonding_period": 2419200,
+          "unbonding_period_variable": false,
+          "unbonding_rewards": true
+        },
+        "user_cap": "100",
+        "allocation_fee": 0,
+        "deallocation_fee": 0.5,
+        "auto_compound": {
+          "type": "optional",
+          "default": true
+        },
+        "yield_source": {
+          "type": "off_chain"
+        },
+        "can_allocate": false,
+        "can_deallocate": true,
+        "allocation_restriction_info": [
+          "tier"
+        ]
+      },
+      {
+        "id": "ESDQCOL-WTZEU-NU55QF",
+        "asset": "USDC",
+        "lock_type": {
+          "type": "flex"
+        },
+        "auto_compound": {
+          "type": "disabled"
+        },
+        "yield_source": {
+          "type": "staking"
+        },
+        "can_allocate": true,
+        "can_deallocate": true,
+        "allocation_restriction_info": []
+      }
+    ],
+    "next_cursor": "2"
+  }
+}

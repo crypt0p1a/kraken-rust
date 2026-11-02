@@ -13,6 +13,7 @@ use kraken_api::account::{
     WalletStatus,
 };
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
+use kraken_api::earn::{EarnStrategies, LockType};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -1114,4 +1115,38 @@ async fn cancel_strategy_fixture() {
         .await
         .unwrap();
     assert_eq!(id, "ASMBA64-R23M2-J7JRJV");
+}
+
+// earn
+
+#[tokio::test]
+async fn earn_strategies_fixture() {
+    let page: EarnStrategies = decode_strict("Earn/Strategies", &fixture("earn_strategies.json"));
+    assert!(
+        page.items
+            .iter()
+            .all(|it| it.lock_type != LockType::Unknown)
+    );
+    // a strategy which can't be allocated tells why
+    assert!(
+        page.items
+            .iter()
+            .filter(|it| !it.can_allocate)
+            .all(|it| !it.allocation_restriction_info.is_empty())
+    );
+
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/Earn/Strategies",
+        "earn_strategies.json",
+    )
+    .await;
+    assert_eq!(
+        private_api(&server)
+            .earn_strategies(&Default::default())
+            .await
+            .unwrap(),
+        page
+    );
 }

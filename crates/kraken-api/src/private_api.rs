@@ -7,6 +7,7 @@ use crate::account::{
 use crate::algo::{
     self, ClosedStrategies, ClosedStrategiesRequest, NewStrategy, Strategy, StrategyType,
 };
+use crate::earn::{self, EarnStrategies, EarnStrategiesRequest};
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, AddOrderBatch, AmendOrder, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
@@ -390,5 +391,18 @@ impl PrivateApi {
     /// <https://docs.kraken.com/api/docs/rest-api/cancel-strategy>
     pub async fn cancel_strategy(&self, strategy_id: &str) -> Result<String, KrakenError> {
         algo::cancel_strategy(&self.client, strategy_id).await
+    }
+
+    // earn
+
+    /// A page of the Earn strategies available to the account. Requires a valid key, no
+    /// permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-strategies>
+    pub async fn earn_strategies(
+        &self,
+        request: &EarnStrategiesRequest,
+    ) -> Result<EarnStrategies, KrakenError> {
+        earn::strategies(&self.client, request).await
     }
 }
