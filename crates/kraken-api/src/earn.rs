@@ -180,6 +180,131 @@ pub(crate) async fn strategies(
     client.call_json("Earn/Strategies", request).await
 }
 
+/// An amount in the asset of the allocation, and in the requested `converted_asset`
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct EarnAmount {
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub native: Decimal,
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub converted: Decimal,
+}
+
+/// An allocation moving to its next state
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct TimedAllocation {
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub native: Decimal,
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub converted: Decimal,
+    /// RFC 3339: when the (de)allocation was received
+    pub created_at: String,
+    /// RFC 3339: when it moves to its next state
+    pub expires: String,
+}
+
+/// The allocations in a state (bonding, exit queue, unbonding)
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct AllocationState {
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub native: Decimal,
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub converted: Decimal,
+    #[serde(deserialize_with = "lenient::number")]
+    pub allocation_count: i64,
+    #[serde(default)]
+    pub allocations: Vec<TimedAllocation>,
+}
+
+/// The amounts allocated to a strategy, by state
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct AllocatedAmounts {
+    pub total: EarnAmount,
+    /// Pending (de)allocation: negative for a deallocation
+    #[serde(default)]
+    pub pending: Option<EarnAmount>,
+    #[serde(default)]
+    pub bonding: Option<AllocationState>,
+    #[serde(default)]
+    pub exit_queue: Option<AllocationState>,
+    #[serde(default)]
+    pub unbonding: Option<AllocationState>,
+}
+
+/// The current payout period
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct EarnPayout {
+    /// Earned since the start of the period
+    pub accumulated_reward: EarnAmount,
+    /// Expected until the payout
+    pub estimated_reward: EarnAmount,
+    /// RFC 3339
+    pub period_start: String,
+    /// RFC 3339: the tentative date of the payout
+    pub period_end: String,
+}
+
+/// The funds of the account in a strategy
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct EarnAllocation {
+    pub strategy_id: String,
+    /// The asset of the native amounts
+    pub native_asset: String,
+    pub amount_allocated: AllocatedAmounts,
+    /// Earned over the whole life of the account
+    pub total_rewarded: EarnAmount,
+    /// None outside of a payout period
+    #[serde(default)]
+    pub payout: Option<EarnPayout>,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/list-allocations>
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct EarnAllocations {
+    /// The asset of the converted amounts, e.g. "USD"
+    pub converted_asset: String,
+    /// In `converted_asset`
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub total_allocated: Decimal,
+    /// Earned over the whole life of the account, in `converted_asset`
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub total_rewarded: Decimal,
+    #[serde(default)]
+    pub items: Vec<EarnAllocation>,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/list-allocations>
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct EarnAllocationsRequest {
+    /// Descending when missing
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub ascending: Option<bool>,
+    /// The asset of the converted amounts: USD when missing
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub converted_asset: Option<String>,
+    /// Omits the strategies used in the past which hold nothing now
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub hide_zero_allocations: Option<bool>,
+}
+
+/// Requires the "Query Funds" permission
+pub(crate) async fn allocations(
+    client: &PrivateClient,
+    request: &EarnAllocationsRequest,
+) -> Result<EarnAllocations, KrakenError> {
+    client.call_with("Earn/Allocations", Some(request)).await
+}
+
 #[cfg(test)]
 pub(crate) const STRATEGIES: &str = r#"{"items":[
     {"id":"ESRFUO3-Q62XD-WIOIL7","asset":"DOT","lock_type":{"type":"instant","payout_frequency":604800},
@@ -260,6 +385,51 @@ mod tests {
         assert_eq!(bonded.yield_source, Some(YieldSource::OffChain));
         assert_eq!(bonded.allocation_restriction_info, ["tier"]);
         assert_eq!(flex.user_cap, None);
+    }
+
+    #[test]
+    fn encodes_the_allocations_request() {
+        let request = EarnAllocationsRequest {
+            ascending: Some(false),
+            converted_asset: Some("EUR".into()),
+            hide_zero_allocations: Some(true),
+        };
+        assert_eq!(
+            kraken_network::params::encode(&request).unwrap(),
+            "ascending=false&converted_asset=EUR&hide_zero_allocations=true"
+        );
+    }
+
+    #[test]
+    fn decodes_the_allocations_by_state() {
+        let allocations: EarnAllocations = serde_json::from_str(
+            r#"{"converted_asset":"USD","total_allocated":"49.2398","total_rewarded":"0.0675",
+            "items":[{"strategy_id":"ESDQCOL-WTZEU-NU55QF","native_asset":"ETH",
+                "amount_allocated":{
+                    "bonding":{"native":"0.0210000000","converted":"39.0645","allocation_count":2,
+                        "allocations":[{"created_at":"2023-07-06T10:52:05Z",
+                            "expires":"2023-08-19T02:34:05.807Z","native":"0.0010000000",
+                            "converted":"1.8602"}]},
+                    "pending":{"native":"-0.0010000000","converted":"-1.8602"},
+                    "total":{"native":"0.0210000000","converted":"39.0645"}},
+                "total_rewarded":{"native":"0","converted":"0.0000"},
+                "payout":{"period_start":"2023-07-06T00:00:00Z","period_end":"2023-07-13T00:00:00Z",
+                    "accumulated_reward":{"native":"0.0001","converted":"0.1860"},
+                    "estimated_reward":{"native":"0.0003","converted":"0.5581"}}}]}"#,
+        )
+        .unwrap();
+        let eth = &allocations.items[0];
+        let bonding = eth.amount_allocated.bonding.as_ref().unwrap();
+        assert_eq!(bonding.allocation_count, 2);
+        assert_eq!(bonding.allocations[0].native, dec!(0.001));
+        // a pending deallocation is negative
+        assert_eq!(eth.amount_allocated.pending.unwrap().native, dec!(-0.001));
+        assert_eq!(eth.amount_allocated.unbonding, None);
+        assert_eq!(
+            eth.payout.as_ref().unwrap().estimated_reward.converted,
+            dec!(0.5581)
+        );
+        assert_eq!(allocations.total_allocated, dec!(49.2398));
     }
 
     #[test]

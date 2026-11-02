@@ -13,7 +13,7 @@ use kraken_api::account::{
     WalletStatus,
 };
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
-use kraken_api::earn::{EarnStrategies, LockType};
+use kraken_api::earn::{EarnAllocations, EarnStrategies, LockType};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -1148,5 +1148,47 @@ async fn earn_strategies_fixture() {
             .await
             .unwrap(),
         page
+    );
+}
+
+#[tokio::test]
+async fn earn_allocations_fixture() {
+    let allocations: EarnAllocations =
+        decode_strict("Earn/Allocations", &fixture("earn_allocations.json"));
+    // the total of the account is the sum of its strategies
+    let total: Decimal = allocations
+        .items
+        .iter()
+        .map(|it| it.amount_allocated.total.converted)
+        .sum();
+    assert_eq!(total, allocations.total_allocated);
+    for state in allocations
+        .items
+        .iter()
+        .flat_map(|it| {
+            [
+                &it.amount_allocated.bonding,
+                &it.amount_allocated.exit_queue,
+                &it.amount_allocated.unbonding,
+            ]
+        })
+        .flatten()
+    {
+        assert_eq!(state.allocation_count as usize, state.allocations.len());
+    }
+
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/Earn/Allocations",
+        "earn_allocations.json",
+    )
+    .await;
+    assert_eq!(
+        private_api(&server)
+            .earn_allocations(&Default::default())
+            .await
+            .unwrap(),
+        allocations
     );
 }

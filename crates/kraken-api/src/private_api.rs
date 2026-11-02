@@ -7,7 +7,9 @@ use crate::account::{
 use crate::algo::{
     self, ClosedStrategies, ClosedStrategiesRequest, NewStrategy, Strategy, StrategyType,
 };
-use crate::earn::{self, EarnStrategies, EarnStrategiesRequest};
+use crate::earn::{
+    self, EarnAllocations, EarnAllocationsRequest, EarnStrategies, EarnStrategiesRequest,
+};
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, AddOrderBatch, AmendOrder, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
@@ -404,5 +406,16 @@ impl PrivateApi {
         request: &EarnStrategiesRequest,
     ) -> Result<EarnStrategies, KrakenError> {
         earn::strategies(&self.client, request).await
+    }
+
+    /// The allocations of the account to the Earn strategies, by state, with their rewards.
+    /// Requires the "Query Funds" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-allocations>
+    pub async fn earn_allocations(
+        &self,
+        request: &EarnAllocationsRequest,
+    ) -> Result<EarnAllocations, KrakenError> {
+        earn::allocations(&self.client, request).await
     }
 }

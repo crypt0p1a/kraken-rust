@@ -6,7 +6,8 @@
 mod live;
 mod strict;
 
-use kraken_api::earn::{EarnStrategy, LockType};
+use kraken_api::Decimal;
+use kraken_api::earn::{EarnAllocations, EarnStrategy, LockType};
 use live::{Presence, decode_strict, private_client};
 use serde::Serialize;
 use serde_json::Value;
@@ -47,4 +48,21 @@ async fn earn_strategies_are_decoded_strictly() {
     }
     println!("{} Earn strategies", strategies.len());
     presence.print("Earn/Strategies");
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn earn_allocations_are_decoded_strictly() {
+    let raw: Value = private_client().call("Earn/Allocations").await.unwrap();
+    let allocations: EarnAllocations = decode_strict("Earn/Allocations", &raw);
+    assert!(!allocations.converted_asset.is_empty());
+    for allocation in &allocations.items {
+        let amounts = &allocation.amount_allocated;
+        assert!(amounts.total.native >= Decimal::ZERO, "{allocation:?}");
+        assert!(
+            allocation.total_rewarded.native >= Decimal::ZERO,
+            "{allocation:?}"
+        );
+    }
+    println!("{} Earn allocations", allocations.items.len());
 }

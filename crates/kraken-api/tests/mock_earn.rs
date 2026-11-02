@@ -2,8 +2,8 @@
 
 mod common;
 
-use common::{JsonIs, SignedJson, ok, private_api};
-use kraken_api::earn::{EarnStrategiesRequest, LockType, LockTypeFilter};
+use common::{FormIs, JsonIs, Signed, SignedJson, ok, private_api};
+use kraken_api::earn::{EarnAllocationsRequest, EarnStrategiesRequest, LockType, LockTypeFilter};
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer};
@@ -34,4 +34,36 @@ async fn earn_strategies_are_signed_json() {
         .unwrap();
     assert!(matches!(page.items[0].lock_type, LockType::Instant { .. }));
     assert_eq!(page.next_cursor, None);
+}
+
+#[tokio::test]
+async fn earn_allocations() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/Earn/Allocations"))
+        .and(Signed)
+        .and(FormIs(vec![
+            ("converted_asset", "EUR"),
+            ("hide_zero_allocations", "true"),
+        ]))
+        .respond_with(ok(
+            json!({"converted_asset": "EUR", "total_allocated": "10.5",
+            "total_rewarded": "0.1", "items": [{"strategy_id": "ESDQCOL-WTZEU-NU55QF",
+            "native_asset": "USDC", "amount_allocated": {"total": {"native": "11",
+            "converted": "10.5"}}, "total_rewarded": {"native": "0.1", "converted": "0.1"}}]}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let allocations = private_api(&server)
+        .earn_allocations(&EarnAllocationsRequest {
+            converted_asset: Some("EUR".into()),
+            hide_zero_allocations: Some(true),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(allocations.items[0].native_asset, "USDC");
+    assert_eq!(allocations.items[0].payout, None);
 }
