@@ -6,10 +6,10 @@ mod live;
 mod strict;
 
 use kraken_api::Decimal;
-use kraken_api::account::{ExtendedBalance, FeeInfo, TradeBalance, TradeVolume};
+use kraken_api::account::{ApiKeyInfo, ExtendedBalance, FeeInfo, TradeBalance, TradeVolume};
 use kraken_api::market::Level3OrderBook;
 use kraken_api::{KrakenError, PrivateApi, RestOptions};
-use live::{Presence, decode_strict, entries, le, private_api, private_client};
+use live::{Presence, decode_strict, entries, env, le, private_api, private_client};
 use serde::Serialize;
 use serde_json::Value;
 use std::sync::Arc;
@@ -242,4 +242,24 @@ async fn trade_balance() {
         "{balance:?}"
     );
     assert!(balance.unexecuted_value >= Decimal::ZERO, "{balance:?}");
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn api_key_info_never_allows_withdrawals() {
+    let raw: Value = private_client().call("GetApiKeyInfo").await.unwrap();
+    let info: ApiKeyInfo = decode_strict("GetApiKeyInfo", &raw);
+    println!(
+        "GetApiKeyInfo fields: {:?}",
+        raw.as_object().unwrap().keys().collect::<Vec<_>>()
+    );
+
+    assert_eq!(info.api_key, env("KRAKEN_API_KEY"));
+    assert!(!info.permissions.is_empty(), "{info:?}");
+    // the key of the tests must never be able to move funds out of the account
+    assert!(
+        !info.permissions.iter().any(|it| it.contains("withdraw")),
+        "the API key of the tests can withdraw: {:?}",
+        info.permissions
+    );
 }

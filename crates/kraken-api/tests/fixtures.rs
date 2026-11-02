@@ -7,7 +7,7 @@ mod strict;
 
 use common::{private_api, public_api};
 use kraken_api::Decimal;
-use kraken_api::account::{CreditLines, ExtendedBalance, TradeBalance, TradeVolume};
+use kraken_api::account::{ApiKeyInfo, CreditLines, ExtendedBalance, TradeBalance, TradeVolume};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -578,5 +578,22 @@ async fn trade_balance_fixture() {
             .await
             .unwrap(),
         balance
+    );
+}
+
+#[tokio::test]
+async fn api_key_info_fixture() {
+    let info: ApiKeyInfo = decode_strict("GetApiKeyInfo", &fixture("api_key_info.json"));
+    assert!(!info.permissions.contains(&"withdraw-funds".to_string()));
+    assert!(info.created_time < info.modified_time);
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/GetApiKeyInfo", "api_key_info.json").await;
+    assert_eq!(
+        private_api(&server)
+            .api_key_info(&Default::default())
+            .await
+            .unwrap(),
+        info
     );
 }

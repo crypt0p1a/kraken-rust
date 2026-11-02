@@ -2,11 +2,13 @@
 //!
 //! Kraken has no Spot sub-accounts: the balances are the ones of the account of the API key.
 
+pub(crate) mod api_key;
 pub(crate) mod balance;
 pub(crate) mod credit;
 pub(crate) mod fees;
 pub(crate) mod trade_balance;
 
+pub use api_key::{ApiKeyInfo, ApiKeyInfoRequest};
 pub use balance::{BalanceRequest, ExtendedBalance, RebaseMultiplier};
 pub use credit::{CreditLimits, CreditLineAsset, CreditLines};
 pub use fees::{FeeInfo, TradeVolume, VolumeInputs};

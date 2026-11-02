@@ -4,11 +4,37 @@
 mod common;
 
 use common::{FormIs, Signed, ok, private_api};
-use kraken_api::account::{BalanceRequest, RebaseMultiplier, TradeBalanceRequest};
+use kraken_api::account::{
+    ApiKeyInfoRequest, BalanceRequest, RebaseMultiplier, TradeBalanceRequest,
+};
 use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer};
+
+#[tokio::test]
+async fn api_key_info() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/GetApiKeyInfo"))
+        .and(Signed)
+        .and(FormIs(vec![("otp", "123456")]))
+        .respond_with(ok(
+            json!({"api_key_name": "bot", "api_key": "key", "nonce": "17",
+            "permissions": ["query-funds", "modify-trades"], "ip_allowlist": []}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let info = private_api(&server)
+        .api_key_info(&ApiKeyInfoRequest {
+            otp: Some("123456".into()),
+        })
+        .await
+        .unwrap();
+    assert_eq!(info.permissions, ["query-funds", "modify-trades"]);
+}
 
 #[tokio::test]
 async fn balance() {

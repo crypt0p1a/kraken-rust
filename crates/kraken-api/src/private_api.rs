@@ -1,7 +1,7 @@
 use crate::Decimal;
 use crate::account::{
-    self, BalanceRequest, CreditLines, ExtendedBalance, TradeBalance, TradeBalanceRequest,
-    TradeVolume,
+    self, ApiKeyInfo, ApiKeyInfoRequest, BalanceRequest, CreditLines, ExtendedBalance,
+    TradeBalance, TradeBalanceRequest, TradeVolume,
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
@@ -43,6 +43,16 @@ impl PrivateApi {
     }
 
     // account
+
+    /// The API key of the requests: name, permissions, restrictions. Requires no permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-api-key-info>
+    pub async fn api_key_info(
+        &self,
+        request: &ApiKeyInfoRequest,
+    ) -> Result<ApiKeyInfo, KrakenError> {
+        account::api_key::api_key_info(&self.client, request).await
+    }
 
     /// The cash balances, net of the pending withdrawals, keyed by asset (e.g. "XXBT")
     ///
