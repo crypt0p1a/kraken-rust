@@ -24,6 +24,8 @@ kraken-network = { path = "crates/kraken-network" }
 trading-notify = { path = "crates/trading-notify" }
 
 # trading bot
+# the indicators of the market (ATR, EMA, linear regression), on candles in f64
+yata = { version = "0.7.0", default-features = false }
 # the managers copied by the virtual managers, picked at random
 fastrand = "2.3.0"
 humantime-serde = "1.1.1"
