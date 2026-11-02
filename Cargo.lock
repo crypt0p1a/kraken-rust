@@ -1074,6 +1074,7 @@ dependencies = [
 name = "kraken-trading-bot"
 version = "0.1.0"
 dependencies = [
+ "fastrand",
  "humantime-serde",
  "kraken-api",
  "rusqlite",
