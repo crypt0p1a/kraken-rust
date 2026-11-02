@@ -5,9 +5,9 @@ mod common;
 
 use common::{FormIs, Signed, ok, private_api};
 use kraken_api::account::{
-    ApiKeyInfoRequest, BalanceRequest, ExportFormat, ExportReport, ExportRequest, LedgerFilter,
-    LedgerType, LedgersRequest, QueryLedgersRequest, RebaseMultiplier, TradeBalanceRequest,
-    WalletType,
+    ApiKeyInfoRequest, BalanceRequest, ExportFormat, ExportReport, ExportRequest, ExportStatus,
+    LedgerFilter, LedgerType, LedgersRequest, QueryLedgersRequest, RebaseMultiplier,
+    TradeBalanceRequest, WalletType,
 };
 use rust_decimal_macros::dec;
 use serde_json::json;
@@ -179,6 +179,28 @@ async fn add_export() {
         .await
         .unwrap();
     assert_eq!(id, "TCJA");
+}
+
+#[tokio::test]
+async fn export_status() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/ExportStatus"))
+        .and(Signed)
+        .and(FormIs(vec![("report", "ledgers")]))
+        .respond_with(ok(
+            json!([{"id": "VSKC", "descr": "ledgers", "format": "CSV",
+            "report": "ledgers", "status": "Queued", "createdtm": "1688669085"}]),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let exports = private_api(&server)
+        .export_status(ExportReport::Ledgers)
+        .await
+        .unwrap();
+    assert_eq!(exports[0].status, ExportStatus::Queued);
 }
 
 #[tokio::test]

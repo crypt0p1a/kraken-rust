@@ -8,8 +8,8 @@ mod strict;
 use common::{private_api, public_api};
 use kraken_api::Decimal;
 use kraken_api::account::{
-    ApiKeyInfo, CreditLines, ExportReport, ExportRequest, ExtendedBalance, LedgerEntry, LedgerType,
-    QueryLedgersRequest, TradeBalance, TradeVolume, WalletAccounts, WalletStatus,
+    ApiKeyInfo, CreditLines, Export, ExportReport, ExportRequest, ExtendedBalance, LedgerEntry,
+    LedgerType, QueryLedgersRequest, TradeBalance, TradeVolume, WalletAccounts, WalletStatus,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -802,4 +802,27 @@ async fn add_export_fixture() {
         .await
         .unwrap();
     assert_eq!(id, "TCJA");
+}
+
+#[tokio::test]
+async fn export_status_fixture() {
+    let raw = fixture("export_status.json");
+    let exports: Vec<Export> = raw
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|it| decode_strict("ExportStatus", it))
+        .collect();
+    assert!(exports.iter().any(|it| it.error.is_some()));
+    assert!(exports.iter().any(|it| it.asset_classes.is_some()));
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/ExportStatus", "export_status.json").await;
+    assert_eq!(
+        private_api(&server)
+            .export_status(ExportReport::Trades)
+            .await
+            .unwrap(),
+        exports
+    );
 }

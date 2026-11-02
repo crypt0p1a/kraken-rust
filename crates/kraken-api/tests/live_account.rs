@@ -7,8 +7,8 @@ mod strict;
 
 use kraken_api::Decimal;
 use kraken_api::account::{
-    ApiKeyInfo, ExtendedBalance, FeeInfo, LedgerEntry, LedgerType, QueryLedgersRequest,
-    TradeBalance, TradeVolume, WalletAccounts, WalletType,
+    ApiKeyInfo, Export, ExportStatus, ExtendedBalance, FeeInfo, LedgerEntry, LedgerType,
+    QueryLedgersRequest, TradeBalance, TradeVolume, WalletAccounts, WalletType,
 };
 use kraken_api::market::Level3OrderBook;
 use kraken_api::{KrakenError, PrivateApi, RestOptions};
@@ -346,5 +346,28 @@ async fn query_ledgers_finds_the_entries_of_the_ledgers() {
         let original = page.entries.iter().find(|it| it.id == entry.id).unwrap();
         assert_eq!(entry.amount, original.amount);
         assert_eq!(entry.balance, original.balance);
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn export_status_with_the_permission() {
+    #[derive(Serialize)]
+    struct Params {
+        report: &'static str,
+    }
+    for report in ["trades", "ledgers"] {
+        let Some(raw) = unless_denied(
+            "ExportStatus",
+            private_client()
+                .call_with::<_, Value>("ExportStatus", Some(&Params { report }))
+                .await,
+        ) else {
+            return;
+        };
+        for value in raw.as_array().unwrap() {
+            let export: Export = decode_strict(&format!("ExportStatus {report}"), value);
+            assert_ne!(export.status, ExportStatus::Unknown, "{value}");
+        }
     }
 }
