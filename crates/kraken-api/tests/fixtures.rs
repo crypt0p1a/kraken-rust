@@ -14,7 +14,7 @@ use kraken_api::account::{
 };
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
 use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
-use kraken_api::funding::{FundingAssets, FundingDirection, FundingMethods};
+use kraken_api::funding::{FundingAssets, FundingDirection, FundingMethods, FundingNetworks};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -1347,4 +1347,30 @@ async fn funding_methods_fixture() {
         .await
         .unwrap();
     assert_eq!(served, methods);
+}
+
+#[tokio::test]
+async fn funding_networks_fixture() {
+    let networks: FundingNetworks = decode_strict(
+        "funding networks",
+        &funding_fixture("funding_networks.json"),
+    );
+    // the networks of a group are known networks
+    for id in networks
+        .network_groups
+        .iter()
+        .flat_map(|it| &it.network_ids)
+    {
+        assert!(
+            networks.networks.iter().any(|it| &it.network_id == id),
+            "{id}"
+        );
+    }
+
+    let server = MockServer::start().await;
+    serve_funding(&server, "/funding/v1/networks", "funding_networks.json").await;
+    assert_eq!(
+        private_api(&server).funding_networks(None).await.unwrap(),
+        networks
+    );
 }

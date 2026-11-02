@@ -11,7 +11,7 @@ use crate::earn::{
     self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
 use crate::funding::{
-    self, FundingAssets, FundingDirection, FundingMethods, FundingMethodsRequest,
+    self, FundingAssets, FundingDirection, FundingMethods, FundingMethodsRequest, FundingNetworks,
 };
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
@@ -509,5 +509,16 @@ impl PrivateApi {
         request: &FundingMethodsRequest,
     ) -> Result<FundingMethods, KrakenError> {
         funding::methods::funding_methods(&self.funding, direction, request).await
+    }
+
+    /// The funding networks, and their groups sharing an address format. Requires the "Funds
+    /// permissions - Query" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-funding-networks>
+    pub async fn funding_networks(
+        &self,
+        account_id: Option<&str>,
+    ) -> Result<FundingNetworks, KrakenError> {
+        funding::networks::funding_networks(&self.funding, account_id).await
     }
 }

@@ -85,3 +85,22 @@ async fn funding_methods() {
         Err(kraken_api::KrakenError::InvalidArgument { .. })
     ));
 }
+
+#[tokio::test]
+async fn funding_networks() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/funding/v1/networks"))
+        .and(SignedFunding)
+        .and(QueryIs(vec![]))
+        .respond_with(plain(
+            json!({"networks": [{"network_id": "n1", "name": "Ethereum"}]}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let networks = private_api(&server).funding_networks(None).await.unwrap();
+    assert_eq!(networks.networks[0].name, "Ethereum");
+    assert!(networks.network_groups.is_empty());
+}

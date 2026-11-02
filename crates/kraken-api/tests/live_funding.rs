@@ -7,7 +7,7 @@
 mod live;
 mod strict;
 
-use kraken_api::funding::{FundingAssets, FundingDirection, FundingMethods};
+use kraken_api::funding::{FundingAssets, FundingDirection, FundingMethods, FundingNetworks};
 use kraken_network::FundingMethod;
 use live::{decode_strict, funding_client, private_api, unless_denied};
 use serde_json::Value;
@@ -57,4 +57,14 @@ async fn funding_methods_of_both_directions() {
             assert!(!method.withdrawal || direction == "withdraw", "{method:?}");
         }
     }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn funding_networks() {
+    let Some(raw) = get("/funding/v1/networks").await else {
+        return;
+    };
+    let networks: FundingNetworks = decode_strict("funding networks", &raw);
+    assert!(!networks.networks.is_empty());
 }

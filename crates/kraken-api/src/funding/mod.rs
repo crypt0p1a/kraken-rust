@@ -15,12 +15,14 @@ use serde::{Deserialize, Serialize};
 
 pub(crate) mod assets;
 pub(crate) mod methods;
+pub(crate) mod networks;
 
 pub use assets::{FundingAssets, FundingDirection, NamedAsset};
 pub use methods::{
     AddressGeneration, AddressGenerationStatus, DepositMethodDetails, FundingMethodInfo,
     FundingMethods, FundingMethodsRequest, MethodFees, MethodNetwork,
 };
+pub use networks::{FundingNetwork, FundingNetworks, NetworkGroup};
 
 /// An asset of the funding API: its class and its name
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
