@@ -165,6 +165,46 @@ pub(crate) async fn deposit_limits(
     Ok(answer.deposit_limits)
 }
 
+/// The withdrawal limits of a funding method
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct WithdrawalLimit {
+    pub method_id: String,
+    /// The maximum allowed by the available balance and the limits of amount
+    pub maximum_amount: FundingAmount,
+    /// What sets the maximum: "balance" or "limits"
+    pub maximum_reason: String,
+    #[serde(default)]
+    pub limits: Vec<TimedLimit>,
+}
+
+/// <https://docs.kraken.com/api/docs/rest-api/list-funding-withdrawal-limits>
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct WithdrawalLimits {
+    /// What can be withdrawn after the holds, the positions and the margin
+    pub available_balance: FundingAmount,
+    #[serde(default)]
+    pub withdrawal_limits: Vec<WithdrawalLimit>,
+}
+
+/// The withdrawal limits of an asset, by funding method. Requires the "Funds permissions -
+/// Query" permission
+pub(crate) async fn withdrawal_limits(
+    client: &FundingClient,
+    asset: &FundingAsset,
+    request: &FundingLimitsRequest,
+) -> Result<WithdrawalLimits, KrakenError> {
+    client
+        .call(
+            FundingMethod::Get,
+            &limits_path("withdrawal", asset)?,
+            Some(&LimitsQuery::new(request)?),
+            None::<&()>,
+        )
+        .await
+}
+
 #[cfg(test)]
 pub(crate) const LIMIT: &str = r#"{"time_window":"86400","limit":{"limit_type":"equiv_amount_usd",
     "remaining":{"policy_asset_amount":{"asset":{"class":"currency","name":"USD"},"amount":"499995.0013"},
@@ -226,6 +266,23 @@ mod tests {
         .unwrap();
         assert_eq!(counts.maximum, LimitValue::Count { count: dec!(5) });
         assert_eq!(counts.used, Some(LimitValue::Count { count: dec!(1) }));
+    }
+
+    #[test]
+    fn decodes_the_withdrawal_limits() {
+        let limits: WithdrawalLimits = serde_json::from_str(&format!(
+            r#"{{"available_balance":{{"asset":{{"class":"currency","name":"USDC"}},
+            "amount":"689005.55897887"}},"withdrawal_limits":[{{"method_id":"ec344850",
+            "maximum_amount":{{"asset":{{"class":"currency","name":"USDC"}},"amount":"500155.05091629"}},
+            "maximum_reason":"limits","limits":[{LIMIT}]}}]}}"#
+        ))
+        .unwrap();
+        assert_eq!(limits.available_balance.amount, dec!(689005.55897887));
+        assert_eq!(limits.withdrawal_limits[0].maximum_reason, "limits");
+        assert_eq!(
+            limits_path("withdrawal", &usdc()).unwrap(),
+            "/funding/v1/limits/withdrawal/currency/USDC"
+        );
     }
 
     #[test]

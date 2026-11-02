@@ -13,7 +13,7 @@ use crate::earn::{
 use crate::funding::{
     self, DepositLimits, FundingAsset, FundingAssets, FundingDirection, FundingFee,
     FundingFeeRequest, FundingLimitsRequest, FundingMethods, FundingMethodsRequest,
-    FundingNetworks,
+    FundingNetworks, WithdrawalLimits,
 };
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
@@ -546,5 +546,17 @@ impl PrivateApi {
         request: &FundingLimitsRequest,
     ) -> Result<Vec<DepositLimits>, KrakenError> {
         funding::limits::deposit_limits(&self.funding, asset, request).await
+    }
+
+    /// The balance available for withdrawal and the withdrawal limits of an asset, by funding
+    /// method. Requires the "Funds permissions - Query" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-funding-withdrawal-limits>
+    pub async fn withdrawal_limits(
+        &self,
+        asset: &FundingAsset,
+        request: &FundingLimitsRequest,
+    ) -> Result<WithdrawalLimits, KrakenError> {
+        funding::limits::withdrawal_limits(&self.funding, asset, request).await
     }
 }

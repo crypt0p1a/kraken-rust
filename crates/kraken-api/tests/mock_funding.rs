@@ -173,3 +173,31 @@ async fn deposit_limits() {
         .unwrap();
     assert_eq!(limits[0].limits[0].limit.limit_type, "success");
 }
+
+#[tokio::test]
+async fn withdrawal_limits() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/funding/v1/limits/withdrawal/currency/USDC"))
+        .and(SignedFunding)
+        .and(QueryIs(vec![("account_id", "WX6V-JUKW-KKPB-QE36")]))
+        .respond_with(plain(
+            json!({"available_balance": {"asset": {"class": "currency",
+            "name": "USDC"}, "amount": "100"}, "withdrawal_limits": []}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let limits = private_api(&server)
+        .withdrawal_limits(
+            &usdc(),
+            &FundingLimitsRequest {
+                account_id: Some("WX6V-JUKW-KKPB-QE36".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(limits.available_balance.amount.to_string(), "100");
+}

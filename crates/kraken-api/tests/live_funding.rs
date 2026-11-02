@@ -9,6 +9,7 @@ mod strict;
 
 use kraken_api::funding::{
     DepositLimits, FundingAssets, FundingDirection, FundingFee, FundingMethods, FundingNetworks,
+    WithdrawalLimits,
 };
 use kraken_network::FundingMethod;
 use live::{decode_strict, funding_client, private_api, unless_denied};
@@ -122,5 +123,21 @@ async fn deposit_limits_of_usdc() {
         for timed in &limits.limits {
             assert!(timed.time_window > 0, "{timed:?}");
         }
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn withdrawal_limits_of_usdc() {
+    let Some(raw) = get("/funding/v1/limits/withdrawal/currency/USDC").await else {
+        return;
+    };
+    let limits: WithdrawalLimits = decode_strict("withdrawal limits", &raw);
+    assert!(limits.available_balance.amount >= kraken_api::Decimal::ZERO);
+    for method in &limits.withdrawal_limits {
+        assert!(
+            ["balance", "limits"].contains(&method.maximum_reason.as_str()),
+            "{method:?}"
+        );
     }
 }

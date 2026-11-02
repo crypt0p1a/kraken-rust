@@ -16,7 +16,7 @@ use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, 
 use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
 use kraken_api::funding::{
     DepositLimits, FundingAsset, FundingAssets, FundingDirection, FundingFee, FundingFeeRequest,
-    FundingMethods, FundingNetworks, LimitValue,
+    FundingMethods, FundingNetworks, LimitValue, WithdrawalLimits,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -1428,6 +1428,40 @@ async fn deposit_limits_fixture() {
     .await;
     let served = private_api(&server)
         .deposit_limits(
+            &FundingAsset {
+                class: kraken_api::market::AssetClass::Currency,
+                name: "USDC".into(),
+            },
+            &Default::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(served, limits);
+}
+
+#[tokio::test]
+async fn withdrawal_limits_fixture() {
+    let limits: WithdrawalLimits = decode_strict(
+        "withdrawal limits",
+        &funding_fixture("withdrawal_limits.json"),
+    );
+    for method in &limits.withdrawal_limits {
+        // never more than the available balance
+        assert!(
+            method.maximum_amount.amount <= limits.available_balance.amount,
+            "{method:?}"
+        );
+    }
+
+    let server = MockServer::start().await;
+    serve_funding(
+        &server,
+        "/funding/v1/limits/withdrawal/currency/USDC",
+        "withdrawal_limits.json",
+    )
+    .await;
+    let served = private_api(&server)
+        .withdrawal_limits(
             &FundingAsset {
                 class: kraken_api::market::AssetClass::Currency,
                 name: "USDC".into(),

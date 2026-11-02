@@ -23,6 +23,7 @@ pub use assets::{FundingAssets, FundingDirection, NamedAsset};
 pub use fees::{FeeDetails, FundingFee, FundingFeeRequest};
 pub use limits::{
     DepositLimits, FundingLimit, FundingLimitsRequest, LimitAmounts, LimitValue, TimedLimit,
+    WithdrawalLimit, WithdrawalLimits,
 };
 pub use methods::{
     AddressGeneration, AddressGenerationStatus, DepositMethodDetails, FundingMethodInfo,
