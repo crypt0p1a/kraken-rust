@@ -11,7 +11,8 @@ use crate::earn::{
     self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
 use crate::funding::{
-    self, FundingAssets, FundingDirection, FundingMethods, FundingMethodsRequest, FundingNetworks,
+    self, FundingAssets, FundingDirection, FundingFee, FundingFeeRequest, FundingMethods,
+    FundingMethodsRequest, FundingNetworks,
 };
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
@@ -520,5 +521,17 @@ impl PrivateApi {
         account_id: Option<&str>,
     ) -> Result<FundingNetworks, KrakenError> {
         funding::networks::funding_networks(&self.funding, account_id).await
+    }
+
+    /// The fee of an amount with a funding method; for a withdrawal, a token pinning its rate for
+    /// 5 minutes. Requires the "Funds permissions - Query" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/calculate-funding-fees>
+    pub async fn funding_fee(
+        &self,
+        method_id: &str,
+        request: &FundingFeeRequest,
+    ) -> Result<FundingFee, KrakenError> {
+        funding::fees::funding_fee(&self.funding, method_id, request).await
     }
 }

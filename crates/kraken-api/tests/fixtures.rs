@@ -14,7 +14,9 @@ use kraken_api::account::{
 };
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
 use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
-use kraken_api::funding::{FundingAssets, FundingDirection, FundingMethods, FundingNetworks};
+use kraken_api::funding::{
+    FundingAssets, FundingDirection, FundingFee, FundingFeeRequest, FundingMethods, FundingNetworks,
+};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -1373,4 +1375,32 @@ async fn funding_networks_fixture() {
         private_api(&server).funding_networks(None).await.unwrap(),
         networks
     );
+}
+
+#[tokio::test]
+async fn funding_fee_fixture() {
+    let fee: FundingFee = decode_strict("funding fee", &funding_fixture("funding_fee.json"));
+    assert_eq!(
+        fee.gross_amount.amount - fee.fee.amount,
+        fee.net_amount.amount
+    );
+
+    let server = MockServer::start().await;
+    serve_funding(
+        &server,
+        "/funding/v1/fees/27ede8db-804b-4d91-8e25-46b7b9668730",
+        "funding_fee.json",
+    )
+    .await;
+    let served = private_api(&server)
+        .funding_fee(
+            "27ede8db-804b-4d91-8e25-46b7b9668730",
+            &FundingFeeRequest {
+                amount: "5".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(served, fee);
 }

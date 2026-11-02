@@ -7,7 +7,9 @@
 mod live;
 mod strict;
 
-use kraken_api::funding::{FundingAssets, FundingDirection, FundingMethods, FundingNetworks};
+use kraken_api::funding::{
+    FundingAssets, FundingDirection, FundingFee, FundingMethods, FundingNetworks,
+};
 use kraken_network::FundingMethod;
 use live::{decode_strict, funding_client, private_api, unless_denied};
 use serde_json::Value;
@@ -67,4 +69,43 @@ async fn funding_networks() {
     };
     let networks: FundingNetworks = decode_strict("funding networks", &raw);
     assert!(!networks.networks.is_empty());
+}
+
+#[derive(serde::Serialize)]
+struct Amount {
+    amount: String,
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn funding_fee_of_a_withdrawal_method() {
+    // a quote only: nothing is withdrawn
+    let Some(raw) = get("/funding/v1/methods/withdraw").await else {
+        return;
+    };
+    let methods: FundingMethods = decode_strict("funding methods", &raw);
+    let method = &methods.methods[0];
+    let amount = method
+        .minimum_amount
+        .unwrap_or(kraken_api::Decimal::ONE)
+        .to_string();
+    let raw: Value = funding_client()
+        .call(
+            FundingMethod::Get,
+            &format!("/funding/v1/fees/{}", method.method_id),
+            Some(&Amount { amount }),
+            None::<&()>,
+        )
+        .await
+        .unwrap();
+    let fee: FundingFee = decode_strict("funding fee", &raw);
+    assert_eq!(
+        fee.gross_amount.amount - fee.fee.amount,
+        fee.net_amount.amount,
+        "{fee:?}"
+    );
+    assert!(
+        fee.withdrawal_fee_token.is_some(),
+        "a withdrawal has a fee token: {fee:?}"
+    );
 }

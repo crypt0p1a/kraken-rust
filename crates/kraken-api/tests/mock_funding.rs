@@ -4,7 +4,7 @@
 mod common;
 
 use common::{QueryIs, SignedFunding, plain, private_api};
-use kraken_api::funding::{FundingDirection, FundingMethodsRequest};
+use kraken_api::funding::{FundingDirection, FundingFeeRequest, FundingMethodsRequest};
 use kraken_api::market::AssetClass;
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -103,4 +103,37 @@ async fn funding_networks() {
     let networks = private_api(&server).funding_networks(None).await.unwrap();
     assert_eq!(networks.networks[0].name, "Ethereum");
     assert!(networks.network_groups.is_empty());
+}
+
+#[tokio::test]
+async fn funding_fee() {
+    let server = MockServer::start().await;
+    let usdc =
+        |amount: &str| json!({"asset": {"class": "currency", "name": "USDC"}, "amount": amount});
+    Mock::given(method("GET"))
+        .and(path(
+            "/funding/v1/fees/27ede8db-804b-4d91-8e25-46b7b9668730",
+        ))
+        .and(SignedFunding)
+        .and(QueryIs(vec![("amount", "5"), ("fee_included", "true")]))
+        .respond_with(plain(json!({"fee": usdc("1"), "gross_amount": usdc("5"),
+            "net_amount": usdc("4"), "fee_details": {"base_fee": usdc("1"),
+            "fee_percentage": "0"}})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let fee = private_api(&server)
+        .funding_fee(
+            "27ede8db-804b-4d91-8e25-46b7b9668730",
+            &FundingFeeRequest {
+                amount: "5".into(),
+                fee_included: Some(true),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(fee.net_amount.amount.to_string(), "4");
+    assert_eq!(fee.withdrawal_fee_token, None);
 }
