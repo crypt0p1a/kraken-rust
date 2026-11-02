@@ -3,7 +3,8 @@
 mod common;
 
 use common::{FormIs, Signed, ok, private_api};
-use kraken_api::algo::{ClosedStrategiesRequest, StrategyStatus, StrategyType};
+use kraken_api::algo::{ClosedStrategiesRequest, NewStrategy, StrategyStatus, StrategyType};
+use kraken_api::trading::{OrderSide, OrderType};
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer};
@@ -87,4 +88,47 @@ async fn closed_strategies() {
         .unwrap();
     assert_eq!(page.strategies[0].status, StrategyStatus::Expired);
     assert_eq!(page.next_cursor.as_deref(), Some("abc"));
+}
+
+fn twap_limit(validate: Option<bool>) -> NewStrategy {
+    NewStrategy {
+        strategy_type: StrategyType::Twap,
+        symbol: "BTC/USD".into(),
+        asset_class: "forex".into(),
+        side: OrderSide::Buy,
+        volume: "0.01".into(),
+        order_type: OrderType::Limit,
+        price: Some("60000.0".into()),
+        start_time: None,
+        expire_time: "+3600".into(),
+        validate,
+    }
+}
+
+#[tokio::test]
+async fn add_strategy() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/AddStrategy"))
+        .and(Signed)
+        .and(FormIs(vec![
+            ("strategy_type", "twap"),
+            ("symbol", "BTC/USD"),
+            ("asset_class", "forex"),
+            ("side", "buy"),
+            ("volume", "0.01"),
+            ("ordertype", "limit"),
+            ("price", "60000.0"),
+            ("expiretm", "+3600"),
+        ]))
+        .respond_with(ok(json!({"strategy_id": "ASMBA64-R23M2-J7JRJV"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let id = private_api(&server)
+        .add_strategy(&twap_limit(None))
+        .await
+        .unwrap();
+    assert_eq!(id, "ASMBA64-R23M2-J7JRJV");
 }

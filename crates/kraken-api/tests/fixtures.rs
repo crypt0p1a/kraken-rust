@@ -12,7 +12,7 @@ use kraken_api::account::{
     LedgerType, QueryLedgersRequest, RemoveExportType, TradeBalance, TradeVolume, WalletAccounts,
     WalletStatus,
 };
-use kraken_api::algo::{ClosedStrategies, Strategy, StrategyStatus};
+use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -1080,4 +1080,26 @@ async fn closed_strategies_fixture() {
             .unwrap(),
         page
     );
+}
+
+#[tokio::test]
+async fn add_strategy_fixture() {
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/AddStrategy", "add_strategy.json").await;
+    let id = private_api(&server)
+        .add_strategy(&NewStrategy {
+            strategy_type: StrategyType::Twap,
+            symbol: "BTC/USD".into(),
+            asset_class: "forex".into(),
+            side: OrderSide::Sell,
+            volume: "2".into(),
+            order_type: OrderType::Market,
+            price: None,
+            start_time: None,
+            expire_time: "+7200".into(),
+            validate: None,
+        })
+        .await
+        .unwrap();
+    assert!(id.starts_with("AS"));
 }

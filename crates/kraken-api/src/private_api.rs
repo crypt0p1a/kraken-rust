@@ -4,7 +4,9 @@ use crate::account::{
     ExportRequest, ExtendedBalance, LedgerEntry, Ledgers, LedgersRequest, QueryLedgersRequest,
     RemoveExportType, TradeBalance, TradeBalanceRequest, TradeVolume, WalletAccounts,
 };
-use crate::algo::{self, ClosedStrategies, ClosedStrategiesRequest, Strategy, StrategyType};
+use crate::algo::{
+    self, ClosedStrategies, ClosedStrategiesRequest, NewStrategy, Strategy, StrategyType,
+};
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, AddOrderBatch, AmendOrder, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
@@ -374,5 +376,12 @@ impl PrivateApi {
         request: &ClosedStrategiesRequest,
     ) -> Result<ClosedStrategies, KrakenError> {
         algo::closed_strategies(&self.client, request).await
+    }
+
+    /// Creates a TWAP strategy: its id, empty when only validated
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/add-strategy>
+    pub async fn add_strategy(&self, request: &NewStrategy) -> Result<String, KrakenError> {
+        algo::add_strategy(&self.client, request).await
     }
 }

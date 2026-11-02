@@ -7,7 +7,10 @@ mod live;
 mod strict;
 
 use kraken_api::Decimal;
-use kraken_api::algo::{ClosedStrategies, ClosedStrategiesRequest, Strategy, StrategyStatus};
+use kraken_api::algo::{
+    ClosedStrategies, ClosedStrategiesRequest, NewStrategy, Strategy, StrategyStatus, StrategyType,
+};
+use kraken_api::trading::{OrderSide, OrderType};
 use live::{decode_strict, entries, private_api, private_client};
 use serde_json::Value;
 
@@ -122,4 +125,26 @@ async fn closed_strategies_are_paginated() {
                 .all(|it| it.strategy_id != strategy.strategy_id)
         );
     }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn validates_a_new_strategy() {
+    // validated only: no strategy is created
+    let id = private_api()
+        .add_strategy(&NewStrategy {
+            strategy_type: StrategyType::Twap,
+            symbol: "BTC/USD".into(),
+            asset_class: "forex".into(),
+            side: OrderSide::Buy,
+            volume: "0.001".into(),
+            order_type: OrderType::Market,
+            price: None,
+            start_time: None,
+            expire_time: "+3600".into(),
+            validate: Some(true),
+        })
+        .await
+        .unwrap();
+    assert!(id.is_empty(), "a validated strategy has no id: {id}");
 }

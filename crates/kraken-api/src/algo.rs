@@ -195,6 +195,58 @@ pub(crate) async fn closed_strategies(
     client.call_with("GetClosedStrategies", Some(request)).await
 }
 
+/// A new TWAP: `volume` executed evenly between its start and its expiry
+///
+/// The amounts and prices are strings, to keep the precision given by the caller
+///
+/// <https://docs.kraken.com/api/docs/rest-api/add-strategy>
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct NewStrategy {
+    pub strategy_type: StrategyType,
+    /// e.g. "BTC/USD" or "XBTUSD"
+    pub symbol: String,
+    /// "forex": the only class supported, the standard spot pairs
+    pub asset_class: String,
+    pub side: OrderSide,
+    /// Total volume, in the base currency
+    pub volume: String,
+    /// Type of the child orders: market or limit
+    #[serde(rename = "ordertype")]
+    pub order_type: OrderType,
+    /// Limit price of the child orders: required by limit, refused by market
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub price: Option<String>,
+    /// "0" (now, the default), "<UTC timestamp in seconds>" or "+<seconds from now>": within 30
+    /// days
+    #[serde(rename = "starttm", skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub start_time: Option<String>,
+    /// "<UTC timestamp in seconds>" or "+<seconds from now>": at least 60 seconds after the
+    /// start, within 30 days
+    #[serde(rename = "expiretm")]
+    pub expire_time: String,
+    /// Validates the strategy without creating it
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub validate: Option<bool>,
+}
+
+#[derive(Deserialize)]
+struct StrategyId {
+    strategy_id: String,
+}
+
+/// The id of the new strategy, empty when only validated
+pub(crate) async fn add_strategy(
+    client: &PrivateClient,
+    request: &NewStrategy,
+) -> Result<String, KrakenError> {
+    let answer: StrategyId = client.call_with("AddStrategy", Some(request)).await?;
+    Ok(answer.strategy_id)
+}
+
 #[cfg(test)]
 pub(crate) const SAMPLE: &str = r#"{
     "ASPBVCI-6MKBA-QE4VF6":{"strategy_id":"ASPBVCI-6MKBA-QE4VF6","status":"pending",
@@ -277,6 +329,33 @@ mod tests {
              &end=1781180000&query_time_mode=open&limit=2&cursor=Q0xPU0VEOjE3ODExNzAwMDA6QVNNQkE2NA"
         );
         assert_eq!(encode(&ClosedStrategiesRequest::default()).unwrap(), "");
+    }
+
+    #[test]
+    fn encodes_a_new_strategy() {
+        let request = NewStrategy {
+            strategy_type: StrategyType::Twap,
+            symbol: "BTC/USD".into(),
+            asset_class: "forex".into(),
+            side: OrderSide::Sell,
+            volume: "2.0".into(),
+            order_type: OrderType::Limit,
+            price: Some("67000.0".into()),
+            start_time: Some("+60".into()),
+            expire_time: "+3660".into(),
+            validate: Some(true),
+        };
+        assert_eq!(
+            encode(&request).unwrap(),
+            "strategy_type=twap&symbol=BTC%2FUSD&asset_class=forex&side=sell&volume=2.0\
+             &ordertype=limit&price=67000.0&starttm=%2B60&expiretm=%2B3660&validate=true"
+        );
+    }
+
+    #[test]
+    fn decodes_the_id_of_a_validated_strategy() {
+        let answer: StrategyId = serde_json::from_str(r#"{"strategy_id":""}"#).unwrap();
+        assert!(answer.strategy_id.is_empty());
     }
 
     #[test]
