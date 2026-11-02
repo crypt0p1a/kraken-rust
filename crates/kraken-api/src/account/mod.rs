@@ -14,6 +14,8 @@ pub use api_key::{ApiKeyInfo, ApiKeyInfoRequest};
 pub use balance::{BalanceRequest, ExtendedBalance, RebaseMultiplier};
 pub use credit::{CreditLimits, CreditLineAsset, CreditLines};
 pub use fees::{FeeInfo, TradeVolume, VolumeInputs};
-pub use ledgers::{LedgerEntry, LedgerFilter, LedgerType, Ledgers, LedgersRequest};
+pub use ledgers::{
+    LedgerEntry, LedgerFilter, LedgerType, Ledgers, LedgersRequest, QueryLedgersRequest,
+};
 pub use trade_balance::{TradeBalance, TradeBalanceRequest};
 pub use wallets::{WalletAccount, WalletAccounts, WalletFlags, WalletStatus, WalletType};

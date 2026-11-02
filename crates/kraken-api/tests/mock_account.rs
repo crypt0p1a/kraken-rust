@@ -5,8 +5,8 @@ mod common;
 
 use common::{FormIs, Signed, ok, private_api};
 use kraken_api::account::{
-    ApiKeyInfoRequest, BalanceRequest, LedgerFilter, LedgerType, LedgersRequest, RebaseMultiplier,
-    TradeBalanceRequest, WalletType,
+    ApiKeyInfoRequest, BalanceRequest, LedgerFilter, LedgerType, LedgersRequest,
+    QueryLedgersRequest, RebaseMultiplier, TradeBalanceRequest, WalletType,
 };
 use rust_decimal_macros::dec;
 use serde_json::json;
@@ -174,6 +174,32 @@ async fn ledgers() {
         .unwrap();
     assert_eq!(ledgers.entries[0].id, "LMKZCZ-Z3GVL-CXKK4H");
     assert_eq!(ledgers.entries[0].entry_type, LedgerType::Deposit);
+}
+
+#[tokio::test]
+async fn query_ledgers() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/QueryLedgers"))
+        .and(Signed)
+        .and(FormIs(vec![("id", "L4UESK-KG3EQ-UFO4T5")]))
+        .respond_with(ok(
+            json!({"L4UESK-KG3EQ-UFO4T5": {"refid": "TJKLXX-PGMUI-4NTLXU",
+            "time": 1688464484.1787, "type": "trade", "subtype": "", "aclass": "currency",
+            "asset": "ZGBP", "amount": "-24.5000", "fee": "0.0490", "balance": "459567.9171"}}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let entries = private_api(&server)
+        .query_ledgers(&QueryLedgersRequest {
+            ids: vec!["L4UESK-KG3EQ-UFO4T5".into()],
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(entries[0].fee, dec!(0.049));
 }
 
 #[tokio::test]

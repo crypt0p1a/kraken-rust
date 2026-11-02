@@ -8,8 +8,8 @@ mod strict;
 use common::{private_api, public_api};
 use kraken_api::Decimal;
 use kraken_api::account::{
-    ApiKeyInfo, CreditLines, ExtendedBalance, LedgerEntry, LedgerType, TradeBalance, TradeVolume,
-    WalletAccounts, WalletStatus,
+    ApiKeyInfo, CreditLines, ExtendedBalance, LedgerEntry, LedgerType, QueryLedgersRequest,
+    TradeBalance, TradeVolume, WalletAccounts, WalletStatus,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -755,4 +755,24 @@ async fn ledgers_fixture() {
         .unwrap();
     assert_eq!(page.count, Some(5));
     assert!(page.entries.windows(2).all(|it| it[0].time >= it[1].time));
+}
+
+#[tokio::test]
+async fn query_ledgers_fixture() {
+    let entries: HashMap<String, LedgerEntry> =
+        each("QueryLedgers", &fixture("query_ledgers.json"));
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/QueryLedgers", "query_ledgers.json").await;
+    let served = private_api(&server)
+        .query_ledgers(&QueryLedgersRequest {
+            ids: entries.keys().cloned().collect(),
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(served.len(), entries.len());
+    for entry in &served {
+        assert_eq!(entry.refid, entries[&entry.id].refid);
+    }
 }

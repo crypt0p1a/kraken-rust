@@ -187,6 +187,28 @@ pub(crate) async fn ledgers(
     })
 }
 
+/// <https://docs.kraken.com/api/docs/rest-api/get-ledgers-info>
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct QueryLedgersRequest {
+    /// Up to 20 identifiers of ledger entries
+    #[serde(rename = "id", serialize_with = "comma_separated")]
+    pub ids: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub rebase_multiplier: Option<RebaseMultiplier>,
+}
+
+/// The entries, most recent first. Requires the "Query ledger entries" permission
+pub(crate) async fn query_ledgers(
+    client: &PrivateClient,
+    request: &QueryLedgersRequest,
+) -> Result<Vec<LedgerEntry>, KrakenError> {
+    let entries: HashMap<String, LedgerEntry> =
+        client.call_with("QueryLedgers", Some(request)).await?;
+    Ok(with_ids(entries))
+}
+
 #[cfg(test)]
 pub(crate) const SAMPLE: &str = r#"{
     "L4UESK-KG3EQ-UFO4T5":{"refid":"TJKLXX-PGMUI-4NTLXU","time":1688464484.1787,"type":"trade",
@@ -226,6 +248,18 @@ mod tests {
              &with_cursor=true&cursor=abc&without_count=true&rebase_multiplier=rebased"
         );
         assert_eq!(encode(&LedgersRequest::default()).unwrap(), "");
+    }
+
+    #[test]
+    fn encodes_the_query() {
+        let request = QueryLedgersRequest {
+            ids: vec!["L4UESK-KG3EQ-UFO4T5".into(), "LMKZCZ-Z3GVL-CXKK4H".into()],
+            rebase_multiplier: None,
+        };
+        assert_eq!(
+            encode(&request).unwrap(),
+            "id=L4UESK-KG3EQ-UFO4T5%2CLMKZCZ-Z3GVL-CXKK4H"
+        );
     }
 
     #[test]
