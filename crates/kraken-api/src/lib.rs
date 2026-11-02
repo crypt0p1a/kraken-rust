@@ -47,6 +47,7 @@ pub mod algo;
 mod cursor;
 pub mod earn;
 pub mod funding;
+mod keyed;
 mod lenient;
 pub mod market;
 mod params;

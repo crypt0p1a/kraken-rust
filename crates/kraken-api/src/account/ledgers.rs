@@ -74,12 +74,11 @@ pub struct LedgerEntry {
 
 /// Entries keyed by id → entries holding their id, most recent first
 fn with_ids(entries: HashMap<String, LedgerEntry>) -> Vec<LedgerEntry> {
-    let mut entries: Vec<LedgerEntry> = entries
-        .into_iter()
-        .map(|(id, entry)| LedgerEntry { id, ..entry })
-        .collect();
-    entries.sort_by(|a, b| b.time.total_cmp(&a.time));
-    entries
+    crate::keyed::most_recent_first(
+        entries,
+        |id, entry| LedgerEntry { id, ..entry },
+        |it| it.time,
+    )
 }
 
 /// The types of entries the ledgers can be filtered by

@@ -118,12 +118,11 @@ pub struct Order {
 
 /// Orders keyed by txid → orders holding their txid, most recent first
 pub(crate) fn with_txids(orders: std::collections::HashMap<String, Order>) -> Vec<Order> {
-    let mut orders: Vec<Order> = orders
-        .into_iter()
-        .map(|(txid, order)| Order { txid, ..order })
-        .collect();
-    orders.sort_by(|a, b| b.open_time.total_cmp(&a.open_time));
-    orders
+    crate::keyed::most_recent_first(
+        orders,
+        |txid, order| Order { txid, ..order },
+        |it| it.open_time,
+    )
 }
 
 #[cfg(test)]

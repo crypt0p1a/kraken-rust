@@ -93,12 +93,7 @@ pub struct Trade {
 
 /// Trades keyed by txid → trades holding their txid, most recent first
 pub(crate) fn with_txids(trades: HashMap<String, Trade>) -> Vec<Trade> {
-    let mut trades: Vec<Trade> = trades
-        .into_iter()
-        .map(|(txid, trade)| Trade { txid, ..trade })
-        .collect();
-    trades.sort_by(|a, b| b.time.total_cmp(&a.time));
-    trades
+    crate::keyed::most_recent_first(trades, |txid, trade| Trade { txid, ..trade }, |it| it.time)
 }
 
 /// Which trades of the margin positions

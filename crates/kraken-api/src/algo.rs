@@ -89,9 +89,12 @@ pub struct Strategy {
 
 /// Strategies keyed by id → their list, the most recent start first
 fn listed(strategies: HashMap<String, Strategy>) -> Vec<Strategy> {
-    let mut strategies: Vec<Strategy> = strategies.into_values().collect();
-    strategies.sort_by_key(|it| std::cmp::Reverse(it.details.start_time));
-    strategies
+    // the id is already in each strategy
+    crate::keyed::most_recent_first(
+        strategies,
+        |_, strategy| strategy,
+        |it| it.details.start_time as f64,
+    )
 }
 
 #[derive(Serialize)]

@@ -128,12 +128,11 @@ pub(crate) async fn open_positions(
 ) -> Result<Vec<Position>, KrakenError> {
     let positions: HashMap<String, Position> =
         client.call_with("OpenPositions", Some(request)).await?;
-    let mut positions: Vec<Position> = positions
-        .into_iter()
-        .map(|(txid, position)| Position { txid, ..position })
-        .collect();
-    positions.sort_by(|a, b| b.time.total_cmp(&a.time));
-    Ok(positions)
+    Ok(crate::keyed::most_recent_first(
+        positions,
+        |txid, position| Position { txid, ..position },
+        |it| it.time,
+    ))
 }
 
 #[derive(Serialize)]
