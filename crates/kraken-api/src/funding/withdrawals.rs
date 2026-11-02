@@ -1,4 +1,7 @@
-use super::{AssetFilterQuery, FundingAmount, FundingAsset, FundingScope, ScopeQuery};
+use super::{
+    AccountQuery, AssetFilterQuery, FundingAmount, FundingAsset, FundingScope, PageQuery,
+    ScopeQuery,
+};
 use crate::account::RebaseMultiplier;
 use crate::market::AssetClass;
 use crate::{KrakenError, lenient};
@@ -98,12 +101,8 @@ struct WithdrawalsQuery<'a> {
     end_time: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rebase_multiplier: Option<RebaseMultiplier>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    limit: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    cursor: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    account_id: Option<&'a str>,
+    #[serde(flatten)]
+    page: PageQuery<'a>,
 }
 
 /// Requires the "Funds permissions - Query" permission
@@ -118,9 +117,11 @@ pub(crate) async fn withdrawals(
         start_time: request.start_time.as_deref(),
         end_time: request.end_time.as_deref(),
         rebase_multiplier: request.rebase_multiplier,
-        limit: request.limit,
-        cursor: request.cursor.as_deref(),
-        account_id: request.account_id.as_deref(),
+        page: PageQuery {
+            limit: request.limit,
+            cursor: request.cursor.as_deref(),
+            account_id: request.account_id.as_deref(),
+        },
     };
     client
         .call(
@@ -266,12 +267,6 @@ pub struct CreatedWithdrawal {
     pub approval_request_id: Option<String>,
 }
 
-#[derive(Serialize)]
-struct AccountQuery<'a> {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    account_id: Option<&'a str>,
-}
-
 /// Requires the "Funds permissions - Withdraw" permission
 pub(crate) async fn create_withdrawal(
     client: &FundingClient,
@@ -303,9 +298,11 @@ mod tests {
             start_time: Some("2026-08-01T00:00:00Z"),
             end_time: None,
             rebase_multiplier: Some(RebaseMultiplier::Base),
-            limit: None,
-            cursor: None,
-            account_id: None,
+            page: PageQuery {
+                limit: None,
+                cursor: None,
+                account_id: None,
+            },
         };
         assert_eq!(
             encode(&query).unwrap(),

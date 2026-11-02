@@ -1,4 +1,4 @@
-use super::{FundingAmount, FundingAsset, FundingDirection};
+use super::{AssetFilterQuery, FundingAmount, FundingAsset, FundingDirection, PageQuery};
 use crate::account::RebaseMultiplier;
 use crate::market::AssetClass;
 use crate::{KrakenError, lenient};
@@ -141,33 +141,27 @@ pub struct FundingMethodsRequest {
     pub account_id: Option<String>,
 }
 
-/// The query: `asset` is a deep object, `asset[class]` and `asset[name]`
 #[derive(Serialize)]
 struct MethodsQuery<'a> {
-    #[serde(rename = "asset[class]", skip_serializing_if = "Option::is_none")]
-    asset_class: Option<AssetClass>,
-    #[serde(rename = "asset[name]", skip_serializing_if = "Option::is_none")]
-    asset_name: Option<&'a str>,
+    #[serde(flatten)]
+    asset: AssetFilterQuery<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rebase_multiplier: Option<RebaseMultiplier>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    limit: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    cursor: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    account_id: Option<&'a str>,
+    #[serde(flatten)]
+    page: PageQuery<'a>,
 }
 
-impl<'a> From<&'a FundingMethodsRequest> for MethodsQuery<'a> {
-    fn from(request: &'a FundingMethodsRequest) -> Self {
-        MethodsQuery {
-            asset_class: request.asset_class,
-            asset_name: request.asset_name.as_deref(),
+impl<'a> MethodsQuery<'a> {
+    fn new(request: &'a FundingMethodsRequest) -> Result<Self, KrakenError> {
+        Ok(MethodsQuery {
+            asset: AssetFilterQuery::new(request.asset_class, request.asset_name.as_deref())?,
             rebase_multiplier: request.rebase_multiplier,
-            limit: request.limit,
-            cursor: request.cursor.as_deref(),
-            account_id: request.account_id.as_deref(),
-        }
+            page: PageQuery {
+                limit: request.limit,
+                cursor: request.cursor.as_deref(),
+                account_id: request.account_id.as_deref(),
+            },
+        })
     }
 }
 
@@ -177,16 +171,11 @@ pub(crate) async fn funding_methods(
     direction: FundingDirection,
     request: &FundingMethodsRequest,
 ) -> Result<FundingMethods, KrakenError> {
-    if request.asset_name.is_some() && request.asset_class.is_none() {
-        return Err(KrakenError::InvalidArgument {
-            reason: "the asset filter requires its class".into(),
-        });
-    }
     client
         .call(
             FundingMethod::Get,
             &format!("/funding/v1/methods/{}", direction.as_str()),
-            Some(&MethodsQuery::from(request)),
+            Some(&MethodsQuery::new(request)?),
             None::<&()>,
         )
         .await
@@ -207,7 +196,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            encode(&MethodsQuery::from(&request)).unwrap(),
+            encode(&MethodsQuery::new(&request).unwrap()).unwrap(),
             "asset%5Bclass%5D=currency&asset%5Bname%5D=USDC&limit=20"
         );
     }

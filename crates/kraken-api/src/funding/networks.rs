@@ -1,6 +1,7 @@
+use super::AccountQuery;
 use crate::KrakenError;
 use kraken_network::{FundingClient, FundingMethod};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
@@ -30,12 +31,6 @@ pub struct FundingNetworks {
     pub networks: Vec<FundingNetwork>,
 }
 
-#[derive(Serialize)]
-struct NetworksQuery<'a> {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    account_id: Option<&'a str>,
-}
-
 /// Requires the "Funds permissions - Query" permission
 pub(crate) async fn funding_networks(
     client: &FundingClient,
@@ -45,7 +40,7 @@ pub(crate) async fn funding_networks(
         .call(
             FundingMethod::Get,
             "/funding/v1/networks",
-            Some(&NetworksQuery { account_id }),
+            Some(&AccountQuery { account_id }),
             None::<&()>,
         )
         .await

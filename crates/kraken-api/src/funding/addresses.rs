@@ -1,4 +1,4 @@
-use super::{AddressDetails, FundingScope, ScopeQuery};
+use super::{AccountQuery, AddressDetails, FundingScope, PageQuery, ScopeQuery};
 use crate::KrakenError;
 use kraken_network::{FundingClient, FundingMethod};
 use serde::{Deserialize, Serialize};
@@ -56,12 +56,8 @@ pub struct WithdrawalAddressesRequest {
 struct AddressesQuery<'a> {
     #[serde(flatten)]
     scope: ScopeQuery<'a>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    limit: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    cursor: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    account_id: Option<&'a str>,
+    #[serde(flatten)]
+    page: PageQuery<'a>,
 }
 
 /// Requires the "Funds permissions - Query" permission
@@ -71,9 +67,11 @@ pub(crate) async fn withdrawal_addresses(
 ) -> Result<WithdrawalAddresses, KrakenError> {
     let query = AddressesQuery {
         scope: ScopeQuery::new(request.scope.as_ref()),
-        limit: request.limit,
-        cursor: request.cursor.as_deref(),
-        account_id: request.account_id.as_deref(),
+        page: PageQuery {
+            limit: request.limit,
+            cursor: request.cursor.as_deref(),
+            account_id: request.account_id.as_deref(),
+        },
     };
     client
         .call(
@@ -150,12 +148,6 @@ pub struct SavedAddress {
     pub address_id: String,
     /// Verified, ready to be used
     pub verified: bool,
-}
-
-#[derive(Serialize)]
-struct AccountQuery<'a> {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    account_id: Option<&'a str>,
 }
 
 /// Requires the "Funds permissions - Add withdrawal addresses" permission

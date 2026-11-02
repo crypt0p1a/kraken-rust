@@ -1,15 +1,12 @@
-use super::{AddressDetails, AssetFilterQuery, FundingAmount, FundingScope, ScopeQuery};
+use super::{
+    AccountQuery, AddressDetails, AssetFilterQuery, FundingAmount, FundingScope, PageQuery,
+    ScopeQuery,
+};
 use crate::KrakenError;
 use crate::account::RebaseMultiplier;
 use crate::market::AssetClass;
 use kraken_network::{FundingClient, FundingMethod};
 use serde::{Deserialize, Serialize};
-
-#[derive(Serialize)]
-struct AccountQuery<'a> {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    account_id: Option<&'a str>,
-}
 
 #[derive(Serialize)]
 struct Claim<'a> {
@@ -102,12 +99,8 @@ struct ClaimedQuery<'a> {
     scope: ScopeQuery<'a>,
     #[serde(flatten)]
     asset: AssetFilterQuery<'a>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    limit: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    cursor: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    account_id: Option<&'a str>,
+    #[serde(flatten)]
+    page: PageQuery<'a>,
 }
 
 /// Requires the "Funds permissions - Query" permission
@@ -118,9 +111,11 @@ pub(crate) async fn claimed_addresses(
     let query = ClaimedQuery {
         scope: ScopeQuery::new(request.scope.as_ref()),
         asset: AssetFilterQuery::new(request.asset_class, request.asset_name.as_deref())?,
-        limit: request.limit,
-        cursor: request.cursor.as_deref(),
-        account_id: request.account_id.as_deref(),
+        page: PageQuery {
+            limit: request.limit,
+            cursor: request.cursor.as_deref(),
+            account_id: request.account_id.as_deref(),
+        },
     };
     client
         .call(
@@ -223,12 +218,8 @@ struct DepositsQuery<'a> {
     end_time: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rebase_multiplier: Option<RebaseMultiplier>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    limit: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    cursor: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    account_id: Option<&'a str>,
+    #[serde(flatten)]
+    page: PageQuery<'a>,
 }
 
 /// Requires the "Funds permissions - Query" permission
@@ -242,9 +233,11 @@ pub(crate) async fn deposits(
         start_time: request.start_time.as_deref(),
         end_time: request.end_time.as_deref(),
         rebase_multiplier: request.rebase_multiplier,
-        limit: request.limit,
-        cursor: request.cursor.as_deref(),
-        account_id: request.account_id.as_deref(),
+        page: PageQuery {
+            limit: request.limit,
+            cursor: request.cursor.as_deref(),
+            account_id: request.account_id.as_deref(),
+        },
     };
     client
         .call(
@@ -298,9 +291,11 @@ mod tests {
             scope: ScopeQuery::new(request.scope.as_ref()),
             asset: AssetFilterQuery::new(request.asset_class, request.asset_name.as_deref())
                 .unwrap(),
-            limit: request.limit,
-            cursor: None,
-            account_id: None,
+            page: PageQuery {
+                limit: request.limit,
+                cursor: None,
+                account_id: None,
+            },
         };
         assert_eq!(
             kraken_network::params::encode(&query).unwrap(),

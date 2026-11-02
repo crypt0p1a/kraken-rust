@@ -101,6 +101,24 @@ impl<'a> ScopeQuery<'a> {
     }
 }
 
+/// The wallet of a request: the default wallet when missing
+#[derive(Serialize)]
+pub(crate) struct AccountQuery<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<&'a str>,
+}
+
+/// The page of a list and its wallet, flattened into the query of the request
+#[derive(Serialize)]
+pub(crate) struct PageQuery<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<&'a str>,
+}
+
 /// The asset filter of a query, a deep object: `asset[class]` and `asset[name]`, the name
 /// requiring the class
 #[derive(Serialize, Default)]
