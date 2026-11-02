@@ -20,6 +20,7 @@ use kraken_api::market::{
     OrderBookRequest, RecentSpreadsRequest, RecentTradesRequest, ServerTime, SystemState,
     SystemStatus, Ticker,
 };
+use kraken_api::subaccounts::NewSubaccount;
 use kraken_api::trading::{
     AddOrderBatch, AmendOrder, AmendType, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
     ClosedOrdersRequest, EditOrder, EditedOrder, NewOrder, NewOrderAnswer, OpenOrdersRequest,
@@ -1252,4 +1253,25 @@ async fn earn_deallocate_status_fixture() {
         .await
         .unwrap();
     assert!(!pending);
+}
+
+// subaccounts
+
+#[tokio::test]
+async fn create_subaccount_fixture() {
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/0/private/CreateSubaccount",
+        "create_subaccount.json",
+    )
+    .await;
+    let created = private_api(&server)
+        .create_subaccount(&NewSubaccount {
+            username: "bot-1".into(),
+            email: "bot@example.com".into(),
+        })
+        .await
+        .unwrap();
+    assert!(created);
 }

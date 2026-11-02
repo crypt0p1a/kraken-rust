@@ -7,6 +7,7 @@
 //! | [`account`]      | private: Balance, BalanceEx, CreditLines, TradeBalance, TradeVolume, Ledgers, QueryLedgers, AddExport, ExportStatus, RetrieveExport, RemoveExport, GetApiKeyInfo, ListWalletAccounts |
 //! | [`algo`]         | private: AddStrategy, CancelStrategy, GetOpenStrategies, GetClosedStrategies, QueryStrategies |
 //! | [`earn`]         | private: Earn/Strategies, Earn/Allocations, Earn/Allocate, Earn/AllocateStatus, Earn/Deallocate, Earn/DeallocateStatus |
+//! | [`subaccounts`]  | private: CreateSubaccount                         |
 //! | [`trading`]      | private: OpenOrders, ClosedOrders, QueryOrders, OrderAmends, TradesHistory, QueryTrades, OpenPositions, AddOrder, AddOrderBatch, AmendOrder, EditOrder, CancelOrder, CancelAll, CancelAllOrdersAfter, CancelOrderBatch, GetWebSocketsToken |
 //!
 //! Each domain holds its models and its calls, [`PublicApi`] and [`PrivateApi`] being the facades
@@ -49,6 +50,7 @@ pub mod market;
 mod params;
 mod private_api;
 mod public_api;
+pub mod subaccounts;
 pub mod trading;
 pub mod transparency;
 

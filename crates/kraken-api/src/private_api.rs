@@ -11,6 +11,7 @@ use crate::earn::{
     self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
+use crate::subaccounts::{self, NewSubaccount};
 use crate::trading::{
     self, AddOrderBatch, AmendOrder, BatchOrderAnswer, CancelAllAfter, CancelledOrders,
     ClosedOrders, ClosedOrdersRequest, ConsolidatedPosition, EditOrder, EditedOrder, NewOrder,
@@ -449,5 +450,15 @@ impl PrivateApi {
     /// <https://docs.kraken.com/api/docs/rest-api/get-deallocate-strategy-status>
     pub async fn earn_deallocate_status(&self, strategy_id: &str) -> Result<bool, KrakenError> {
         earn::deallocate_status(&self.client, strategy_id).await
+    }
+
+    // subaccounts
+
+    /// Creates a trading subaccount: institutional accounts only, with a key of the master
+    /// account having the "Funds permissions - Withdraw" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/create-subaccount>
+    pub async fn create_subaccount(&self, subaccount: &NewSubaccount) -> Result<bool, KrakenError> {
+        subaccounts::create_subaccount(&self.client, subaccount).await
     }
 }
