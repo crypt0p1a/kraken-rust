@@ -15,8 +15,9 @@ use kraken_api::account::{
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
 use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
 use kraken_api::funding::{
-    AddressDetails, ClaimedAddresses, DepositLimits, FundingAsset, FundingAssets, FundingDirection,
-    FundingFee, FundingFeeRequest, FundingMethods, FundingNetworks, LimitValue, WithdrawalLimits,
+    AddressDetails, ClaimedAddresses, DepositLimits, Deposits, FundingAsset, FundingAssets,
+    FundingDirection, FundingFee, FundingFeeRequest, FundingMethods, FundingNetworks, LimitValue,
+    TransferStatus, WithdrawalLimits,
 };
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
@@ -1514,6 +1515,33 @@ async fn claimed_deposit_addresses_fixture() {
     assert_eq!(
         private_api(&server)
             .claimed_deposit_addresses(&Default::default())
+            .await
+            .unwrap(),
+        page
+    );
+}
+
+#[tokio::test]
+async fn deposits_fixture() {
+    let page: Deposits = decode_strict("deposits", &funding_fixture("deposits.json"));
+    // the fee only once complete
+    assert!(
+        page.deposits
+            .iter()
+            .filter(|it| it.fee.is_some())
+            .all(|it| it.status == TransferStatus::Success)
+    );
+    assert!(
+        page.deposits
+            .windows(2)
+            .all(|it| it[0].create_time >= it[1].create_time)
+    );
+
+    let server = MockServer::start().await;
+    serve_funding(&server, "/funding/v1/deposits", "deposits.json").await;
+    assert_eq!(
+        private_api(&server)
+            .deposits(&Default::default())
             .await
             .unwrap(),
         page

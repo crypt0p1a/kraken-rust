@@ -5,8 +5,8 @@ mod common;
 
 use common::{QueryIs, SignedFunding, plain, private_api};
 use kraken_api::funding::{
-    AddressDetails, ClaimedAddressesRequest, FundingAsset, FundingDirection, FundingFeeRequest,
-    FundingLimitsRequest, FundingMethodsRequest, FundingScope,
+    AddressDetails, ClaimedAddressesRequest, DepositsRequest, FundingAsset, FundingDirection,
+    FundingFeeRequest, FundingLimitsRequest, FundingMethodsRequest, FundingScope, TransferStatus,
 };
 use kraken_api::market::AssetClass;
 use serde_json::json;
@@ -265,4 +265,35 @@ async fn claimed_deposit_addresses() {
         .unwrap();
     assert_eq!(page.addresses[0].id.as_deref(), Some("a1"));
     assert_eq!(page.next_cursor.as_deref(), Some("n"));
+}
+
+#[tokio::test]
+async fn deposits() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/funding/v1/deposits"))
+        .and(SignedFunding)
+        .and(QueryIs(vec![
+            ("asset[class]", "currency"),
+            ("start_time", "2026-07-01T00:00:00Z"),
+            ("limit", "2"),
+        ]))
+        .respond_with(plain(
+            json!({"deposits": [{"deposit_id": "FT1", "method_id": "m",
+            "status": "pending"}]}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let page = private_api(&server)
+        .deposits(&DepositsRequest {
+            asset_class: Some(AssetClass::Currency),
+            start_time: Some("2026-07-01T00:00:00Z".into()),
+            limit: Some(2),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(page.deposits[0].status, TransferStatus::Pending);
 }

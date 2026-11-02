@@ -22,7 +22,8 @@ pub(crate) mod networks;
 
 pub use assets::{FundingAssets, FundingDirection, NamedAsset};
 pub use deposits::{
-    AddressDetails, ClaimedAddress, ClaimedAddresses, ClaimedAddressesRequest, FiatAccount,
+    AddressDetails, ClaimedAddress, ClaimedAddresses, ClaimedAddressesRequest, Deposit, Deposits,
+    DepositsRequest, FiatAccount, TransferStatus,
 };
 pub use fees::{FeeDetails, FundingFee, FundingFeeRequest};
 pub use limits::{

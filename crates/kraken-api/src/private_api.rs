@@ -11,9 +11,9 @@ use crate::earn::{
     self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
 use crate::funding::{
-    self, AddressDetails, ClaimedAddresses, ClaimedAddressesRequest, DepositLimits, FundingAsset,
-    FundingAssets, FundingDirection, FundingFee, FundingFeeRequest, FundingLimitsRequest,
-    FundingMethods, FundingMethodsRequest, FundingNetworks, WithdrawalLimits,
+    self, AddressDetails, ClaimedAddresses, ClaimedAddressesRequest, DepositLimits, Deposits,
+    DepositsRequest, FundingAsset, FundingAssets, FundingDirection, FundingFee, FundingFeeRequest,
+    FundingLimitsRequest, FundingMethods, FundingMethodsRequest, FundingNetworks, WithdrawalLimits,
 };
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
@@ -581,5 +581,13 @@ impl PrivateApi {
         request: &ClaimedAddressesRequest,
     ) -> Result<ClaimedAddresses, KrakenError> {
         funding::deposits::claimed_addresses(&self.funding, request).await
+    }
+
+    /// A page of the deposits, most recent first. Requires the "Funds permissions - Query"
+    /// permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-funding-deposits>
+    pub async fn deposits(&self, request: &DepositsRequest) -> Result<Deposits, KrakenError> {
+        funding::deposits::deposits(&self.funding, request).await
     }
 }
