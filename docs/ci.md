@@ -23,6 +23,11 @@
 - **Swift**: tested on Linux, on macOS and on the iOS simulator (XCFramework); the Swift package as
   an artifact
 - **audit**: `cargo audit` of the dependencies
+- **docker**: the image of the bot on amd64 and arm64; the cache mounts of the Dockerfile (cargo
+  registry and target) and its layers are kept in the cache of GitHub between the runs
+
+The runs of a pull request are cancelled by a new push to it; the runs of `main` always go to the
+end, to save the caches the pull requests start from.
 
 Daily and on demand, the live contracts run against the real Kraken API, the private ones with the
 `KRAKEN_API_KEY` / `KRAKEN_API_SECRET` secrets of the repository (Settings → Secrets and variables

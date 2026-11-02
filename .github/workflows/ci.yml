@@ -12,12 +12,14 @@ on:
 permissions:
   contents: read
 
-# a new push to the same branch or pull request cancels the run in progress. The steps and jobs
+# a new push to the same pull request cancels the run in progress. The steps and jobs
 # which must run after a failure use !cancelled(), not always(): always() keeps them running after
 # a cancellation, which holds the run and leaves the new one pending
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # only the runs of a pull request: the runs of main go to the end, to save the caches every pull
+  # request starts from (a cancelled run saves none)
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -283,8 +285,35 @@ jobs:
           - { arch: arm64, os: ubuntu-24.04-arm }
     steps:
       - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      # the cache mounts of the Dockerfile (registry, target) live in the runner, lost after the job:
+      # kept in the cache of GitHub, then put back into BuildKit before the build
+      - name: Cache of the cargo mounts of the Dockerfile
+        id: cargo-mounts
+        uses: actions/cache@v4
+        with:
+          path: |
+            cargo-registry
+            cargo-target
+          key: docker-cargo-${{ matrix.arch }}-${{ hashFiles('Cargo.lock', 'Dockerfile') }}
+          restore-keys: docker-cargo-${{ matrix.arch }}-
+      - uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          cache-map: |
+            {
+              "cargo-registry": "/usr/local/cargo/registry",
+              "cargo-target": "/build/target"
+            }
+          skip-extraction: ${{ steps.cargo-mounts.outputs.cache-hit }}
+      # the layers (the base images) in the cache of GitHub too
       - name: Build the image of kraken-trading-bot
-        run: docker build -t kraken-trading-bot:ci .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: kraken-trading-bot:ci
+          cache-from: type=gha,scope=docker-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=docker-${{ matrix.arch }}
       - name: Refuses to start without credentials
         run: |
           set +e
