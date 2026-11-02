@@ -1,0 +1,82 @@
+{
+  "error": [],
+  "result": {
+    "USDC": {
+      "aclass": "currency",
+      "altname": "USDC",
+      "decimals": 8,
+      "display_decimals": 4,
+      "collateral_value": 0.995,
+      "status": "enabled",
+      "margin_rate": "0.02"
+    },
+    "XETH": {
+      "aclass": "currency",
+      "altname": "ETH",
+      "decimals": 10,
+      "display_decimals": 5,
+      "collateral_value": 0.99,
+      "status": "enabled",
+      "margin_rate": "0.02"
+    },
+    "XXBT": {
+      "aclass": "currency",
+      "altname": "XBT",
+      "decimals": 10,
+      "display_decimals": 5,
+      "collateral_value": 0.99,
+      "status": "enabled",
+      "margin_rate": "0.01"
+    },
+    "ZUSD": {
+      "aclass": "currency",
+      "altname": "USD",
+      "decimals": 4,
+      "display_decimals": 2,
+      "collateral_value": 1.0,
+      "status": "enabled",
+      "margin_rate": "0.025"
+    },
+    "AALx": {
+      "aclass": "tokenized_asset",
+      "altname": "AALx",
+      "decimals": 8,
+      "display_decimals": 6,
+      "status": "enabled",
+      "token_multiplier": "1"
+    },
+    "AAPLSPV": {
+      "aclass": "tokenized_asset",
+      "altname": "AAPLx",
+      "decimals": 8,
+      "display_decimals": 8,
+      "collateral_value": 0.8,
+      "max_collateral_balance_usd_value": "250000",
+      "status": "enabled",
+      "margin_rate": "0.02"
+    },
+    "SPCXSPV": {
+      "aclass": "tokenized_asset",
+      "altname": "SPCXx",
+      "decimals": 8,
+      "display_decimals": 6,
+      "status": "enabled",
+      "margin_rate": "0.02"
+    },
+    "ANSEM": {
+      "aclass": "currency",
+      "altname": "ANSEM",
+      "decimals": 5,
+      "display_decimals": 3,
+      "status": "withdrawal_only",
+      "margin_rate": "0"
+    },
+    "1INCH": {
+      "aclass": "currency",
+      "altname": "1INCH",
+      "decimals": 10,
+      "display_decimals": 5,
+      "status": "enabled"
+    }
+  }
+}

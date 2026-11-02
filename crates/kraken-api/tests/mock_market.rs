@@ -3,7 +3,9 @@
 mod common;
 
 use common::{QueryIs, ok, public_api};
-use kraken_api::market::{CandleInterval, CandlesRequest, SystemState};
+use kraken_api::market::{
+    AssetClass, AssetStatus, AssetsRequest, CandleInterval, CandlesRequest, SystemState,
+};
 use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -161,4 +163,32 @@ async fn maintenance_schedule() {
     let events = public_api(&server).maintenance_schedule().await.unwrap();
     assert_eq!(events[0].event_id, 34);
     assert_eq!(events[0].affected_services, ["spot_rest", "spot_ws"]);
+}
+
+#[tokio::test]
+async fn assets() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/0/public/Assets"))
+        .and(QueryIs(vec![
+            ("asset", "XBT,AALx"),
+            ("aclass", "tokenized_asset"),
+        ]))
+        .respond_with(ok(
+            json!({"AALx": {"aclass": "tokenized_asset", "altname": "AALx",
+            "decimals": 8, "display_decimals": 6, "status": "enabled", "token_multiplier": "1"}}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let assets = public_api(&server)
+        .assets(&AssetsRequest {
+            assets: vec!["XBT".into(), "AALx".into()],
+            aclass: Some(AssetClass::TokenizedAsset),
+        })
+        .await
+        .unwrap();
+    assert_eq!(assets["AALx"].status, AssetStatus::Enabled);
+    assert_eq!(assets["AALx"].token_multiplier, Some(dec!(1)));
 }

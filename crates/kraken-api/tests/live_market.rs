@@ -10,8 +10,8 @@ mod strict;
 use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::{
-    AssetPair, AssetPairStatus, CandleInterval, CandlesRequest, MaintenanceEvent, ServerTime,
-    SystemState, SystemStatus, Ticker,
+    Asset, AssetClass, AssetPair, AssetPairStatus, AssetsRequest, CandleInterval, CandlesRequest,
+    MaintenanceEvent, ServerTime, SystemState, SystemStatus, Ticker,
 };
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
 use rust_decimal_macros::dec;
@@ -456,4 +456,39 @@ async fn maintenance_schedule() {
         public_api().maintenance_schedule().await.unwrap().len(),
         schedule.events.len()
     );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn assets_of_every_class() {
+    #[derive(Serialize)]
+    struct Params<'a> {
+        aclass: &'a str,
+    }
+    for aclass in ["currency", "tokenized_asset"] {
+        let raw: Value = public_client()
+            .call_with("Assets", Some(&Params { aclass }))
+            .await
+            .unwrap();
+        let mut presence = Presence::default();
+        for (key, value) in entries(&raw) {
+            presence.record(value);
+            let asset: Asset = decode_strict(&format!("Assets {key}"), value);
+            assert_ne!(asset.aclass, AssetClass::Unknown, "{key}");
+            assert!((0..=18).contains(&asset.decimals), "{key}: {asset:?}");
+            assert!(asset.display_decimals <= asset.decimals, "{key}: {asset:?}");
+        }
+        assert!(presence.total() > 10, "{aclass}");
+        presence.assert_always(aclass, &["aclass", "altname", "decimals", "status"]);
+        presence.print(&format!("Assets {aclass}"));
+    }
+
+    let bitcoin = public_api()
+        .assets(&AssetsRequest {
+            assets: vec!["XBT".into()],
+            aclass: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(bitcoin["XXBT"].altname, "XBT");
 }

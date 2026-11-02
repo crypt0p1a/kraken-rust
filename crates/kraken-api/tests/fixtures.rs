@@ -9,8 +9,8 @@ use common::{private_api, public_api};
 use kraken_api::Decimal;
 use kraken_api::account::{ExtendedBalance, TradeVolume};
 use kraken_api::market::{
-    AssetPair, AssetPairStatus, CandleInterval, CandlesRequest, ServerTime, SystemState,
-    SystemStatus, Ticker,
+    Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
+    ServerTime, SystemState, SystemStatus, Ticker,
 };
 use kraken_api::trading::{
     ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
@@ -321,5 +321,39 @@ async fn maintenance_schedule_fixture() {
             .await
             .unwrap()
             .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn assets_fixture() {
+    let assets: HashMap<String, Asset> = each("Assets", &fixture("assets.json"));
+
+    assert_eq!(assets["XXBT"].altname, "XBT");
+    assert_eq!(assets["XXBT"].aclass, AssetClass::Currency);
+    assert!(assets["XXBT"].margin_rate.is_some());
+    assert!(
+        assets
+            .values()
+            .any(|it| it.status == AssetStatus::WithdrawalOnly)
+    );
+    let tokenized: Vec<_> = assets
+        .values()
+        .filter(|it| it.aclass == AssetClass::TokenizedAsset)
+        .collect();
+    assert!(tokenized.iter().any(|it| it.token_multiplier.is_some()));
+    assert!(
+        tokenized
+            .iter()
+            .any(|it| it.max_collateral_balance_usd_value.is_some())
+    );
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/public/Assets", "assets.json").await;
+    assert_eq!(
+        public_api(&server)
+            .assets(&Default::default())
+            .await
+            .unwrap(),
+        assets
     );
 }
