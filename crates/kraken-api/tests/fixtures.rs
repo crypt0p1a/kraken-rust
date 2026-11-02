@@ -10,7 +10,7 @@ use kraken_api::Decimal;
 use kraken_api::account::{ExtendedBalance, TradeVolume};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
-    ServerTime, SystemState, SystemStatus, Ticker,
+    OrderBookRequest, ServerTime, SystemState, SystemStatus, Ticker,
 };
 use kraken_api::trading::{
     ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
@@ -356,4 +356,44 @@ async fn assets_fixture() {
             .unwrap(),
         assets
     );
+}
+
+/// The rows of the single pair of a fixture, or of one of its sides
+fn rows(name: &str, side: Option<&str>) -> Vec<Value> {
+    let result = fixture(name);
+    let pair = result
+        .as_object()
+        .unwrap()
+        .keys()
+        .find(|it| *it != "last")
+        .unwrap()
+        .clone();
+    match side {
+        None => result[&pair].as_array().unwrap().clone(),
+        Some(side) => result[&pair][side].as_array().unwrap().clone(),
+    }
+}
+
+#[tokio::test]
+async fn order_book_fixture() {
+    for row in rows("depth.json", Some("asks"))
+        .iter()
+        .chain(&rows("depth.json", Some("bids")))
+    {
+        assert_eq!(row.as_array().unwrap().len(), 3, "{row}");
+    }
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/public/Depth", "depth.json").await;
+    let book = public_api(&server)
+        .order_book(&OrderBookRequest {
+            pair: "XBTUSD".into(),
+            count: Some(3),
+            asset_class: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(book.pair, "XXBTZUSD");
+    assert_eq!((book.asks.len(), book.bids.len()), (3, 3));
+    assert!(book.bids[0].price < book.asks[0].price);
 }

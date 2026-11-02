@@ -4,6 +4,8 @@
 //! [`crate::PublicApi`] and [`crate::PrivateApi`].
 
 pub(crate) mod assets;
+pub(crate) mod book;
+mod keyed;
 pub(crate) mod ohlc;
 pub(crate) mod pairs;
 pub(crate) mod status;
@@ -11,6 +13,7 @@ pub(crate) mod ticker;
 pub(crate) mod time;
 
 pub use assets::{Asset, AssetClass, AssetStatus, AssetsRequest};
+pub use book::{BookLevel, OrderBook, OrderBookRequest};
 pub use ohlc::{Candle, CandleInterval, Candles, CandlesRequest};
 pub use pairs::{AssetPair, AssetPairStatus, FeeTier};
 pub use status::{

@@ -1,6 +1,6 @@
 use crate::market::{
-    self, Asset, AssetPair, AssetsRequest, Candles, CandlesRequest, MaintenanceEvent, ServerTime,
-    SystemStatus, Ticker,
+    self, Asset, AssetPair, AssetsRequest, Candles, CandlesRequest, MaintenanceEvent, OrderBook,
+    OrderBookRequest, ServerTime, SystemStatus, Ticker,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PublicClient;
@@ -65,6 +65,13 @@ impl PublicApi {
         pairs: &[String],
     ) -> Result<HashMap<String, AssetPair>, KrakenError> {
         market::pairs::asset_pairs(&self.client, pairs).await
+    }
+
+    /// Level 2 order book of a pair: the aggregated volume of each price level
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-order-book>
+    pub async fn order_book(&self, request: &OrderBookRequest) -> Result<OrderBook, KrakenError> {
+        market::book::order_book(&self.client, request).await
     }
 
     /// OHLC candles of a pair, the last one being still open

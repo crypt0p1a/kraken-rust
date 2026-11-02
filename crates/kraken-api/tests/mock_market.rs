@@ -4,7 +4,8 @@ mod common;
 
 use common::{QueryIs, ok, public_api};
 use kraken_api::market::{
-    AssetClass, AssetStatus, AssetsRequest, CandleInterval, CandlesRequest, SystemState,
+    AssetClass, AssetStatus, AssetsRequest, CandleInterval, CandlesRequest, OrderBookRequest,
+    SystemState,
 };
 use rust_decimal_macros::dec;
 use serde_json::json;
@@ -191,4 +192,31 @@ async fn assets() {
         .unwrap();
     assert_eq!(assets["AALx"].status, AssetStatus::Enabled);
     assert_eq!(assets["AALx"].token_multiplier, Some(dec!(1)));
+}
+
+#[tokio::test]
+async fn order_book() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/0/public/Depth"))
+        .and(QueryIs(vec![("pair", "XBTUSD"), ("count", "2")]))
+        .respond_with(ok(json!({"XXBTZUSD": {
+            "asks": [["77934.10000", "4.317", 1793612207], ["77934.20000", "0.002", 1793612201]],
+            "bids": [["77934.00000", "0.001", 1793612198]]
+        }})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let book = public_api(&server)
+        .order_book(&OrderBookRequest {
+            pair: "XBTUSD".into(),
+            count: Some(2),
+            asset_class: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(book.pair, "XXBTZUSD");
+    assert_eq!(book.asks.len(), 2);
+    assert_eq!(book.bids[0].price, dec!(77934));
 }

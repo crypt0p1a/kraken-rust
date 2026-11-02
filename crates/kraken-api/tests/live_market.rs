@@ -11,7 +11,7 @@ use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetsRequest, CandleInterval, CandlesRequest,
-    MaintenanceEvent, ServerTime, SystemState, SystemStatus, Ticker,
+    MaintenanceEvent, OrderBookRequest, ServerTime, SystemState, SystemStatus, Ticker,
 };
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
 use rust_decimal_macros::dec;
@@ -491,4 +491,28 @@ async fn assets_of_every_class() {
         .await
         .unwrap();
     assert_eq!(bitcoin["XXBT"].altname, "XBT");
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn order_book_is_ordered() {
+    let book = public_api()
+        .order_book(&OrderBookRequest {
+            pair: "XBTUSD".into(),
+            count: Some(25),
+            asset_class: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(book.pair, "XXBTZUSD");
+    assert_eq!((book.asks.len(), book.bids.len()), (25, 25));
+    assert!(book.bids[0].price < book.asks[0].price, "crossed book");
+    assert!(book.asks.windows(2).all(|it| it[0].price < it[1].price));
+    assert!(book.bids.windows(2).all(|it| it[0].price > it[1].price));
+    assert!(
+        book.asks
+            .iter()
+            .chain(&book.bids)
+            .all(|it| it.volume > Decimal::ZERO)
+    );
 }
