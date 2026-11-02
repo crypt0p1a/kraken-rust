@@ -12,12 +12,14 @@ on:
 permissions:
   contents: read
 
-# a new push to the same branch or pull request cancels the run in progress. The steps and jobs
+# a new push to the same pull request cancels the run in progress. The steps and jobs
 # which must run after a failure use !cancelled(), not always(): always() keeps them running after
 # a cancellation, which holds the run and leaves the new one pending
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # only the runs of a pull request: the runs of main go to the end, to save the caches every pull
+  # request starts from (a cancelled run saves none)
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
