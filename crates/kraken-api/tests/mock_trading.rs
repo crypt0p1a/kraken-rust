@@ -5,9 +5,9 @@ mod common;
 use common::{FormIs, Signed, ok, orders_fixture, private_api};
 use kraken_api::KrakenError;
 use kraken_api::trading::{
-    AmendType, CloseTime, ClosedOrdersRequest, NewOrder, OpenOrdersRequest, OrderAmendsRequest,
-    OrderFlag, OrderSide, OrderStatus, OrderType, QueryOrdersRequest, QueryTradesRequest,
-    TimeInForce, TradesHistoryRequest,
+    AmendType, CloseTime, ClosedOrdersRequest, NewOrder, OpenOrdersRequest, OpenPositionsRequest,
+    OrderAmendsRequest, OrderFlag, OrderSide, OrderStatus, OrderType, QueryOrdersRequest,
+    QueryTradesRequest, TimeInForce, TradesHistoryRequest,
 };
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -306,4 +306,57 @@ async fn order_amends() {
         .await
         .unwrap();
     assert_eq!(amends.amends[0].amend_type, AmendType::Original);
+}
+
+#[tokio::test]
+async fn open_positions() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/OpenPositions"))
+        .and(Signed)
+        .and(FormIs(vec![("docalcs", "true")]))
+        .respond_with(ok(
+            json!({"TF5GVO-T7ZZ2-6NBKBI": {"ordertxid": "OLWNFG-LLH4R-D6SFFP",
+            "posstatus": "open", "pair": "XXBTZUSD", "time": 1605280097.8294, "type": "sell",
+            "ordertype": "market", "cost": "100", "fee": "0.26", "vol": "0.01",
+            "vol_closed": "0", "margin": "20", "value": "99", "net": "+0.74", "misc": "",
+            "oflags": ""}}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let positions = private_api(&server)
+        .open_positions(&OpenPositionsRequest {
+            docalcs: Some(true),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(positions[0].txid, "TF5GVO-T7ZZ2-6NBKBI");
+    assert_eq!(positions[0].side, OrderSide::Sell);
+}
+
+#[tokio::test]
+async fn open_positions_by_market() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/OpenPositions"))
+        .and(Signed)
+        .and(FormIs(vec![("consolidation", "market")]))
+        .respond_with(ok(
+            json!([{"pair": "XXBTZUSD", "class": "margin", "positions": "2",
+            "type": "buy", "leverage": "n/a", "cost": "100", "fee": "0.26", "vol": "0.01",
+            "vol_closed": "0", "margin": "20"}]),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let positions = private_api(&server)
+        .open_positions_by_market(None)
+        .await
+        .unwrap();
+    assert_eq!(positions[0].positions, 2);
+    assert_eq!(positions[0].leverage, "n/a");
 }

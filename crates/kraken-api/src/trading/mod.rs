@@ -6,10 +6,12 @@
 //! - `add`: new orders
 //! - `trades`: the trades (fills) of the account
 //! - `amends`: the versions of an amended order
+//! - `positions`: the open margin positions
 
 pub(crate) mod add;
 pub(crate) mod amends;
 pub(crate) mod order;
+pub(crate) mod positions;
 pub(crate) mod query;
 pub(crate) mod trades;
 mod types;
@@ -17,6 +19,7 @@ mod types;
 pub use add::{NewOrder, NewOrderAnswer, NewOrderDescription};
 pub use amends::{AmendType, OrderAmend, OrderAmends, OrderAmendsRequest};
 pub use order::{Order, OrderDescription};
+pub use positions::{ConsolidatedPosition, OpenPositionsRequest, Position};
 pub use query::{
     CloseTime, ClosedOrders, ClosedOrdersRequest, OpenOrdersRequest, QueryOrdersRequest,
 };

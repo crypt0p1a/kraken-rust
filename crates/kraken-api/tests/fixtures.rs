@@ -19,8 +19,8 @@ use kraken_api::market::{
 };
 use kraken_api::trading::{
     AmendType, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
-    OrderAmends, OrderAmendsRequest, OrderSide, OrderStatus, OrderType, QueryOrdersRequest,
-    QueryTradesRequest, TimeInForce, Trade,
+    OrderAmends, OrderAmendsRequest, OrderSide, OrderStatus, OrderType, Position,
+    QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade,
 };
 use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
@@ -705,4 +705,26 @@ async fn order_amends_fixture() {
         .await
         .unwrap();
     assert_eq!(served, amends);
+}
+
+#[tokio::test]
+async fn open_positions_fixture() {
+    let positions: HashMap<String, Position> =
+        each("OpenPositions", &fixture("open_positions.json"));
+    assert!(positions.values().all(|it| it.volume_closed <= it.volume));
+    assert!(
+        positions
+            .values()
+            .all(|it| it.net.is_some_and(|net| net > Decimal::ZERO))
+    );
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/OpenPositions", "open_positions.json").await;
+    let served = private_api(&server)
+        .open_positions(&Default::default())
+        .await
+        .unwrap();
+    assert_eq!(served.len(), 3);
+    assert_eq!(served[0].txid, "TYMRFG-URRG5-2ZTQSD");
+    assert!(served.windows(2).all(|it| it[0].time >= it[1].time));
 }

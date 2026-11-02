@@ -5,9 +5,9 @@ use crate::account::{
 };
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
-    self, ClosedOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
-    OrderAmends, OrderAmendsRequest, QueryOrdersRequest, QueryTradesRequest, Trade, TradesHistory,
-    TradesHistoryRequest,
+    self, ClosedOrders, ClosedOrdersRequest, ConsolidatedPosition, NewOrder, NewOrderAnswer,
+    OpenOrdersRequest, OpenPositionsRequest, Order, OrderAmends, OrderAmendsRequest, Position,
+    QueryOrdersRequest, QueryTradesRequest, Trade, TradesHistory, TradesHistoryRequest,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PrivateClient;
@@ -192,5 +192,26 @@ impl PrivateApi {
         request: &QueryTradesRequest,
     ) -> Result<Vec<Trade>, KrakenError> {
         trading::trades::query_trades(&self.client, request).await
+    }
+
+    /// The open margin positions, most recent first
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-open-positions>
+    pub async fn open_positions(
+        &self,
+        request: &OpenPositionsRequest,
+    ) -> Result<Vec<Position>, KrakenError> {
+        trading::positions::open_positions(&self.client, request).await
+    }
+
+    /// The open margin positions consolidated by pair, with their value and profit / loss when
+    /// `docalcs`
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-open-positions>
+    pub async fn open_positions_by_market(
+        &self,
+        docalcs: Option<bool>,
+    ) -> Result<Vec<ConsolidatedPosition>, KrakenError> {
+        trading::positions::open_positions_by_market(&self.client, docalcs).await
     }
 }

@@ -10,9 +10,9 @@ use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::AssetPair;
 use kraken_api::trading::{
-    AmendType, CloseTime, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
-    OrderAmends, OrderFlag, OrderSide, OrderStatus, OrderType, QueryTradesRequest, TimeInForce,
-    Trade, TradesHistoryRequest,
+    AmendType, CloseTime, ClosedOrdersRequest, ConsolidatedPosition, NewOrder, NewOrderAnswer,
+    OpenOrdersRequest, Order, OrderAmends, OrderFlag, OrderSide, OrderStatus, OrderType, Position,
+    QueryTradesRequest, TimeInForce, Trade, TradesHistoryRequest,
 };
 use live::{
     Presence, decode_strict, entries, le, now_seconds, private_api, private_client, public_api,
@@ -755,5 +755,54 @@ async fn order_amends_start_with_the_original_order() {
         amends.amends.last().unwrap().order_quantity,
         order.volume,
         "{amends:?}"
+    );
+}
+
+#[derive(Serialize)]
+struct PositionsParams {
+    docalcs: bool,
+}
+
+#[derive(Serialize)]
+struct ConsolidatedParams {
+    docalcs: bool,
+    consolidation: &'static str,
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn open_positions_are_decoded_strictly() {
+    let raw: Value = private_client()
+        .call_with("OpenPositions", Some(&PositionsParams { docalcs: true }))
+        .await
+        .unwrap();
+    for (txid, value) in entries(&raw) {
+        let position: Position = decode_strict(&format!("OpenPositions {txid}"), value);
+        assert!(position.volume_closed <= position.volume, "{txid}");
+    }
+
+    let raw: Value = private_client()
+        .call_with(
+            "OpenPositions",
+            Some(&ConsolidatedParams {
+                docalcs: true,
+                consolidation: "market",
+            }),
+        )
+        .await
+        .unwrap();
+    // an empty object without positions
+    let consolidated = raw.as_array().cloned().unwrap_or_default();
+    for value in &consolidated {
+        let position: ConsolidatedPosition = decode_strict("OpenPositions by market", value);
+        assert!(position.positions > 0, "{position:?}");
+    }
+    assert_eq!(
+        private_api()
+            .open_positions_by_market(Some(true))
+            .await
+            .unwrap()
+            .len(),
+        consolidated.len()
     );
 }
