@@ -4,10 +4,84 @@
 mod common;
 
 use common::{FormIs, Signed, ok, private_api};
+use kraken_api::account::{
+    ApiKeyInfoRequest, BalanceRequest, ExportFormat, ExportReport, ExportRequest, ExportStatus,
+    LedgerFilter, LedgerType, LedgersRequest, QueryLedgersRequest, RebaseMultiplier,
+    RemoveExportType, TradeBalanceRequest, WalletType,
+};
 use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};
-use wiremock::{Mock, MockServer};
+use wiremock::{Mock, MockServer, ResponseTemplate};
+
+#[tokio::test]
+async fn api_key_info() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/GetApiKeyInfo"))
+        .and(Signed)
+        .and(FormIs(vec![("otp", "123456")]))
+        .respond_with(ok(
+            json!({"api_key_name": "bot", "api_key": "key", "nonce": "17",
+            "permissions": ["query-funds", "modify-trades"], "ip_allowlist": []}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let info = private_api(&server)
+        .api_key_info(&ApiKeyInfoRequest {
+            otp: Some("123456".into()),
+        })
+        .await
+        .unwrap();
+    assert_eq!(info.permissions, ["query-funds", "modify-trades"]);
+}
+
+#[tokio::test]
+async fn balance() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/Balance"))
+        .and(Signed)
+        .and(FormIs(vec![("rebase_multiplier", "rebased")]))
+        .respond_with(ok(json!({"ZUSD": "2970172.7962", "XXBT": "0.0000000001"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let balances = private_api(&server)
+        .balance(&BalanceRequest {
+            rebase_multiplier: Some(RebaseMultiplier::Rebased),
+        })
+        .await
+        .unwrap();
+    assert_eq!(balances["ZUSD"], dec!(2970172.7962));
+    assert_eq!(balances["XXBT"].to_string(), "0.0000000001");
+}
+
+#[tokio::test]
+async fn credit_lines() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/CreditLines"))
+        .and(Signed)
+        .and(FormIs(vec![]))
+        .respond_with(ok(json!({
+            "asset_details": {"ZUSD": {"balance": "1000.5", "hold_trade": "0", "credit": "50000"}},
+            "limits_monitor": {"total_credit_usd": "50000.00", "equity_usd": "110000.00"}
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let lines = private_api(&server)
+        .credit_lines(&Default::default())
+        .await
+        .unwrap();
+    assert_eq!(lines.asset_details["ZUSD"].credit, Some(dec!(50000)));
+    assert_eq!(lines.limits_monitor.equity_usd, Some(dec!(110000)));
+}
 
 #[tokio::test]
 async fn extended_balance() {
@@ -27,6 +101,200 @@ async fn extended_balance() {
     let balances = private_api(&server).extended_balance().await.unwrap();
     assert_eq!(balances["ZUSD"].available(), dec!(17185.45));
     assert_eq!(balances["XXBT"].hold_trade, None);
+}
+
+#[tokio::test]
+async fn trade_balance() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/TradeBalance"))
+        .and(Signed)
+        .and(FormIs(vec![("asset", "ZEUR")]))
+        .respond_with(ok(
+            json!({"eb": "100.5", "tb": "90", "m": "10", "n": "-1.5", "c": "50",
+            "v": "48.5", "e": "88.5", "mf": "78.5", "mfo": "70", "ml": "885.00", "uv": "0"}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let balance = private_api(&server)
+        .trade_balance(&TradeBalanceRequest {
+            asset: Some("ZEUR".into()),
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(balance.unrealized_net, dec!(-1.5));
+    assert_eq!(balance.margin_level, Some(dec!(885)));
+}
+
+#[tokio::test]
+async fn wallet_accounts() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/ListWalletAccounts"))
+        .and(Signed)
+        .and(FormIs(vec![]))
+        .respond_with(ok(
+            json!({"accounts": [{"account_id": "WX6V-JUKW-KKPB-QE36",
+            "flags": {"user_defined": true, "active": true}, "status": "active", "type": "spot",
+            "name": "bot"}], "cursor": {"next": "abc"}}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let wallets = private_api(&server).wallet_accounts().await.unwrap();
+    assert_eq!(wallets.accounts[0].wallet_type, WalletType::Spot);
+    assert_eq!(wallets.cursor.next.as_deref(), Some("abc"));
+}
+
+#[tokio::test]
+async fn add_export() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/AddExport"))
+        .and(Signed)
+        .and(FormIs(vec![
+            ("report", "trades"),
+            ("format", "CSV"),
+            ("description", "my_trades_1"),
+            ("starttm", "1688169600"),
+        ]))
+        .respond_with(ok(json!({"id": "TCJA"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let id = private_api(&server)
+        .add_export(&ExportRequest {
+            report: ExportReport::Trades,
+            format: Some(ExportFormat::Csv),
+            description: "my_trades_1".into(),
+            fields: vec![],
+            start_time: Some(1688169600),
+            end_time: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(id, "TCJA");
+}
+
+#[tokio::test]
+async fn export_status() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/ExportStatus"))
+        .and(Signed)
+        .and(FormIs(vec![("report", "ledgers")]))
+        .respond_with(ok(
+            json!([{"id": "VSKC", "descr": "ledgers", "format": "CSV",
+            "report": "ledgers", "status": "Queued", "createdtm": "1688669085"}]),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let exports = private_api(&server)
+        .export_status(ExportReport::Ledgers)
+        .await
+        .unwrap();
+    assert_eq!(exports[0].status, ExportStatus::Queued);
+}
+
+#[tokio::test]
+async fn retrieve_export() {
+    let zip: Vec<u8> = vec![
+        0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ];
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/RetrieveExport"))
+        .and(Signed)
+        .and(FormIs(vec![("id", "TCJA")]))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(zip.clone()))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    assert_eq!(
+        private_api(&server).retrieve_export("TCJA").await.unwrap(),
+        zip
+    );
+}
+
+#[tokio::test]
+async fn remove_export() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/RemoveExport"))
+        .and(Signed)
+        .and(FormIs(vec![("id", "TCJA"), ("type", "delete")]))
+        .respond_with(ok(json!({"delete": true})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    assert!(
+        private_api(&server)
+            .remove_export("TCJA", RemoveExportType::Delete)
+            .await
+            .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn ledgers() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/Ledgers"))
+        .and(Signed)
+        .and(FormIs(vec![("asset", "XXBT"), ("type", "deposit")]))
+        .respond_with(ok(json!({"count": 1, "ledger": {"LMKZCZ-Z3GVL-CXKK4H": {
+            "refid": "FTzhVSJ-qQ2NJR2vmIhMzZm3DjE5Gr", "time": 1688444262.8888,
+            "type": "deposit", "subtype": "", "aclass": "currency", "asset": "XXBT",
+            "amount": "0.5", "fee": "0", "balance": "0.5"}}})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let ledgers = private_api(&server)
+        .ledgers(&LedgersRequest {
+            assets: vec!["XXBT".into()],
+            entry_type: Some(LedgerFilter::Deposit),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(ledgers.entries[0].id, "LMKZCZ-Z3GVL-CXKK4H");
+    assert_eq!(ledgers.entries[0].entry_type, LedgerType::Deposit);
+}
+
+#[tokio::test]
+async fn query_ledgers() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/QueryLedgers"))
+        .and(Signed)
+        .and(FormIs(vec![("id", "L4UESK-KG3EQ-UFO4T5")]))
+        .respond_with(ok(
+            json!({"L4UESK-KG3EQ-UFO4T5": {"refid": "TJKLXX-PGMUI-4NTLXU",
+            "time": 1688464484.1787, "type": "trade", "subtype": "", "aclass": "currency",
+            "asset": "ZGBP", "amount": "-24.5000", "fee": "0.0490", "balance": "459567.9171"}}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let entries = private_api(&server)
+        .query_ledgers(&QueryLedgersRequest {
+            ids: vec!["L4UESK-KG3EQ-UFO4T5".into()],
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(entries[0].fee, dec!(0.049));
 }
 
 #[tokio::test]

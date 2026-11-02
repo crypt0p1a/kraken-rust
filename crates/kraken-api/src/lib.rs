@@ -1,10 +1,15 @@
 //! Calls of the Kraken Spot REST API, grouped by domain
 //!
-//! | Module        | Endpoints                                         |
-//! |---------------|---------------------------------------------------|
-//! | [`market`]    | public: Time, Ticker, AssetPairs, OHLC            |
-//! | [`account`]   | private: BalanceEx, TradeVolume                   |
-//! | [`trading`]   | private: OpenOrders, ClosedOrders, QueryOrders, AddOrder |
+//! | Module           | Endpoints                                         |
+//! |------------------|---------------------------------------------------|
+//! | [`funding`]      | private, Funding (Beta): /funding/v1/assets, /funding/v1/methods, /funding/v1/networks, /funding/v1/fees, /funding/v1/limits, /funding/v1/deposit/address, /funding/v2/deposit/addresses, /funding/v1/deposits, /funding/v1/addresses (GET, POST, PUT, DELETE), /funding/v1/withdrawals (GET, POST) |
+//! | [`market`]       | public: Time, SystemStatus, MaintenanceSchedule, Assets, AssetPairs, Ticker, OHLC, Depth, GroupedBook, Trades, Spread; private: Level3 |
+//! | [`transparency`] | public: PreTrade, PostTrade                       |
+//! | [`account`]      | private: Balance, BalanceEx, CreditLines, TradeBalance, TradeVolume, Ledgers, QueryLedgers, AddExport, ExportStatus, RetrieveExport, RemoveExport, GetApiKeyInfo, ListWalletAccounts |
+//! | [`algo`]         | private: AddStrategy, CancelStrategy, GetOpenStrategies, GetClosedStrategies, QueryStrategies |
+//! | [`earn`]         | private: Earn/Strategies, Earn/Allocations, Earn/Allocate, Earn/AllocateStatus, Earn/Deallocate, Earn/DeallocateStatus |
+//! | [`subaccounts`]  | private: CreateSubaccount, AccountTransfer        |
+//! | [`trading`]      | private: OpenOrders, ClosedOrders, QueryOrders, OrderAmends, TradesHistory, QueryTrades, OpenPositions, AddOrder, AddOrderBatch, AmendOrder, EditOrder, CancelOrder, CancelAll, CancelAllOrdersAfter, CancelOrderBatch, GetWebSocketsToken |
 //!
 //! Each domain holds its models and its calls, [`PublicApi`] and [`PrivateApi`] being the facades
 //! composing them over the clients of `kraken-network`.
@@ -38,13 +43,21 @@ uniffi::custom_type!(Decimal, String, {
 });
 
 pub mod account;
+pub mod algo;
+mod cursor;
+pub mod earn;
+pub mod funding;
+mod keyed;
 mod lenient;
 pub mod market;
 mod params;
 mod private_api;
 mod public_api;
+pub mod subaccounts;
 pub mod trading;
+pub mod transparency;
 
+pub use cursor::Cursor;
 pub use kraken_network::{KrakenError, Logger, RateLimiter, RestOptions};
 pub use private_api::PrivateApi;
 pub use public_api::PublicApi;

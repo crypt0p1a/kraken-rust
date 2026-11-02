@@ -1,0 +1,25 @@
+{
+  "error": [],
+  "result": {
+    "api_key_name": "trading-bot",
+    "api_key": "integration-test-key",
+    "nonce": "1772627060997",
+    "nonce_window": 0,
+    "permissions": [
+      "query-funds",
+      "query-open-trades",
+      "query-closed-trades",
+      "modify-trades"
+    ],
+    "iban": "AA88 N84G WOAK NMOI",
+    "valid_until": "0",
+    "query_from": "0",
+    "query_to": "0",
+    "created_time": "1772542900",
+    "modified_time": "1772543095",
+    "ip_allowlist": [
+      "203.0.113.0/24"
+    ],
+    "last_used": "1772627061"
+  }
+}

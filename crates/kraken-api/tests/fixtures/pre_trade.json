@@ -1,0 +1,69 @@
+{
+  "error": [],
+  "result": {
+    "symbol": "BTC/USD",
+    "description": "Bitcoin / US Dollar",
+    "base_asset": "XBT",
+    "base_notation": "UNIT",
+    "base_dti_code": "V15WLZJMF",
+    "base_dti_short_name": "BTC,XBT",
+    "quote_asset": "USD",
+    "quote_notation": "MONE",
+    "quote_dti_code": "",
+    "quote_dti_short_name": "",
+    "venue": "PGSL",
+    "system": "CLOB",
+    "bids": [
+      {
+        "side": "BUY",
+        "price": "77931.00000",
+        "qty": "0.02565977",
+        "count": 2,
+        "publication_ts": "2026-11-02T09:37:16.830882918Z",
+        "submission_ts": "2026-11-02T09:37:16.830882918Z"
+      },
+      {
+        "side": "BUY",
+        "price": "77930.90000",
+        "qty": "0.00071216",
+        "count": 1,
+        "publication_ts": "2026-11-02T09:25:44.094165102Z",
+        "submission_ts": "2026-11-02T09:25:44.094165102Z"
+      },
+      {
+        "side": "BUY",
+        "price": "77930.80000",
+        "qty": "1.20735835",
+        "count": 1,
+        "publication_ts": "2026-11-02T09:37:14.980602584Z",
+        "submission_ts": "2026-11-02T09:37:14.980602584Z"
+      }
+    ],
+    "asks": [
+      {
+        "side": "SELL",
+        "price": "77931.10000",
+        "qty": "0.49878371",
+        "count": 7,
+        "publication_ts": "2026-11-02T09:37:16.826130418Z",
+        "submission_ts": "2026-11-02T09:37:16.826130418Z"
+      },
+      {
+        "side": "SELL",
+        "price": "77931.60000",
+        "qty": "0.15987847",
+        "count": 1,
+        "publication_ts": "2026-11-02T09:37:16.888040016Z",
+        "submission_ts": "2026-11-02T09:37:16.888040016Z"
+      },
+      {
+        "side": "SELL",
+        "price": "77931.70000",
+        "qty": "0.13712831",
+        "count": 1,
+        "publication_ts": "2026-11-02T09:37:16.721174550Z",
+        "submission_ts": "2026-11-02T09:37:16.721174550Z"
+      }
+    ]
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "deposits": [
+    {
+      "deposit_id": "FTcQ4qW-fWGQbQwUfqdnZo4dsMn1ao",
+      "method_id": "3e7f8072-cc6d-4394-982a-5f4ca6ab27dd",
+      "network_id": "b336ce74-8d60-42b8-8714-b1095e06b711",
+      "status": "success",
+      "amount": {
+        "asset": {
+          "class": "currency",
+          "name": "USDC"
+        },
+        "amount": "20.00000000"
+      },
+      "fee": {
+        "asset": {
+          "class": "currency",
+          "name": "USDC"
+        },
+        "amount": "0.00000000"
+      },
+      "create_time": "2026-07-01T08:31:33Z",
+      "onchain_transaction": "0d0a8f941a1ee0caeca3396757c847e0a3fa326d6994c320b4f283db99cd5e48"
+    },
+    {
+      "deposit_id": "FTAsxe1-PHt8Ni7NodvtOEw8FBvLAJ",
+      "method_id": "a897bb0b-e7bc-4eff-969f-433bc811e4ad",
+      "network_id": "d9d375da-44b7-4be1-8a00-8b281acfe366",
+      "status": "pending",
+      "amount": {
+        "asset": {
+          "class": "currency",
+          "name": "LINK"
+        },
+        "amount": "5555.0000000000"
+      },
+      "create_time": "2026-06-23T08:41:17Z",
+      "onchain_transaction": "0941a1d057c847e0a3fa326da8fee0caeca339676994c320283db99cdb4f5e48"
+    },
+    {
+      "deposit_id": "FTb2L7d-QkM3Rx9WpZnYo1c8VdEe4g",
+      "method_id": "b7c1d5e0-6f0a-4b8e-9d1c-2f6a8e4c0d11",
+      "status": "initial",
+      "create_time": "2026-06-20T10:00:00Z"
+    }
+  ],
+  "next_cursor": "gqNrZXm-RlREc1IxRC1oOTd3c1Y4"
+}

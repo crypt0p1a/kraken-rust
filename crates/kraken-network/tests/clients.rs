@@ -3,7 +3,10 @@
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use hmac::{Hmac, Mac};
-use kraken_network::{KrakenError, PrivateClient, PublicClient, RateLimiter, RestOptions};
+use kraken_network::{
+    FundingClient, FundingMethod, KrakenError, PrivateClient, PublicClient, RateLimiter,
+    RestOptions,
+};
 use serde::Serialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256, Sha512};
@@ -253,4 +256,287 @@ fn rejects_an_invalid_secret() {
         rate_limiter(),
     );
     assert!(matches!(client, Err(KrakenError::InvalidArgument { .. })));
+}
+
+#[derive(Serialize)]
+struct ReportId {
+    id: &'static str,
+}
+
+#[tokio::test]
+async fn private_files_are_returned_byte_for_byte() {
+    // a zip header, then bytes which aren't UTF-8
+    let file: Vec<u8> = vec![0x50, 0x4b, 0x03, 0x04, 0xff, 0xfe, 0x00, 0x80];
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/RetrieveExport"))
+        .and(header("API-Key", API_KEY))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(file.clone()))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let bytes = private_client(&server)
+        .call_bytes("RetrieveExport", Some(&ReportId { id: "TCJA" }))
+        .await
+        .unwrap();
+    assert_eq!(bytes, file);
+
+    let request = &server.received_requests().await.unwrap()[0];
+    let body = std::str::from_utf8(&request.body).unwrap();
+    assert_eq!(body, format!("nonce={}&id=TCJA", nonce(request)));
+    assert_eq!(
+        request.headers.get("API-Sign").unwrap().to_str().unwrap(),
+        expected_signature(request)
+    );
+}
+
+#[tokio::test]
+async fn private_files_map_the_failures() {
+    let server = MockServer::start().await;
+    let respond = |template: ResponseTemplate| {
+        Mock::given(method("POST"))
+            .and(path("/0/private/RetrieveExport"))
+            .respond_with(template)
+            .up_to_n_times(1)
+    };
+    let call = || async {
+        private_client(&server)
+            .call_bytes("RetrieveExport", Some(&ReportId { id: "TCJA" }))
+            .await
+    };
+
+    respond(ResponseTemplate::new(200).set_body_json(json!({"error": ["EExport:Unknown export"]})))
+        .mount(&server)
+        .await;
+    assert_eq!(
+        call().await,
+        Err(KrakenError::Api {
+            status: 200,
+            body: "EExport:Unknown export".into()
+        })
+    );
+    server.reset().await;
+
+    respond(ResponseTemplate::new(503).set_body_string("unavailable"))
+        .mount(&server)
+        .await;
+    assert_eq!(
+        call().await,
+        Err(KrakenError::Network {
+            status: 503,
+            body: "unavailable".into()
+        })
+    );
+    server.reset().await;
+
+    // JSON where a file was expected
+    respond(ok(json!({"id": "TCJA"}))).mount(&server).await;
+    assert!(matches!(call().await, Err(KrakenError::Decode { .. })));
+}
+
+#[derive(Serialize)]
+struct Batch {
+    orders: Vec<&'static str>,
+    cl_ord_ids: Vec<&'static str>,
+}
+
+#[tokio::test]
+async fn private_json_calls_sign_their_json_body() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/CancelOrderBatch"))
+        .and(header("API-Key", API_KEY))
+        .and(header("Content-Type", "application/json"))
+        .respond_with(ok(json!({"count": 2})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let answer: Value = private_client(&server)
+        .call_json(
+            "CancelOrderBatch",
+            &Batch {
+                orders: vec!["OG5V2Y-RYKVL-DT3V3B", "OP5V2Y-RYKVL-ET3V3B"],
+                cl_ord_ids: vec!["mgr1 buy"],
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(answer, json!({"count": 2}));
+
+    let request = &server.received_requests().await.unwrap()[0];
+    let body: Value = serde_json::from_slice(&request.body).unwrap();
+    let nonce = body["nonce"].as_u64().unwrap();
+    assert_eq!(
+        body,
+        json!({"nonce": nonce, "orders": ["OG5V2Y-RYKVL-DT3V3B", "OP5V2Y-RYKVL-ET3V3B"],
+            "cl_ord_ids": ["mgr1 buy"]})
+    );
+    // API-Sign over the exact bytes sent: path + SHA256(nonce + body)
+    let digest = Sha256::digest([nonce.to_string().as_bytes(), &request.body].concat());
+    let mut mac = Hmac::<Sha512>::new_from_slice(&BASE64.decode(API_SECRET).unwrap()).unwrap();
+    mac.update(request.url.path().as_bytes());
+    mac.update(&digest);
+    assert_eq!(
+        request.headers.get("API-Sign").unwrap().to_str().unwrap(),
+        BASE64.encode(mac.finalize().into_bytes())
+    );
+}
+
+#[tokio::test]
+async fn private_json_calls_take_an_object() {
+    let server = MockServer::start().await;
+    let answer = private_client(&server)
+        .call_json::<_, Value>("CancelOrderBatch", &vec!["OG5V2Y-RYKVL-DT3V3B"])
+        .await;
+    assert!(matches!(answer, Err(KrakenError::InvalidArgument { .. })));
+    assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+fn funding_client(server: &MockServer) -> FundingClient {
+    FundingClient::new(API_KEY.into(), API_SECRET, options(server), rate_limiter()).unwrap()
+}
+
+/// API-Sign of the funding API: the path with its query string, then SHA256(nonce + body)
+fn funding_signature(request: &Request) -> String {
+    let nonce = request.headers.get("API-Nonce").unwrap().to_str().unwrap();
+    let signed_path = match request.url.query() {
+        Some(query) => format!("{}?{query}", request.url.path()),
+        None => request.url.path().to_string(),
+    };
+    let digest = Sha256::digest([nonce.as_bytes(), &request.body].concat());
+    let mut mac = Hmac::<Sha512>::new_from_slice(&BASE64.decode(API_SECRET).unwrap()).unwrap();
+    mac.update(signed_path.as_bytes());
+    mac.update(&digest);
+    BASE64.encode(mac.finalize().into_bytes())
+}
+
+#[derive(Serialize)]
+struct FundingQuery {
+    #[serde(rename = "scope[method_id]")]
+    method_id: &'static str,
+    limit: u32,
+}
+
+#[tokio::test]
+async fn funding_gets_sign_their_query_string() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/funding/v1/addresses"))
+        .and(query_param("scope[method_id]", "27ede8db"))
+        .and(query_param("limit", "20"))
+        .and(header("API-Key", API_KEY))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"addresses": []})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let answer: Value = funding_client(&server)
+        .call(
+            FundingMethod::Get,
+            "/funding/v1/addresses",
+            Some(&FundingQuery {
+                method_id: "27ede8db",
+                limit: 20,
+            }),
+            None::<&()>,
+        )
+        .await
+        .unwrap();
+    assert_eq!(answer, json!({"addresses": []}));
+
+    let request = &server.received_requests().await.unwrap()[0];
+    assert_eq!(
+        request.url.query(),
+        Some("scope%5Bmethod_id%5D=27ede8db&limit=20")
+    );
+    assert!(request.body.is_empty());
+    assert!(request.headers.get("Content-Type").is_none());
+    assert!(request.headers.get("API-Nonce").is_some());
+    assert_eq!(
+        request.headers.get("API-Sign").unwrap().to_str().unwrap(),
+        funding_signature(request)
+    );
+}
+
+#[tokio::test]
+async fn funding_writes_sign_their_json_body() {
+    let server = MockServer::start().await;
+    for (verb, method_name) in [
+        (FundingMethod::Post, "POST"),
+        (FundingMethod::Put, "PUT"),
+        (FundingMethod::Delete, "DELETE"),
+    ] {
+        Mock::given(method(method_name))
+            .and(path("/funding/v1/addresses"))
+            .and(header("Content-Type", "application/json"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"ok": method_name})))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let answer: Value = funding_client(&server)
+            .call(
+                verb,
+                "/funding/v1/addresses",
+                None::<&()>,
+                Some(&json!({"address": "bc1q", "label": "cold"})),
+            )
+            .await
+            .unwrap();
+        assert_eq!(answer, json!({"ok": method_name}));
+    }
+
+    let requests = server.received_requests().await.unwrap();
+    let nonces: Vec<u64> = requests
+        .iter()
+        .map(|it| {
+            it.headers
+                .get("API-Nonce")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .parse()
+                .unwrap()
+        })
+        .collect();
+    assert!(nonces.windows(2).all(|it| it[0] < it[1]), "{nonces:?}");
+    for request in &requests {
+        assert_eq!(
+            serde_json::from_slice::<Value>(&request.body).unwrap(),
+            json!({"address": "bc1q", "label": "cold"})
+        );
+        assert_eq!(
+            request.headers.get("API-Sign").unwrap().to_str().unwrap(),
+            funding_signature(request)
+        );
+    }
+}
+
+#[tokio::test]
+async fn funding_maps_the_failures() {
+    let server = MockServer::start().await;
+    Mock::given(path("/funding/v1/deposit/address"))
+        .respond_with(
+            ResponseTemplate::new(409).set_body_json(json!({"error": "TooManyDepositAddresses"})),
+        )
+        .mount(&server)
+        .await;
+
+    let answer = funding_client(&server)
+        .call::<(), _, Value>(
+            FundingMethod::Put,
+            "/funding/v1/deposit/address",
+            None,
+            Some(&json!({})),
+        )
+        .await;
+    match answer {
+        Err(KrakenError::Api { status, body }) => {
+            assert_eq!(status, 409);
+            assert!(body.contains("TooManyDepositAddresses"), "{body}");
+        }
+        other => panic!("unexpected {other:?}"),
+    }
 }

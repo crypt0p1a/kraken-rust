@@ -10,8 +10,10 @@ use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::AssetPair;
 use kraken_api::trading::{
-    CloseTime, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderFlag,
-    OrderSide, OrderStatus, OrderType, TimeInForce,
+    AmendOrder, AmendType, CloseTime, ClosedOrdersRequest, ConsolidatedPosition, EditOrder,
+    NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends, OrderFlag, OrderReference,
+    OrderSide, OrderStatus, OrderType, Position, QueryTradesRequest, TimeInForce, Trade,
+    TradesHistoryRequest, WebSocketsToken,
 };
 use live::{
     Presence, decode_strict, entries, le, now_seconds, private_api, private_client, public_api,
@@ -451,6 +453,14 @@ impl Market {
             cl_ord_id: None,
             userref: None,
             validate: None,
+            display_volume: None,
+            asset_class: None,
+            trigger: None,
+            leverage: None,
+            reduce_only: None,
+            self_trade_prevention: None,
+            deadline: None,
+            broker: None,
         })
     }
 }
@@ -610,4 +620,316 @@ async fn maps_the_errors_of_invalid_new_orders() {
         api.new_order(&gtd_without_expiry).await,
         Err(KrakenError::InvalidArgument { .. })
     ));
+}
+
+#[derive(Serialize)]
+struct TradesParams {
+    ledgers: bool,
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn trades_history_is_consistent_and_paginated() {
+    let raw: Value = private_client()
+        .call_with("TradesHistory", Some(&TradesParams { ledgers: true }))
+        .await
+        .unwrap();
+    let mut presence = Presence::default();
+    for (txid, value) in entries(&raw["trades"]) {
+        presence.record(value);
+        let trade: Trade = decode_strict(&format!("TradesHistory {txid}"), value);
+        assert!(
+            trade.volume > Decimal::ZERO && trade.fee >= Decimal::ZERO,
+            "{txid}"
+        );
+        // cost = price × volume, to the decimals of the pair
+        let cost = trade.price * trade.volume;
+        assert!(
+            (trade.cost - cost).abs() <= trade.cost * dec!(0.0001) + dec!(0.01),
+            "{txid}: {} vs {cost}",
+            trade.cost
+        );
+    }
+    presence.print("TradesHistory");
+
+    let api = private_api();
+    let request = |cursor: Option<String>| TradesHistoryRequest {
+        limit: Some(2),
+        with_cursor: Some(true),
+        cursor,
+        ..Default::default()
+    };
+    let first = api.trades_history(&request(None)).await.unwrap();
+    assert!(first.trades.len() <= 2);
+    assert!(first.trades.windows(2).all(|it| it[0].time >= it[1].time));
+    if let Some(next) = first.cursor.and_then(|it| it.next) {
+        let second = api.trades_history(&request(Some(next))).await.unwrap();
+        let first_ids: HashSet<_> = first.trades.iter().map(|it| &it.txid).collect();
+        assert!(second.trades.iter().all(|it| !first_ids.contains(&it.txid)));
+        if let (Some(newest), Some(oldest)) = (second.trades.first(), first.trades.last()) {
+            assert!(newest.time <= oldest.time);
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn query_trades_finds_the_trades_of_the_history() {
+    let api = private_api();
+    let history = api.trades_history(&Default::default()).await.unwrap();
+    let txids: Vec<String> = history
+        .trades
+        .iter()
+        .take(20)
+        .map(|it| it.txid.clone())
+        .collect();
+    if txids.is_empty() {
+        println!("no trade on the account: nothing to query");
+        return;
+    }
+
+    #[derive(Serialize)]
+    struct Params {
+        txid: String,
+        ledgers: bool,
+    }
+    let raw: Value = private_client()
+        .call_with(
+            "QueryTrades",
+            Some(&Params {
+                txid: txids.join(","),
+                ledgers: true,
+            }),
+        )
+        .await
+        .unwrap();
+    for (txid, value) in entries(&raw) {
+        let _: Trade = decode_strict(&format!("QueryTrades {txid}"), value);
+    }
+
+    let queried = api
+        .query_trades(&QueryTradesRequest {
+            txids: txids.clone(),
+            trades: None,
+            ledgers: None,
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(queried.len(), txids.len());
+    for trade in &queried {
+        let original = history
+            .trades
+            .iter()
+            .find(|it| it.txid == trade.txid)
+            .unwrap();
+        assert_eq!(trade, original);
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn order_amends_start_with_the_original_order() {
+    let closed = private_api()
+        .closed_orders(&ClosedOrdersRequest::default())
+        .await
+        .unwrap();
+    let Some(order) = closed.orders.first() else {
+        println!("no closed order on the account: no amends to query");
+        return;
+    };
+
+    #[derive(Serialize)]
+    struct Params<'a> {
+        order_id: &'a str,
+    }
+    let raw: Value = private_client()
+        .call_with(
+            "OrderAmends",
+            Some(&Params {
+                order_id: &order.txid,
+            }),
+        )
+        .await
+        .unwrap();
+    let amends: OrderAmends = decode_strict("OrderAmends", &raw);
+    assert!(amends.count >= 1, "{amends:?}");
+    assert_eq!(
+        amends.amends[0].amend_type,
+        AmendType::Original,
+        "{amends:?}"
+    );
+    // the current volume of the order is the one of its last version
+    assert_eq!(
+        amends.amends.last().unwrap().order_quantity,
+        order.volume,
+        "{amends:?}"
+    );
+}
+
+#[derive(Serialize)]
+struct PositionsParams {
+    docalcs: bool,
+}
+
+#[derive(Serialize)]
+struct ConsolidatedParams {
+    docalcs: bool,
+    consolidation: &'static str,
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn open_positions_are_decoded_strictly() {
+    let raw: Value = private_client()
+        .call_with("OpenPositions", Some(&PositionsParams { docalcs: true }))
+        .await
+        .unwrap();
+    for (txid, value) in entries(&raw) {
+        let position: Position = decode_strict(&format!("OpenPositions {txid}"), value);
+        assert!(position.volume_closed <= position.volume, "{txid}");
+    }
+
+    let raw: Value = private_client()
+        .call_with(
+            "OpenPositions",
+            Some(&ConsolidatedParams {
+                docalcs: true,
+                consolidation: "market",
+            }),
+        )
+        .await
+        .unwrap();
+    // an empty object without positions
+    let consolidated = raw.as_array().cloned().unwrap_or_default();
+    for value in &consolidated {
+        let position: ConsolidatedPosition = decode_strict("OpenPositions by market", value);
+        assert!(position.positions > 0, "{position:?}");
+    }
+    assert_eq!(
+        private_api()
+            .open_positions_by_market(Some(true))
+            .await
+            .unwrap()
+            .len(),
+        consolidated.len()
+    );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn websockets_token_with_the_permission() {
+    let Some(raw) = live::unless_denied(
+        "GetWebSocketsToken",
+        private_client().call::<Value>("GetWebSocketsToken").await,
+    ) else {
+        return;
+    };
+    let token: WebSocketsToken = decode_strict("GetWebSocketsToken", &raw);
+    assert!(!token.token.is_empty());
+    assert!(token.expires > 0 && token.expires <= 900, "{token:?}");
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn cancel_an_unknown_order_is_refused() {
+    // no order of the account is touched: this txid doesn't exist
+    let answer = private_api()
+        .cancel_order(&OrderReference::Txid {
+            txid: "OAAAAA-AAAAA-AAAAAA".into(),
+        })
+        .await;
+    match answer {
+        Err(KrakenError::Api { body, .. }) => assert!(body.starts_with("EOrder:"), "{body}"),
+        other => panic!("unexpected {other:?}"),
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn cancel_a_batch_of_unknown_orders() {
+    // no order of the account is touched: these orders don't exist. Kraken reading the shape of
+    // the batch, its error is about the orders, not about the arguments
+    let answer = private_api()
+        .cancel_order_batch(&[
+            OrderReference::Txid {
+                txid: "OAAAAA-AAAAA-AAAAAA".into(),
+            },
+            OrderReference::Txid {
+                txid: "OBBBBB-BBBBB-BBBBBB".into(),
+            },
+        ])
+        .await;
+    match answer {
+        // nothing to cancel
+        Ok(cancelled) => assert_eq!(cancelled.count, 0, "{cancelled:?}"),
+        Err(KrakenError::Api { body, .. }) => {
+            assert!(!body.contains("Invalid arguments"), "{body}");
+            assert!(body.starts_with("EOrder:"), "{body}");
+        }
+        other => panic!("unexpected {other:?}"),
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn amend_an_unknown_order_is_refused() {
+    // no order of the account is touched: this txid doesn't exist
+    let answer = private_api()
+        .amend_order(&AmendOrder {
+            txid: Some("OAAAAA-AAAAA-AAAAAA".into()),
+            order_qty: Some("1".into()),
+            ..Default::default()
+        })
+        .await;
+    match answer {
+        Err(KrakenError::Api { body, .. }) => assert!(body.starts_with("EOrder:"), "{body}"),
+        other => panic!("unexpected {other:?}"),
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn edit_an_unknown_order_is_refused() {
+    // validated only, on an order which doesn't exist: nothing is replaced
+    let answer = private_api()
+        .edit_order(&EditOrder {
+            txid: "OAAAAA-AAAAA-AAAAAA".into(),
+            pair: "XBTUSD".into(),
+            volume: Some("1".into()),
+            validate: Some(true),
+            ..Default::default()
+        })
+        .await;
+    match answer {
+        Err(KrakenError::Api { body, .. }) => assert!(body.starts_with("EOrder:"), "{body}"),
+        Ok(edited) => assert_eq!(edited.status, "err", "{edited:?}"),
+        other => panic!("unexpected {other:?}"),
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn validates_a_batch_of_orders() {
+    // validated only: nothing is placed
+    let market = market("XBTUSD").await;
+    let orders = [
+        market.order(
+            OrderSide::Buy,
+            OrderType::Limit,
+            Some(market.bid * dec!(0.5)),
+        ),
+        market.order(
+            OrderSide::Sell,
+            OrderType::Limit,
+            Some(market.ask * dec!(1.5)),
+        ),
+    ];
+    let answers = private_api().add_order_batch(&orders).await.unwrap();
+    assert_eq!(answers.len(), 2, "{answers:?}");
+    for answer in &answers {
+        assert_eq!(answer.txid, None, "validated only: {answer:?}");
+        assert_eq!(answer.error, None, "{answer:?}");
+        assert!(answer.description.is_some(), "{answer:?}");
+    }
 }

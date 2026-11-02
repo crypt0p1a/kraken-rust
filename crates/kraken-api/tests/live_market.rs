@@ -10,8 +10,12 @@ mod strict;
 use kraken_api::Decimal;
 use kraken_api::KrakenError;
 use kraken_api::market::{
-    AssetPair, AssetPairStatus, CandleInterval, CandlesRequest, ServerTime, Ticker,
+    Asset, AssetClass, AssetPair, AssetPairStatus, AssetsRequest, CandleInterval, CandlesRequest,
+    GroupedOrderBook, MaintenanceEvent, OrderBookRequest, RecentSpreadsRequest,
+    RecentTradesRequest, ServerTime, SystemState, SystemStatus, Ticker,
 };
+use kraken_api::trading::OrderType;
+use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
 use rust_decimal_macros::dec;
 use serde::Serialize;
@@ -417,4 +421,239 @@ async fn maps_the_errors_of_unknown_pairs() {
             .await,
         Err(unknown())
     );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn system_status() {
+    let raw: Value = public_client().call("SystemStatus").await.unwrap();
+    let status: SystemStatus = decode_strict("SystemStatus", &raw);
+    assert_ne!(status.status, SystemState::Unknown, "{raw}");
+    assert!(status.timestamp.ends_with('Z'), "{status:?}");
+    for event in &status.upcoming_maintenance {
+        assert!(
+            event.expected_start_utc < event.expected_end_utc,
+            "{event:?}"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn maintenance_schedule() {
+    #[derive(serde::Deserialize)]
+    struct Schedule {
+        #[serde(default)]
+        events: Vec<Value>,
+    }
+    let raw: Value = public_client().call("MaintenanceSchedule").await.unwrap();
+    let schedule: Schedule = decode_strict("MaintenanceSchedule", &raw);
+    for event in &schedule.events {
+        let event: MaintenanceEvent = decode_strict("MaintenanceSchedule event", event);
+        assert!(
+            event.expected_start_utc < event.expected_end_utc,
+            "{event:?}"
+        );
+    }
+    assert_eq!(
+        public_api().maintenance_schedule().await.unwrap().len(),
+        schedule.events.len()
+    );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn assets_of_every_class() {
+    #[derive(Serialize)]
+    struct Params<'a> {
+        aclass: &'a str,
+    }
+    for aclass in ["currency", "tokenized_asset"] {
+        let raw: Value = public_client()
+            .call_with("Assets", Some(&Params { aclass }))
+            .await
+            .unwrap();
+        let mut presence = Presence::default();
+        for (key, value) in entries(&raw) {
+            presence.record(value);
+            let asset: Asset = decode_strict(&format!("Assets {key}"), value);
+            assert_ne!(asset.aclass, AssetClass::Unknown, "{key}");
+            assert!((0..=18).contains(&asset.decimals), "{key}: {asset:?}");
+            assert!(asset.display_decimals <= asset.decimals, "{key}: {asset:?}");
+        }
+        assert!(presence.total() > 10, "{aclass}");
+        presence.assert_always(aclass, &["aclass", "altname", "decimals", "status"]);
+        presence.print(&format!("Assets {aclass}"));
+    }
+
+    let bitcoin = public_api()
+        .assets(&AssetsRequest {
+            assets: vec!["XBT".into()],
+            aclass: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(bitcoin["XXBT"].altname, "XBT");
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn order_book_is_ordered() {
+    let book = public_api()
+        .order_book(&OrderBookRequest {
+            pair: "XBTUSD".into(),
+            count: Some(25),
+            asset_class: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(book.pair, "XXBTZUSD");
+    assert_eq!((book.asks.len(), book.bids.len()), (25, 25));
+    assert!(book.bids[0].price < book.asks[0].price, "crossed book");
+    assert!(book.asks.windows(2).all(|it| it[0].price < it[1].price));
+    assert!(book.bids.windows(2).all(|it| it[0].price > it[1].price));
+    assert!(
+        book.asks
+            .iter()
+            .chain(&book.bids)
+            .all(|it| it.volume > Decimal::ZERO)
+    );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn grouped_order_book_is_ordered() {
+    #[derive(Serialize)]
+    struct Params<'a> {
+        pair: &'a str,
+        depth: u32,
+        grouping: u32,
+    }
+    let raw: Value = public_client()
+        .call_with(
+            "GroupedBook",
+            Some(&Params {
+                pair: "XBTUSD",
+                depth: 25,
+                grouping: 10,
+            }),
+        )
+        .await
+        .unwrap();
+    let grouped: GroupedOrderBook = decode_strict("GroupedBook", &raw);
+    assert_eq!(grouped.grouping, Some(10));
+    assert!(grouped.bids.len() <= 25 && !grouped.bids.is_empty());
+    assert!(
+        grouped.bids[0].price < grouped.asks[0].price,
+        "crossed book"
+    );
+    assert!(grouped.asks.windows(2).all(|it| it[0].price < it[1].price));
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn recent_trades_continue_from_last() {
+    let api = public_api();
+    let request = |since: Option<String>| RecentTradesRequest {
+        pair: "XBTUSD".into(),
+        since,
+        count: Some(50),
+        asset_class: None,
+    };
+    let trades = api.recent_trades(&request(None)).await.unwrap();
+    assert_eq!(trades.pair, "XXBTZUSD");
+    assert_eq!(trades.trades.len(), 50);
+    assert!(trades.trades.windows(2).all(|it| it[0].time <= it[1].time));
+    assert!(trades.trades.iter().all(|it| it.price > Decimal::ZERO));
+    assert!(
+        trades
+            .trades
+            .iter()
+            .all(|it| it.order_type != OrderType::Unknown)
+    );
+    let next = api
+        .recent_trades(&request(Some(trades.last.clone())))
+        .await
+        .unwrap();
+    // `since` is inclusive: the last trade is sent again
+    let last_id = trades.trades.last().unwrap().trade_id;
+    assert!(next.trades.iter().all(|it| it.trade_id >= last_id));
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn recent_spreads_are_ordered() {
+    let spreads = public_api()
+        .recent_spreads(&RecentSpreadsRequest {
+            pair: "XBTUSD".into(),
+            since: None,
+            asset_class: None,
+        })
+        .await
+        .unwrap();
+    assert!(!spreads.spreads.is_empty());
+    assert!(spreads.spreads.iter().all(|it| it.bid <= it.ask));
+    assert!(
+        spreads
+            .spreads
+            .windows(2)
+            .all(|it| it[0].time <= it[1].time)
+    );
+    assert!(spreads.last >= spreads.spreads.last().unwrap().time);
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn pre_trade_data() {
+    #[derive(Serialize)]
+    struct Symbol<'a> {
+        symbol: &'a str,
+    }
+    let raw: Value = public_client()
+        .call_with("PreTrade", Some(&Symbol { symbol: "BTC/USD" }))
+        .await
+        .unwrap();
+    let pre: PreTradeData = decode_strict("PreTrade", &raw);
+    assert_eq!((pre.bids.len(), pre.asks.len()), (10, 10));
+    assert!(pre.bids[0].price < pre.asks[0].price, "crossed book");
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn post_trade_data_most_recent_first() {
+    #[derive(Serialize)]
+    struct Params<'a> {
+        symbol: &'a str,
+        count: u32,
+    }
+    let raw: Value = public_client()
+        .call_with(
+            "PostTrade",
+            Some(&Params {
+                symbol: "BTC/USD",
+                count: 20,
+            }),
+        )
+        .await
+        .unwrap();
+    let post: PostTradeData = decode_strict("PostTrade", &raw);
+    assert_eq!(post.count, 20);
+    assert!(post.trades.iter().all(|it| it.symbol == "BTC/USD"));
+    // most recent first, the documentation says the opposite
+    assert!(
+        post.trades
+            .windows(2)
+            .all(|it| it[0].trade_ts >= it[1].trade_ts)
+    );
+    assert_eq!(post.last_ts.as_ref(), Some(&post.trades[0].trade_ts));
+
+    let typed = public_api()
+        .post_trade(&PostTradeRequest {
+            symbol: Some("BTC/USD".into()),
+            count: Some(1),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(typed.trades.len(), 1);
 }

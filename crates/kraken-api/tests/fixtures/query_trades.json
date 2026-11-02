@@ -1,0 +1,74 @@
+{
+  "error": [],
+  "result": {
+    "THVRQM-33VKH-UCI7BS": {
+      "ordertxid": "OQCLML-BW3P3-BUCMWZ",
+      "postxid": "TKH2SE-M7IF5-CFI7LT",
+      "pair": "XXBTZUSD",
+      "time": 1688667796.8802,
+      "type": "buy",
+      "ordertype": "limit",
+      "price": "30010.00000",
+      "cost": "616.79361",
+      "fee": "1.60366",
+      "vol": "0.02055308",
+      "margin": "0.00000",
+      "leverage": "0",
+      "misc": "",
+      "ledgers": [
+        "LQ64ZJ-7WE4M-ODNVSY",
+        "L4UEN4-PG3FO-QO6BRI"
+      ],
+      "trade_id": 93748276,
+      "maker": true,
+      "aclass": "forex"
+    },
+    "TCWJEG-FL4SZ-3FKGH6": {
+      "ordertxid": "OB5VMB-B4U2U-DK2WRW",
+      "postxid": "TKH2SE-M7IF5-CFI7LT",
+      "pair": "XETHZUSD",
+      "time": 1688665499.1922,
+      "type": "sell",
+      "ordertype": "market",
+      "price": "30000.80000",
+      "cost": "7500.20000",
+      "fee": "19.50052",
+      "vol": "0.25000000",
+      "margin": "0.00000",
+      "leverage": "0",
+      "misc": "",
+      "trade_id": 93748270,
+      "maker": false,
+      "aclass": "forex",
+      "tradeordertype": "market"
+    },
+    "TKH2SE-M7IF5-CFI7LT": {
+      "ordertxid": "OMMDB2-FSB6Z-7W3HPO",
+      "postxid": "TKH2SE-M7IF5-CFI7LT",
+      "pair": "XXBTZUSD",
+      "time": 1688660000.5,
+      "type": "buy",
+      "ordertype": "limit",
+      "price": "29000.0",
+      "cost": "2900.0",
+      "fee": "4.64",
+      "vol": "0.1",
+      "margin": "580.0",
+      "leverage": "5",
+      "misc": "",
+      "trade_id": 93748100,
+      "maker": true,
+      "aclass": "forex",
+      "posstatus": "closed",
+      "cprice": "30100.0",
+      "ccost": "3010.0",
+      "cfee": "4.82",
+      "cvol": "0.1",
+      "cmargin": "580.0",
+      "net": "100.54",
+      "trades": [
+        "TCWJEG-FL4SZ-3FKGH6"
+      ]
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "error": [],
+  "result": {
+    "asset_details": {
+      "ZUSD": {
+        "balance": "1000.5000",
+        "hold_trade": "0.0000",
+        "credit": "50000.0000",
+        "credit_used": "12500.0000",
+        "collateral_value": 1,
+        "rollover_fees": "0.0100",
+        "reserve_fees": "0.0050"
+      },
+      "XXBT": {
+        "balance": "2.5000000000",
+        "hold_trade": "0.1000000000",
+        "collateral_value": 0.95
+      }
+    },
+    "limits_monitor": {
+      "total_credit_usd": "50000.00",
+      "total_credit_used_usd": "12500.00",
+      "total_collateral_value_usd": "160000.00",
+      "equity_usd": "110000.00",
+      "ongoing_balance": "3.2000",
+      "debt_to_equity": "0.1136"
+    }
+  }
+}

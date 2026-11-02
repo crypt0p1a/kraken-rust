@@ -1,5 +1,6 @@
-use super::{OrderFlag, OrderSide, OrderType, TimeInForce};
+use super::{OrderFlag, OrderSide, OrderType, SelfTradePrevention, TimeInForce, Trigger};
 use crate::KrakenError;
+use crate::market::AssetClass;
 use kraken_network::PrivateClient;
 use kraken_network::params::opt_comma_separated;
 use serde::{Deserialize, Serialize};
@@ -36,11 +37,11 @@ pub struct NewOrder {
     #[serde(rename = "timeinforce", skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub time_in_force: Option<TimeInForce>,
-    /// "0" (now), "<UTC timestamp in seconds>" or "+<seconds from now>"
+    /// `0` (now), `<UTC timestamp in seconds>` or `+<seconds from now>`
     #[serde(rename = "starttm", skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub start_time: Option<String>,
-    /// Required by GTD: "<UTC timestamp in seconds>" or "+<seconds from now>"
+    /// Required by GTD: `<UTC timestamp in seconds>` or `+<seconds from now>`
     #[serde(rename = "expiretm", skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub expire_time: Option<String>,
@@ -52,6 +53,37 @@ pub struct NewOrder {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub userref: Option<i32>,
+    /// Volume shown in the book, for the iceberg orders
+    #[serde(rename = "displayvol", skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub display_volume: Option<String>,
+    /// [`AssetClass::TokenizedAsset`] for the xStocks
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub asset_class: Option<AssetClass>,
+    /// Price signal of the stop-loss and take-profit orders: the last trade when missing
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub trigger: Option<Trigger>,
+    /// e.g. "2:1": none when missing
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub leverage: Option<String>,
+    /// Only reduces an open margin position
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub reduce_only: Option<bool>,
+    #[serde(rename = "stptype", skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub self_trade_prevention: Option<SelfTradePrevention>,
+    /// RFC 3339: the order is rejected after it
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub deadline: Option<String>,
+    /// IIBAN of the broker (partner) of the order
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub broker: Option<String>,
     /// Validates the parameters without placing the order
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
@@ -132,7 +164,49 @@ mod tests {
             cl_ord_id: Some("mgr1_buy_1".into()),
             userref: None,
             validate: None,
+            display_volume: None,
+            asset_class: None,
+            trigger: None,
+            leverage: None,
+            reduce_only: None,
+            self_trade_prevention: None,
+            deadline: None,
+            broker: None,
         }
+    }
+
+    #[test]
+    fn encodes_the_parameters_of_the_margin_iceberg_and_triggered_orders() {
+        let order = NewOrder {
+            pair: "AAPLxUSD".into(),
+            side: OrderSide::Sell,
+            order_type: OrderType::StopLossLimit,
+            volume: "2".into(),
+            price: Some("180".into()),
+            price2: Some("179.5".into()),
+            oflags: None,
+            time_in_force: Some(TimeInForce::Fok),
+            start_time: None,
+            expire_time: None,
+            cl_ord_id: None,
+            userref: None,
+            display_volume: Some("0.5".into()),
+            asset_class: Some(AssetClass::TokenizedAsset),
+            trigger: Some(Trigger::Index),
+            leverage: Some("2:1".into()),
+            reduce_only: Some(true),
+            self_trade_prevention: Some(SelfTradePrevention::CancelOldest),
+            deadline: Some("2026-11-02T10:00:00Z".into()),
+            broker: Some("AA88 N84G WOAK NMOI".into()),
+            validate: Some(true),
+        };
+        assert_eq!(
+            encode(&order).unwrap(),
+            "pair=AAPLxUSD&type=sell&ordertype=stop-loss-limit&volume=2&price=180&price2=179.5\
+             &timeinforce=FOK&displayvol=0.5&asset_class=tokenized_asset&trigger=index\
+             &leverage=2%3A1&reduce_only=true&stptype=cancel-oldest\
+             &deadline=2026-11-02T10%3A00%3A00Z&broker=AA88+N84G+WOAK+NMOI&validate=true"
+        );
     }
 
     #[test]
@@ -209,6 +283,14 @@ mod tests {
             cl_ord_id: None,
             userref: Some(42),
             validate: Some(true),
+            display_volume: None,
+            asset_class: None,
+            trigger: None,
+            leverage: None,
+            reduce_only: None,
+            self_trade_prevention: None,
+            deadline: None,
+            broker: None,
         };
         assert_eq!(
             encode(&order).unwrap(),

@@ -1,0 +1,61 @@
+{
+  "addresses": [
+    {
+      "address_id": "AB7J4FF-BGM7G-V2JMIH",
+      "scope": {
+        "network_id": "d9d375da-44b7-4be1-8a00-8b281acfe366"
+      },
+      "address_details": {
+        "crypto": {
+          "address": "0xBef7B36845cA31045E86D0B46DBCac4e675277B4",
+          "beneficiary": {
+            "recipient": "sender",
+            "typ": "individual",
+            "country": "FR"
+          }
+        }
+      },
+      "name": "Personal Wallet",
+      "description": "My Ethereum hardware wallet address",
+      "verified": true
+    },
+    {
+      "address_id": "ABSXEMA-3FXQS-T7Q2FG",
+      "scope": {
+        "method_id": "67b765fd-4efd-42dc-8ce7-63352971d566"
+      },
+      "address_details": {
+        "fiat": {
+          "iban": "DE89370400440532013000",
+          "bic": "COBADEFFXXX",
+          "name_on_account": "Kevin Le Perf",
+          "beneficiary": {
+            "recipient": "sender",
+            "typ": "individual",
+            "last_name": "Le Perf",
+            "country": "FR",
+            "city": "Paris",
+            "postal_code": "75001"
+          }
+        }
+      },
+      "description": "Bank account",
+      "modifier": "third_party",
+      "verified": false
+    },
+    {
+      "address_id": "ABR6SXP-SF6CY-VJMONY",
+      "scope": {
+        "network_group_id": "f95acdb7-48fb-4441-b5b4-843d3bf60e61"
+      },
+      "address_details": {
+        "crypto": {
+          "address": "0xBef7B36845cA31045E86D0B46DBCac4e675277B4",
+          "tag": "1234"
+        }
+      },
+      "verified": true
+    }
+  ],
+  "next_cursor": "Mw"
+}

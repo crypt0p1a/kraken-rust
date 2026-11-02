@@ -6,9 +6,13 @@ mod live;
 mod strict;
 
 use kraken_api::Decimal;
-use kraken_api::account::{ExtendedBalance, FeeInfo, TradeVolume};
+use kraken_api::account::{
+    ApiKeyInfo, Export, ExportReport, ExportStatus, ExtendedBalance, FeeInfo, LedgerEntry,
+    LedgerType, QueryLedgersRequest, TradeBalance, TradeVolume, WalletAccounts, WalletType,
+};
+use kraken_api::market::Level3OrderBook;
 use kraken_api::{KrakenError, PrivateApi, RestOptions};
-use live::{Presence, decode_strict, entries, le, private_api, private_client};
+use live::{Presence, decode_strict, entries, env, le, private_api, private_client, unless_denied};
 use serde::Serialize;
 use serde_json::Value;
 use std::sync::Arc;
@@ -171,4 +175,224 @@ async fn trade_volume_of_an_unknown_pair_is_an_error() {
         matches!(&error, KrakenError::Api { body, .. } if body.starts_with("EQuery:")),
         "{error:?}"
     );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn level3_order_book() {
+    #[derive(Serialize)]
+    struct Params<'a> {
+        pair: &'a str,
+        depth: u32,
+    }
+    let raw: Value = private_client()
+        .call_with(
+            "Level3",
+            Some(&Params {
+                pair: "XBTUSD",
+                depth: 10,
+            }),
+        )
+        .await
+        .unwrap();
+    let book: Level3OrderBook = decode_strict("Level3", &raw);
+    assert!(!book.bids.is_empty() && !book.asks.is_empty());
+    assert!(book.bids[0].price < book.asks[0].price, "crossed book");
+    assert!(
+        book.bids
+            .iter()
+            .chain(&book.asks)
+            .all(|it| it.quantity > Decimal::ZERO && !it.order_id.is_empty())
+    );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn balance_matches_the_extended_balance() {
+    let raw: Value = private_client().call("Balance").await.unwrap();
+    // exact decimals sent as strings
+    for (asset, amount) in entries(&raw) {
+        let amount = amount
+            .as_str()
+            .unwrap_or_else(|| panic!("{asset}: {amount}"));
+        let amount =
+            Decimal::from_str_exact(amount).unwrap_or_else(|_| panic!("{asset}: {amount}"));
+        assert!(amount >= Decimal::ZERO, "{asset}: {amount}");
+    }
+
+    let api = private_api();
+    let balances = api.balance(&Default::default()).await.unwrap();
+    let extended = api.extended_balance().await.unwrap();
+    for (asset, amount) in &balances {
+        assert_eq!(
+            extended.get(asset).map(|it| it.balance),
+            Some(*amount),
+            "{asset}"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn trade_balance() {
+    let raw: Value = private_client().call("TradeBalance").await.unwrap();
+    let balance: TradeBalance = decode_strict("TradeBalance", &raw);
+    assert!(balance.equivalent_balance >= Decimal::ZERO, "{balance:?}");
+    // rounded by Kraken to 4 decimals
+    assert!(
+        (balance.equity - balance.trade_balance - balance.unrealized_net).abs()
+            <= Decimal::new(1, 4),
+        "{balance:?}"
+    );
+    assert!(balance.unexecuted_value >= Decimal::ZERO, "{balance:?}");
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn api_key_info_never_allows_withdrawals() {
+    let raw: Value = private_client().call("GetApiKeyInfo").await.unwrap();
+    let info: ApiKeyInfo = decode_strict("GetApiKeyInfo", &raw);
+    println!(
+        "GetApiKeyInfo fields: {:?}",
+        raw.as_object().unwrap().keys().collect::<Vec<_>>()
+    );
+
+    assert_eq!(info.api_key, env("KRAKEN_API_KEY"));
+    assert!(!info.permissions.is_empty(), "{info:?}");
+    // the key of the tests must never be able to move funds out of the account
+    assert!(
+        !info.permissions.iter().any(|it| it.contains("withdraw")),
+        "the API key of the tests can withdraw: {:?}",
+        info.permissions
+    );
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn wallet_accounts_hold_the_main_one() {
+    let raw: Value = private_client().call("ListWalletAccounts").await.unwrap();
+    let wallets: WalletAccounts = decode_strict("ListWalletAccounts", &raw);
+    assert!(
+        wallets
+            .accounts
+            .iter()
+            .any(|it| it.wallet_type == WalletType::Main),
+        "{wallets:?}"
+    );
+    assert!(wallets.accounts.iter().all(|it| !it.account_id.is_empty()));
+}
+
+#[derive(Serialize)]
+struct LedgersParams {
+    without_count: bool,
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn ledgers_with_the_permission() {
+    let Some(raw) = unless_denied(
+        "Ledgers",
+        private_client()
+            .call_with::<_, Value>(
+                "Ledgers",
+                Some(&LedgersParams {
+                    without_count: false,
+                }),
+            )
+            .await,
+    ) else {
+        return;
+    };
+    let mut presence = Presence::default();
+    for (id, value) in entries(&raw["ledger"]) {
+        presence.record(value);
+        let entry: LedgerEntry = decode_strict(&format!("Ledgers {id}"), value);
+        assert_ne!(entry.entry_type, LedgerType::Unknown, "{id}: {value}");
+        assert!(entry.fee >= Decimal::ZERO, "{id}");
+    }
+    presence.print("Ledgers");
+
+    let page = private_api().ledgers(&Default::default()).await.unwrap();
+    assert!(page.entries.len() <= 50);
+    assert!(page.entries.windows(2).all(|it| it[0].time >= it[1].time));
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn query_ledgers_finds_the_entries_of_the_ledgers() {
+    let api = private_api();
+    let Some(page) = unless_denied("QueryLedgers", api.ledgers(&Default::default()).await) else {
+        return;
+    };
+    let ids: Vec<String> = page
+        .entries
+        .iter()
+        .take(20)
+        .map(|it| it.id.clone())
+        .collect();
+    if ids.is_empty() {
+        println!("no ledger entry on the account: nothing to query");
+        return;
+    }
+    let queried = api
+        .query_ledgers(&QueryLedgersRequest {
+            ids: ids.clone(),
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(queried.len(), ids.len());
+    for entry in &queried {
+        let original = page.entries.iter().find(|it| it.id == entry.id).unwrap();
+        assert_eq!(entry.amount, original.amount);
+        assert_eq!(entry.balance, original.balance);
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn export_status_with_the_permission() {
+    #[derive(Serialize)]
+    struct Params {
+        report: &'static str,
+    }
+    for report in ["trades", "ledgers"] {
+        let Some(raw) = unless_denied(
+            "ExportStatus",
+            private_client()
+                .call_with::<_, Value>("ExportStatus", Some(&Params { report }))
+                .await,
+        ) else {
+            return;
+        };
+        for value in raw.as_array().unwrap() {
+            let export: Export = decode_strict(&format!("ExportStatus {report}"), value);
+            assert_ne!(export.status, ExportStatus::Unknown, "{value}");
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn retrieve_a_processed_export() {
+    let api = private_api();
+    for report in [ExportReport::Trades, ExportReport::Ledgers] {
+        let Some(exports) = unless_denied("RetrieveExport", api.export_status(report).await) else {
+            return;
+        };
+        let Some(export) = exports
+            .iter()
+            .find(|it| it.status == ExportStatus::Processed && it.error.is_none())
+        else {
+            continue;
+        };
+        let zip = api.retrieve_export(&export.id).await.unwrap();
+        assert!(
+            zip.starts_with(b"PK"),
+            "not a zip archive: {:?}",
+            &zip[..zip.len().min(16)]
+        );
+        return;
+    }
+    println!("RetrieveExport: no processed report on the account");
 }
