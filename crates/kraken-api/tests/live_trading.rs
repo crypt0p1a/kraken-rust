@@ -11,7 +11,8 @@ use kraken_api::KrakenError;
 use kraken_api::market::AssetPair;
 use kraken_api::trading::{
     CloseTime, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderFlag,
-    OrderSide, OrderStatus, OrderType, TimeInForce, Trade, TradesHistoryRequest,
+    OrderSide, OrderStatus, OrderType, QueryTradesRequest, TimeInForce, Trade,
+    TradesHistoryRequest,
 };
 use live::{
     Presence, decode_strict, entries, le, now_seconds, private_api, private_client, public_api,
@@ -659,5 +660,60 @@ async fn trades_history_is_consistent_and_paginated() {
         if let (Some(newest), Some(oldest)) = (second.trades.first(), first.trades.last()) {
             assert!(newest.time <= oldest.time);
         }
+    }
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API with credentials"]
+async fn query_trades_finds_the_trades_of_the_history() {
+    let api = private_api();
+    let history = api.trades_history(&Default::default()).await.unwrap();
+    let txids: Vec<String> = history
+        .trades
+        .iter()
+        .take(20)
+        .map(|it| it.txid.clone())
+        .collect();
+    if txids.is_empty() {
+        println!("no trade on the account: nothing to query");
+        return;
+    }
+
+    #[derive(Serialize)]
+    struct Params {
+        txid: String,
+        ledgers: bool,
+    }
+    let raw: Value = private_client()
+        .call_with(
+            "QueryTrades",
+            Some(&Params {
+                txid: txids.join(","),
+                ledgers: true,
+            }),
+        )
+        .await
+        .unwrap();
+    for (txid, value) in entries(&raw) {
+        let _: Trade = decode_strict(&format!("QueryTrades {txid}"), value);
+    }
+
+    let queried = api
+        .query_trades(&QueryTradesRequest {
+            txids: txids.clone(),
+            trades: None,
+            ledgers: None,
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(queried.len(), txids.len());
+    for trade in &queried {
+        let original = history
+            .trades
+            .iter()
+            .find(|it| it.txid == trade.txid)
+            .unwrap();
+        assert_eq!(trade, original);
     }
 }

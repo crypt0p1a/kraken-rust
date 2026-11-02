@@ -19,7 +19,7 @@ use kraken_api::market::{
 };
 use kraken_api::trading::{
     ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
-    OrderStatus, OrderType, QueryOrdersRequest, TimeInForce, Trade,
+    OrderStatus, OrderType, QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade,
 };
 use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
@@ -659,4 +659,25 @@ async fn trades_history_fixture() {
             .iter()
             .all(|it| trades[&it.txid].trade_id == it.trade_id)
     );
+}
+
+#[tokio::test]
+async fn query_trades_fixture() {
+    let trades: HashMap<String, Trade> = each("QueryTrades", &fixture("query_trades.json"));
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/private/QueryTrades", "query_trades.json").await;
+    let served = private_api(&server)
+        .query_trades(&QueryTradesRequest {
+            txids: trades.keys().cloned().collect(),
+            trades: None,
+            ledgers: None,
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(served.len(), trades.len());
+    for trade in &served {
+        assert_eq!(trade.trade_id, trades[&trade.txid].trade_id);
+    }
 }

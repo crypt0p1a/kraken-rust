@@ -17,5 +17,7 @@ pub use order::{Order, OrderDescription};
 pub use query::{
     CloseTime, ClosedOrders, ClosedOrdersRequest, OpenOrdersRequest, QueryOrdersRequest,
 };
-pub use trades::{Trade, TradeHistoryType, TradesHistory, TradesHistoryRequest};
+pub use trades::{
+    QueryTradesRequest, Trade, TradeHistoryType, TradesHistory, TradesHistoryRequest,
+};
 pub use types::{OrderFlag, OrderSide, OrderStatus, OrderType, TimeInForce};

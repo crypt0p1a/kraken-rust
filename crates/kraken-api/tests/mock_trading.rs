@@ -6,7 +6,7 @@ use common::{FormIs, Signed, ok, orders_fixture, private_api};
 use kraken_api::KrakenError;
 use kraken_api::trading::{
     CloseTime, ClosedOrdersRequest, NewOrder, OpenOrdersRequest, OrderFlag, OrderSide, OrderStatus,
-    OrderType, QueryOrdersRequest, TimeInForce, TradesHistoryRequest,
+    OrderType, QueryOrdersRequest, QueryTradesRequest, TimeInForce, TradesHistoryRequest,
 };
 use serde_json::json;
 use wiremock::matchers::{method, path};
@@ -247,4 +247,36 @@ async fn trades_history() {
         .unwrap();
     assert_eq!(page.trades[0].txid, "THVRQM-33VKH-UCI7BS");
     assert_eq!(page.cursor.unwrap().next.as_deref(), Some("page-2"));
+}
+
+#[tokio::test]
+async fn query_trades() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/0/private/QueryTrades"))
+        .and(Signed)
+        .and(FormIs(vec![
+            ("txid", "THVRQM-33VKH-UCI7BS"),
+            ("trades", "true"),
+        ]))
+        .respond_with(ok(json!({
+            "THVRQM-33VKH-UCI7BS": {"ordertxid": "OQCLML-BW3P3-BUCMWZ", "pair": "XXBTZUSD",
+                "time": 1688667796.8802, "type": "sell", "ordertype": "limit", "price": "30010.0",
+                "cost": "616.79361", "fee": "1.60366", "vol": "0.02055308", "misc": "",
+                "trade_id": 93748276}
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let trades = private_api(&server)
+        .query_trades(&QueryTradesRequest {
+            txids: vec!["THVRQM-33VKH-UCI7BS".into()],
+            trades: Some(true),
+            ledgers: None,
+            rebase_multiplier: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(trades[0].side, OrderSide::Sell);
 }

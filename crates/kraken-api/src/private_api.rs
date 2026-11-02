@@ -6,7 +6,7 @@ use crate::account::{
 use crate::market::{self, Level3OrderBook, Level3OrderBookRequest};
 use crate::trading::{
     self, ClosedOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
-    QueryOrdersRequest, TradesHistory, TradesHistoryRequest,
+    QueryOrdersRequest, QueryTradesRequest, Trade, TradesHistory, TradesHistoryRequest,
 };
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PrivateClient;
@@ -171,5 +171,15 @@ impl PrivateApi {
         request: &TradesHistoryRequest,
     ) -> Result<TradesHistory, KrakenError> {
         trading::trades::trades_history(&self.client, request).await
+    }
+
+    /// Trades by Kraken identifier, most recent first
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-trades-info>
+    pub async fn query_trades(
+        &self,
+        request: &QueryTradesRequest,
+    ) -> Result<Vec<Trade>, KrakenError> {
+        trading::trades::query_trades(&self.client, request).await
     }
 }

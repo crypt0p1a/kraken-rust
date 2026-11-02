@@ -2,6 +2,7 @@ use super::{OrderSide, OrderType};
 use crate::account::RebaseMultiplier;
 use crate::{Cursor, KrakenError, lenient};
 use kraken_network::PrivateClient;
+use kraken_network::params::comma_separated;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -211,6 +212,35 @@ pub(crate) async fn trades_history(
     })
 }
 
+/// <https://docs.kraken.com/api/docs/rest-api/get-trades-info>
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct QueryTradesRequest {
+    /// Up to 20 identifiers of trades
+    #[serde(rename = "txid", serialize_with = "comma_separated")]
+    pub txids: Vec<String>,
+    /// Includes the trades of the positions
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub trades: Option<bool>,
+    /// Includes the ledger entries of each trade
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub ledgers: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub rebase_multiplier: Option<RebaseMultiplier>,
+}
+
+/// The trades, most recent first
+pub(crate) async fn query_trades(
+    client: &PrivateClient,
+    request: &QueryTradesRequest,
+) -> Result<Vec<Trade>, KrakenError> {
+    let trades: HashMap<String, Trade> = client.call_with("QueryTrades", Some(request)).await?;
+    Ok(with_txids(trades))
+}
+
 #[cfg(test)]
 pub(crate) const SAMPLE: &str = r#"{
     "THVRQM-33VKH-UCI7BS":{"ordertxid":"OQCLML-BW3P3-BUCMWZ","postxid":"TKH2SE-M7IF5-CFI7LT",
@@ -295,6 +325,20 @@ mod tests {
         assert_eq!(
             closing.trades.as_deref(),
             Some(&["TZX2WP-XSEOP-FP7WYR".to_string()][..])
+        );
+    }
+
+    #[test]
+    fn encodes_the_query() {
+        let request = QueryTradesRequest {
+            txids: vec!["THVRQM-33VKH-UCI7BS".into(), "TCWJEG-FL4SZ-3FKGH6".into()],
+            trades: None,
+            ledgers: Some(true),
+            rebase_multiplier: None,
+        };
+        assert_eq!(
+            encode(&request).unwrap(),
+            "txid=THVRQM-33VKH-UCI7BS%2CTCWJEG-FL4SZ-3FKGH6&ledgers=true"
         );
     }
 
