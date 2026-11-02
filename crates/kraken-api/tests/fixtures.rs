@@ -18,6 +18,7 @@ use kraken_api::trading::{
     ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderSide,
     OrderStatus, OrderType, QueryOrdersRequest, TimeInForce,
 };
+use kraken_api::transparency::PreTradeData;
 use rust_decimal_macros::dec;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -484,4 +485,16 @@ async fn recent_spreads_fixture() {
         .unwrap();
     assert_eq!(spreads.spreads.len(), 3);
     assert!(spreads.spreads.iter().all(|it| it.bid <= it.ask));
+}
+
+#[tokio::test]
+async fn pre_trade_fixture() {
+    let pre: PreTradeData = decode_strict("PreTrade", &fixture("pre_trade.json"));
+    assert_eq!(pre.symbol, "BTC/USD");
+    assert!(pre.bids.iter().all(|it| it.side == "BUY"));
+    assert!(pre.asks.iter().all(|it| it.side == "SELL"));
+
+    let server = MockServer::start().await;
+    serve(&server, "/0/public/PreTrade", "pre_trade.json").await;
+    assert_eq!(public_api(&server).pre_trade("BTC/USD").await.unwrap(), pre);
 }

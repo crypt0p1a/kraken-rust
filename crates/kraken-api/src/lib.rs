@@ -44,6 +44,7 @@ mod params;
 mod private_api;
 mod public_api;
 pub mod trading;
+pub mod transparency;
 
 pub use kraken_network::{KrakenError, Logger, RateLimiter, RestOptions};
 pub use private_api::PrivateApi;

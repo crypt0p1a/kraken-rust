@@ -3,6 +3,7 @@ use crate::market::{
     GroupedOrderBookRequest, MaintenanceEvent, OrderBook, OrderBookRequest, RecentSpreads,
     RecentSpreadsRequest, RecentTrades, RecentTradesRequest, ServerTime, SystemStatus, Ticker,
 };
+use crate::transparency::{self, PreTradeData};
 use crate::{KrakenError, RateLimiter, RestOptions};
 use kraken_network::PublicClient;
 use std::collections::HashMap;
@@ -110,5 +111,14 @@ impl PublicApi {
     /// <https://docs.kraken.com/api/docs/rest-api/get-ohlc-data>
     pub async fn candles(&self, request: &CandlesRequest) -> Result<Candles, KrakenError> {
         market::ohlc::candles(&self.client, request).await
+    }
+
+    // transparency
+
+    /// The top 10 levels of each side of the order book of `symbol` (e.g. "BTC/USD")
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/get-pre-trade-data>
+    pub async fn pre_trade(&self, symbol: &str) -> Result<PreTradeData, KrakenError> {
+        transparency::pre_trade(&self.client, symbol).await
     }
 }

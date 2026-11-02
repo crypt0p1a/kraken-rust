@@ -333,3 +333,23 @@ async fn recent_spreads() {
     assert_eq!(spreads.last, 1793611608);
     assert_eq!(spreads.spreads[0].ask, dec!(78058.1));
 }
+
+#[tokio::test]
+async fn pre_trade() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/0/public/PreTrade"))
+        .and(QueryIs(vec![("symbol", "BTC/USD")]))
+        .respond_with(ok(
+            json!({"symbol": "BTC/USD", "description": "Bitcoin / US Dollar",
+            "base_asset": "XBT", "base_notation": "UNIT", "quote_asset": "USD",
+            "quote_notation": "MONE", "venue": "PGSL", "system": "CLOB", "bids": [], "asks": []}),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let data = public_api(&server).pre_trade("BTC/USD").await.unwrap();
+    assert_eq!(data.system, "CLOB");
+    assert_eq!(data.base_dti_code, None);
+}

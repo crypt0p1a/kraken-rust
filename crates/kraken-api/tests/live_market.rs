@@ -15,6 +15,7 @@ use kraken_api::market::{
     RecentTradesRequest, ServerTime, SystemState, SystemStatus, Ticker,
 };
 use kraken_api::trading::OrderType;
+use kraken_api::transparency::PreTradeData;
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
 use rust_decimal_macros::dec;
 use serde::Serialize;
@@ -599,4 +600,20 @@ async fn recent_spreads_are_ordered() {
             .all(|it| it[0].time <= it[1].time)
     );
     assert!(spreads.last >= spreads.spreads.last().unwrap().time);
+}
+
+#[tokio::test]
+#[ignore = "calls the real Kraken API"]
+async fn pre_trade_data() {
+    #[derive(Serialize)]
+    struct Symbol<'a> {
+        symbol: &'a str,
+    }
+    let raw: Value = public_client()
+        .call_with("PreTrade", Some(&Symbol { symbol: "BTC/USD" }))
+        .await
+        .unwrap();
+    let pre: PreTradeData = decode_strict("PreTrade", &raw);
+    assert_eq!((pre.bids.len(), pre.asks.len()), (10, 10));
+    assert!(pre.bids[0].price < pre.asks[0].price, "crossed book");
 }
