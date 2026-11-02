@@ -8,6 +8,34 @@
 //! `account_id` targets a wallet of the account (see `wallet_accounts`): the default wallet when
 //! missing.
 
+use crate::lenient;
+use crate::market::AssetClass;
+use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
+
 pub(crate) mod assets;
+pub(crate) mod methods;
 
 pub use assets::{FundingAssets, FundingDirection, NamedAsset};
+pub use methods::{
+    AddressGeneration, AddressGenerationStatus, DepositMethodDetails, FundingMethodInfo,
+    FundingMethods, FundingMethodsRequest, MethodFees, MethodNetwork,
+};
+
+/// An asset of the funding API: its class and its name
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct FundingAsset {
+    pub class: AssetClass,
+    /// e.g. "USDC"
+    pub name: String,
+}
+
+/// An exact amount of an asset
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct FundingAmount {
+    pub asset: FundingAsset,
+    #[serde(deserialize_with = "lenient::decimal")]
+    pub amount: Decimal,
+}

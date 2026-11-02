@@ -10,7 +10,9 @@ use crate::algo::{
 use crate::earn::{
     self, EarnAllocations, EarnAllocationsRequest, EarnFunds, EarnStrategies, EarnStrategiesRequest,
 };
-use crate::funding::{self, FundingAssets, FundingDirection};
+use crate::funding::{
+    self, FundingAssets, FundingDirection, FundingMethods, FundingMethodsRequest,
+};
 use crate::market::{self, AssetClass, Level3OrderBook, Level3OrderBookRequest};
 use crate::subaccounts::{self, AccountTransfer, NewSubaccount, TransferResult};
 use crate::trading::{
@@ -495,5 +497,17 @@ impl PrivateApi {
         account_id: Option<&str>,
     ) -> Result<FundingAssets, KrakenError> {
         funding::assets::funding_assets(&self.funding, direction, asset_class, account_id).await
+    }
+
+    /// A page of the ways to deposit or withdraw: methods, networks, fees, minimums and maximums.
+    /// Requires the "Funds permissions - Query" permission
+    ///
+    /// <https://docs.kraken.com/api/docs/rest-api/list-funding-methods>
+    pub async fn funding_methods(
+        &self,
+        direction: FundingDirection,
+        request: &FundingMethodsRequest,
+    ) -> Result<FundingMethods, KrakenError> {
+        funding::methods::funding_methods(&self.funding, direction, request).await
     }
 }

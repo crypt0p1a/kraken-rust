@@ -14,7 +14,7 @@ use kraken_api::account::{
 };
 use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
 use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
-use kraken_api::funding::{FundingAssets, FundingDirection};
+use kraken_api::funding::{FundingAssets, FundingDirection, FundingMethods};
 use kraken_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
@@ -1323,4 +1323,28 @@ async fn funding_assets_fixture() {
         .await
         .unwrap();
     assert_eq!(served, assets);
+}
+
+#[tokio::test]
+async fn funding_methods_fixture() {
+    let methods: FundingMethods =
+        decode_strict("funding methods", &funding_fixture("funding_methods.json"));
+    for method in &methods.methods {
+        // the fees in the asset of the method
+        assert_eq!(method.fees.base.asset, method.asset, "{method:?}");
+        assert!(method.minimum_amount <= method.maximum_amount, "{method:?}");
+    }
+
+    let server = MockServer::start().await;
+    serve_funding(
+        &server,
+        "/funding/v1/methods/deposit",
+        "funding_methods.json",
+    )
+    .await;
+    let served = private_api(&server)
+        .funding_methods(FundingDirection::Deposit, &Default::default())
+        .await
+        .unwrap();
+    assert_eq!(served, methods);
 }
