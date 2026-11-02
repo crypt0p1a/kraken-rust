@@ -37,11 +37,11 @@ pub struct NewOrder {
     #[serde(rename = "timeinforce", skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub time_in_force: Option<TimeInForce>,
-    /// "0" (now), "<UTC timestamp in seconds>" or "+<seconds from now>"
+    /// `0` (now), `<UTC timestamp in seconds>` or `+<seconds from now>`
     #[serde(rename = "starttm", skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub start_time: Option<String>,
-    /// Required by GTD: "<UTC timestamp in seconds>" or "+<seconds from now>"
+    /// Required by GTD: `<UTC timestamp in seconds>` or `+<seconds from now>`
     #[serde(rename = "expiretm", skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub expire_time: Option<String>,

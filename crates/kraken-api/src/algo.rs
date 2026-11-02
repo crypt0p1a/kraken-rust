@@ -218,12 +218,12 @@ pub struct NewStrategy {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub price: Option<String>,
-    /// "0" (now, the default), "<UTC timestamp in seconds>" or "+<seconds from now>": within 30
+    /// `0` (now, the default), `<UTC timestamp in seconds>` or `+<seconds from now>`: within 30
     /// days
     #[serde(rename = "starttm", skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub start_time: Option<String>,
-    /// "<UTC timestamp in seconds>" or "+<seconds from now>": at least 60 seconds after the
+    /// `<UTC timestamp in seconds>` or `+<seconds from now>`: at least 60 seconds after the
     /// start, within 30 days
     #[serde(rename = "expiretm")]
     pub expire_time: String,
