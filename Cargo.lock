@@ -1041,6 +1041,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "kraken-dashboard"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "rust_decimal",
+]
+
+[[package]]
 name = "kraken-ffi"
 version = "0.1.0"
 dependencies = [
