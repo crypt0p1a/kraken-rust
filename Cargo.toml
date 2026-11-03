@@ -22,6 +22,7 @@ repository = "https://github.com/crypt0p1a/kraken-rust"
 kraken-api = { path = "crates/kraken-api" }
 kraken-crypto = { path = "crates/kraken-crypto" }
 kraken-network = { path = "crates/kraken-network" }
+kraken-trading-bot = { path = "crates/kraken-trading-bot" }
 trading-notify = { path = "crates/trading-notify" }
 
 # trading bot
@@ -52,6 +53,8 @@ thiserror = "2.0.18"
 tokio = { version = "1", default-features = false }
 uniffi = "=0.32.0"
 
+# dashboard: the terminal UI, with its crossterm backend
+ratatui = "0.30.2"
 
 # tests only
 serde_ignored = "0.1.14"
