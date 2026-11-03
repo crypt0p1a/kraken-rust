@@ -35,6 +35,8 @@ struct State {
     next_txid: u64,
     /// Calls of AddOrder, validated ones included
     add_order_calls: usize,
+    /// The error every cancellation answers, when set
+    cancel_error: Option<String>,
 }
 
 fn error(body: &str) -> KrakenError {
@@ -57,6 +59,7 @@ impl SimulatedExchange {
                 now,
                 next_txid: 1,
                 add_order_calls: 0,
+                cancel_error: None,
             }),
         }
     }
@@ -229,6 +232,11 @@ impl SimulatedExchange {
 
     pub fn orders(&self) -> Vec<Order> {
         self.state().orders.clone()
+    }
+
+    /// Every cancellation fails with this error of Kraken, none when None
+    pub fn fail_cancels(&self, error: Option<&str>) {
+        self.state().cancel_error = error.map(str::to_string);
     }
 
     pub fn add_order_calls(&self) -> usize {
@@ -565,17 +573,24 @@ impl Exchange for SimulatedExchange {
             .collect())
     }
 
-    async fn cancel_order(&self, txid: &str) -> ExchangeResult<()> {
-        let open = self
-            .state()
-            .orders
-            .iter()
-            .any(|it| it.txid == txid && it.status == OrderStatus::Open);
-        if !open {
-            return Err(error("EOrder:Unknown order"));
+    /// Like Kraken: an unknown order is an error, a closed one isn't cancelled
+    async fn cancel_order(&self, txid: &str) -> ExchangeResult<bool> {
+        let mut state = self.state();
+        if let Some(body) = &state.cancel_error {
+            return Err(error(body));
         }
-        self.cancel(txid);
-        Ok(())
+        let now = state.now;
+        let order = state
+            .orders
+            .iter_mut()
+            .find(|it| it.txid == txid)
+            .ok_or_else(|| error("EOrder:Unknown order"))?;
+        if order.status != OrderStatus::Open {
+            return Ok(false);
+        }
+        order.status = OrderStatus::Canceled;
+        order.close_time = Some(now);
+        Ok(true)
     }
 
     async fn new_order(&self, request: &NewOrder) -> ExchangeResult<NewOrderAnswer> {
@@ -696,5 +711,28 @@ mod tests {
         // the price of then, still being built
         assert_eq!((candles[1].open, candles[1].close), (d("90"), d("90")));
         assert!(!candles[1].is_closed);
+    }
+
+    #[tokio::test]
+    async fn cancels_only_the_open_orders() {
+        let exchange = SimulatedExchange::new(1_800_000_000.0);
+        exchange.add_pair("XXBTZUSD", "XBTUSD", "XXBT", "ZUSD", d("100"));
+        let open = exchange.add_foreign_order(Some(1), "XBTUSD", OrderSide::Buy, d("1"), d("90"));
+        let filled = exchange.add_foreign_order(Some(1), "XBTUSD", OrderSide::Buy, d("1"), d("95"));
+        exchange.fill(&filled, None);
+
+        assert!(exchange.cancel_order(&open).await.unwrap());
+        assert!(!exchange.cancel_order(&filled).await.unwrap());
+        assert!(exchange.cancel_order("OUNKNOWN").await.is_err());
+        let status = |txid: &str| {
+            exchange
+                .orders()
+                .into_iter()
+                .find(|it| it.txid == txid)
+                .unwrap()
+                .status
+        };
+        assert_eq!(status(&open), OrderStatus::Canceled);
+        assert_eq!(status(&filled), OrderStatus::Closed);
     }
 }

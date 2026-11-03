@@ -15,20 +15,27 @@ fn d(value: &str) -> Decimal {
     Decimal::from_str(value).unwrap()
 }
 
+fn config(dry_run: bool, settings: &str) -> BotConfig {
+    BotConfig::parse(&format!(
+        "dry_run: {dry_run}
+{settings}
+managers:
+  - {{id: 1, pair: XBTUSD, budget: 100, buy_below: 1, sell_above: 1.5}}"
+    ))
+    .unwrap()
+}
+
 /// Manager 1 buys at -1% of 50000: 49500
 async fn bot(settings: &str) -> Bot<SimulatedExchange> {
     let exchange = SimulatedExchange::new(1_800_000_000.0);
     exchange.add_pair(BTC, "XBTUSD", "XXBT", "ZUSD", d("50000"));
     exchange.set_fee_percent(d("0.25"));
     exchange.deposit("ZUSD", d("1000"));
-    let config = BotConfig::parse(&format!(
-        "dry_run: false
-{settings}
-managers:
-  - {{id: 1, pair: XBTUSD, budget: 100, buy_below: 1, sell_above: 1.5}}"
-    ))
-    .unwrap();
-    let mut bot = Bot::new(exchange, Storage::open_in_memory().unwrap(), config);
+    let mut bot = Bot::new(
+        exchange,
+        Storage::open_in_memory().unwrap(),
+        config(false, settings),
+    );
     bot.prepare().await.unwrap();
     bot
 }
@@ -119,4 +126,145 @@ async fn never_touches_a_sell() {
     bot.exchange().set_price(BTC, d("50200"));
     assert_eq!(tick(&mut bot).await, Outcome::Waited);
     assert_eq!(open_orders(&bot), 1);
+}
+
+#[tokio::test]
+async fn a_dry_run_never_cancels_a_buy() {
+    // a real buy placed by a live run, then the same database in a dry run
+    let mut live = bot("buy_trailing: 0.5").await;
+    tick(&mut live).await;
+    let storage = Storage::open_in_memory().unwrap();
+    storage
+        .upsert_orders(&live.storage().orders_of(1).unwrap())
+        .unwrap();
+    let mut dry = Bot::new(
+        live.into_exchange(),
+        storage,
+        config(true, "buy_trailing: 0.5"),
+    );
+    dry.prepare().await.unwrap();
+
+    dry.exchange().set_price(BTC, d("60000"));
+    for _ in 0..3 {
+        assert_eq!(tick(&mut dry).await, Outcome::Waited);
+    }
+    assert_eq!(open_orders(&dry), 1);
+}
+
+#[tokio::test]
+async fn a_cancellation_refused_is_a_failure_recorded_once() {
+    let mut bot = bot("buy_trailing: 0.5").await;
+    tick(&mut bot).await;
+    bot.exchange()
+        .fail_cancels(Some("EGeneral:Permission denied"));
+    bot.exchange().set_price(BTC, d("60000"));
+
+    for _ in 0..3 {
+        let outcome = tick(&mut bot).await;
+        assert!(
+            matches!(&outcome, Outcome::Failed(error) if error.contains("Permission denied")),
+            "{outcome:?}"
+        );
+    }
+    let cancellations: Vec<_> = bot
+        .storage()
+        .actions_of(1, 10)
+        .unwrap()
+        .into_iter()
+        .filter(|it| it.kind == "buy_cancelled")
+        .collect();
+    assert_eq!(cancellations.len(), 1);
+    assert!(
+        cancellations[0]
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("Permission denied")
+    );
+    assert_eq!(open_orders(&bot), 1);
+
+    // allowed again: cancelled, then placed again
+    bot.exchange().fail_cancels(None);
+    assert!(matches!(tick(&mut bot).await, Outcome::Cancelled(_)));
+    assert_eq!(buy_price(&tick(&mut bot).await), d("59400"));
+}
+
+#[tokio::test]
+async fn a_buy_gone_meanwhile_is_waited_for() {
+    let mut bot = bot("buy_trailing: 0.5").await;
+    tick(&mut bot).await;
+    bot.exchange().fail_cancels(Some("EOrder:Unknown order"));
+    bot.exchange().set_price(BTC, d("60000"));
+    assert_eq!(tick(&mut bot).await, Outcome::Waited);
+    assert!(
+        bot.storage()
+            .actions_of(1, 10)
+            .unwrap()
+            .iter()
+            .all(|it| it.kind != "buy_cancelled")
+    );
+}
+
+#[tokio::test]
+async fn trails_from_the_price_the_buy_was_placed_from_whatever_the_configuration_became() {
+    let directory = std::env::temp_dir().join(format!("trailing-{}", std::process::id()));
+    let path = directory.join("bot.sqlite");
+    let exchange = SimulatedExchange::new(1_800_000_000.0);
+    exchange.add_pair(BTC, "XBTUSD", "XXBT", "ZUSD", d("50000"));
+    exchange.deposit("ZUSD", d("1000"));
+    let manager = |buy_below: &str| {
+        BotConfig::parse(&format!(
+            "dry_run: false
+buy_trailing: 0.5
+managers:
+  - {{id: 1, pair: XBTUSD, budget: 100, buy_below: {buy_below}, sell_above: 1.5}}"
+        ))
+        .unwrap()
+    };
+
+    // placed at -5% of 50000
+    let mut bot = Bot::new(exchange, Storage::open(&path).unwrap(), manager("5"));
+    bot.prepare().await.unwrap();
+    assert_eq!(buy_price(&tick(&mut bot).await), d("47500"));
+
+    // buy_below is now 1: the open buy was still placed from 50000, the price didn't move
+    let mut bot = Bot::new(
+        bot.into_exchange(),
+        Storage::open(&path).unwrap(),
+        manager("1"),
+    );
+    bot.prepare().await.unwrap();
+    assert_eq!(tick(&mut bot).await, Outcome::Waited);
+    bot.exchange().set_price(BTC, d("50200"));
+    assert_eq!(tick(&mut bot).await, Outcome::Waited);
+    bot.exchange().set_price(BTC, d("50300"));
+    assert!(matches!(tick(&mut bot).await, Outcome::Cancelled(_)));
+
+    drop(bot);
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[tokio::test]
+async fn a_buy_without_its_reference_never_trails_too_early() {
+    let mut bot = bot("buy_trailing: 0.5").await;
+    tick(&mut bot).await;
+    // as if placed before the references were recorded: from 50000, its limit rounded down
+    let txid = bot.exchange().orders()[0].txid.clone();
+    let storage = Storage::open_in_memory().unwrap();
+    storage
+        .upsert_orders(&bot.storage().orders_of(1).unwrap())
+        .unwrap();
+    assert_eq!(storage.order_reference(&txid).unwrap(), None);
+    let mut bot = Bot::new(
+        bot.into_exchange(),
+        storage,
+        config(false, "buy_trailing: 0.5"),
+    );
+    bot.prepare().await.unwrap();
+
+    // (49500 + 0.1) / 0.99 = 50000.1: no trailing at +0.5% of 50000 exactly
+    bot.exchange().set_price(BTC, d("50250"));
+    assert_eq!(tick(&mut bot).await, Outcome::Waited);
+    bot.exchange().set_price(BTC, d("50260"));
+    assert!(matches!(tick(&mut bot).await, Outcome::Cancelled(_)));
 }

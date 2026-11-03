@@ -178,6 +178,12 @@ impl<E: Exchange> Bot<E> {
     ) -> BotResult<()> {
         for event in events {
             let order = &event.order;
+            // the bot placed it again from the new price: the new buy is notified
+            if event.change == OrderChange::Ended
+                && self.storage.cancelled_by_the_bot(&order.txid)?
+            {
+                continue;
+            }
             let Some(manager) = managers.iter().find(|it| it.id == order.manager_id) else {
                 continue;
             };
@@ -701,6 +707,10 @@ impl<E: Exchange> Bot<E> {
         let Some(trailing) = self.config.buy_trailing else {
             return Ok(None);
         };
+        // a dry run never changes the orders on Kraken: an open buy left by a live run stays
+        if self.config.dry_run {
+            return Ok(None);
+        }
         let Some((order, limit)) = open
             .iter()
             .filter(|it| it.side == OrderSide::Buy && it.volume_executed.is_zero())
@@ -708,12 +718,18 @@ impl<E: Exchange> Bot<E> {
         else {
             return Ok(None);
         };
-        // the buy was placed at -buy_below% of this price
-        let below = Decimal::ONE - percent(manager.buy_below);
-        if below <= Decimal::ZERO {
-            return Ok(None);
-        }
-        let placed_from = limit / below;
+        let placed_from = match self.storage.order_reference(&order.txid)? {
+            Some(reference) => reference,
+            // placed before the references were recorded: the highest price it can have been
+            // placed from, its limit having been rounded down to the tick of the pair
+            None => {
+                let below = Decimal::ONE - percent(manager.buy_below);
+                if below <= Decimal::ZERO {
+                    return Ok(None);
+                }
+                (limit + market.rules.tick_size) / below
+            }
+        };
         if market.reference <= placed_from * (Decimal::ONE + percent(trailing)) {
             return Ok(None);
         }
@@ -735,17 +751,30 @@ impl<E: Exchange> Bot<E> {
             error: None,
         };
         match self.exchange.cancel_order(&order.txid).await {
-            Ok(()) => {
+            Ok(true) => {
                 tracing::info!(manager = manager.id, txid = %order.txid, %reason, "buy cancelled");
                 self.storage.record_action(&record)?;
                 Ok(Some(Outcome::Cancelled(reason)))
             }
-            // filled or ended meanwhile: the next synchronization tells
+            // closed meanwhile: the next synchronization tells
+            Ok(false) => Ok(None),
+            // gone from the open orders meanwhile: the next synchronization tells
+            Err(error) if is_unknown_order(&error) => Ok(None),
+            // a permission, a rate limit, the network: a failure of the manager, notified once,
+            // recorded when it changes
             Err(error) => {
                 tracing::warn!(manager = manager.id, txid = %order.txid, %error, "the buy couldn't be cancelled");
                 record.error = Some(error.to_string());
-                self.storage.record_action(&record)?;
-                Ok(None)
+                let last = self.storage.actions_of(manager.id, 1)?;
+                let repeated = last
+                    .first()
+                    .is_some_and(|it| it.kind == record.kind && it.error == record.error);
+                if !repeated {
+                    self.storage.record_action(&record)?;
+                }
+                Ok(Some(Outcome::Failed(format!(
+                    "the buy couldn't be cancelled: {error}"
+                ))))
             }
         }
     }
@@ -870,6 +899,9 @@ impl<E: Exchange> Bot<E> {
                         close_time: None,
                         expire_time: None,
                     }])?;
+                    if side == OrderSide::Buy {
+                        self.storage.set_order_reference(txid, market.reference)?;
+                    }
                 }
                 tracing::info!(manager = manager.id, order = %answer.description.order, ?txid, dry_run, "order accepted");
                 let notify_dry_run = self
@@ -908,6 +940,11 @@ impl<E: Exchange> Bot<E> {
             }
         }
     }
+}
+
+/// Kraken doesn't know the order as an open one
+fn is_unknown_order(error: &kraken_api::KrakenError) -> bool {
+    matches!(error, kraken_api::KrakenError::Api { body, .. } if body.contains("EOrder:Unknown order"))
 }
 
 /// The bot only trades with limit orders, at the price it computed, with the fees in the quote:
