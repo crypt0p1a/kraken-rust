@@ -1351,6 +1351,7 @@ dependencies = [
 name = "kraken-dashboard"
 version = "0.1.0"
 dependencies = [
+ "fastrand",
  "kraken-api",
  "kraken-trading-bot",
  "ratatui",
