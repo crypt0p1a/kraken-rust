@@ -28,11 +28,20 @@ use std::collections::{BTreeMap, HashSet};
 
 /// In the sync state once the orders of Kraken have been searched for virtual managers
 pub const REBUILT: &str = "virtual_managers_rebuilt";
+/// In the sync state after a failed search: when to try again
+pub const RETRY_AT: &str = "virtual_managers_rebuild_retry_at";
+/// A failed search is tried again an hour later
+pub const RETRY_SECONDS: f64 = 3600.0;
 
 /// A budget the first buy differs from by more than this ratio is the one of the orders
 const BUDGET_TOLERANCE: Decimal = Decimal::from_parts(2, 0, 0, false, 2);
 /// A percentage the orders differ from by more than these points is the one of the orders
 const PERCENT_TOLERANCE: Decimal = Decimal::from_parts(1, 0, 0, false, 1);
+/// The decimals of a percentage found in the orders
+const PERCENT_DECIMALS: u32 = 2;
+/// The decimals of a budget found in the orders: an amount of Kraken, whatever the quote (a budget
+/// in XBT has more than 2)
+const BUDGET_DECIMALS: u32 = 8;
 /// The trades read to find the price of the market when a buy was placed, before it
 const PRICE_WINDOW: f64 = 60.0;
 
@@ -65,15 +74,17 @@ pub fn implied_buy_below(buy: &BotOrder, reference: Decimal) -> Option<Decimal> 
     Some((Decimal::ONE - price / reference) * Decimal::ONE_HUNDRED)
 }
 
-/// The value of the copied manager when the orders agree with it, else the one of the orders
+/// The value of the copied manager when the orders agree with it, else the one of the orders,
+/// with the value of the orders rounded to `decimals`
 fn choose(
     template: Option<Decimal>,
     implied: Option<Decimal>,
     agrees: impl Fn(Decimal, Decimal) -> bool,
+    decimals: u32,
 ) -> Option<Decimal> {
     match (template, implied) {
         (Some(template), Some(implied)) if agrees(template, implied) => Some(template),
-        (_, Some(implied)) => Some(implied.round_dp(2).normalize()),
+        (_, Some(implied)) => Some(implied.round_dp(decimals).normalize()),
         (template, None) => template,
     }
 }
@@ -104,6 +115,14 @@ async fn price_at<E: Exchange>(exchange: &E, pair: &str, time: f64) -> BotResult
         .map(|it| it.price))
 }
 
+/// What a search of the orders of Kraken rebuilt
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct RebuildReport {
+    pub rebuilt: Vec<Rebuilt>,
+    /// Userrefs which couldn't be rebuilt now (a call to Kraken failing): tried again later
+    pub failed: usize,
+}
+
 /// What the rebuild found for a virtual manager
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rebuilt {
@@ -132,6 +151,7 @@ pub async fn rebuild_one<E: Exchange>(
         template.map(|it| it.budget),
         buys.first().and_then(|it| implied_budget(it, fee_rate)),
         close_budget,
+        BUDGET_DECIMALS,
     );
     let Some(budget) = budget else {
         return Ok(None);
@@ -150,6 +170,7 @@ pub async fn rebuild_one<E: Exchange>(
                 template.map(|it| it.sell_above),
                 implied_sell_above(sell, cost, fee_rate),
                 close_percent,
+                PERCENT_DECIMALS,
             )
         }
         // never sold: the copied manager, else the fallback over what the buy cost
@@ -169,6 +190,7 @@ pub async fn rebuild_one<E: Exchange>(
         template.map(|it| it.buy_below),
         implied_buy_below,
         close_percent,
+        PERCENT_DECIMALS,
     )
     .unwrap_or_default()
     .clamp(Decimal::ZERO, Decimal::new(99, 0));
@@ -179,11 +201,125 @@ pub async fn rebuild_one<E: Exchange>(
         budget,
         buy_below,
         sell_above,
-        mode: if template.is_some() {
-            ManagerMode::Active
-        } else {
-            ManagerMode::Closing
+        // closing with the manager it copies, or without it
+        mode: match template {
+            Some(template) if template.mode == ManagerMode::Active => ManagerMode::Active,
+            _ => ManagerMode::Closing,
         },
+    }))
+}
+
+/// Rebuilds the virtual manager of this userref from its orders. None when it's left untouched
+#[allow(clippy::too_many_arguments)]
+async fn rebuild_id<E: Exchange>(
+    exchange: &E,
+    storage: &Storage,
+    config: &BotConfig,
+    pairs: &std::collections::HashMap<String, kraken_api::market::AssetPair>,
+    id: i32,
+    orders: &[BotOrder],
+    now_ms: i64,
+) -> BotResult<Option<Rebuilt>> {
+    let Some(decoded) = VirtualId::decode(id) else {
+        tracing::warn!(
+            manager = id,
+            "a userref of virtual manager which copies no manager: left untouched"
+        );
+        return Ok(None);
+    };
+    let Some((key, pair)) = pairs
+        .iter()
+        .find(|(key, pair)| PairRules::matches(&orders[0].pair, key, pair))
+    else {
+        tracing::warn!(manager = id, pair = %orders[0].pair, "the pair of a virtual manager is unknown: left untouched");
+        return Ok(None);
+    };
+    let rules = PairRules::from_asset_pair(key, pair);
+    let fee = exchange
+        .trade_volume(std::slice::from_ref(key))
+        .await?
+        .fees
+        .get(key)
+        .map(|it| it.fee)
+        .ok_or_else(|| BotError::Config(format!("no fee for {key}")))?;
+    let fee_rate = percent(fee);
+
+    // the copied manager, if it still trades the same pair
+    let template = config
+        .managers
+        .iter()
+        .find(|it| it.id == decoded.template && PairRules::matches(&it.pair, key, pair));
+
+    let found = rebuild_one(
+        exchange,
+        id,
+        template,
+        FALLBACK_SELL_ABOVE,
+        orders,
+        &rules,
+        fee_rate,
+    )
+    .await?;
+    let holds_orders = orders.iter().any(|it| !it.is_final());
+    let (manager, holds, reason) = match found {
+        Some(config) => {
+            let balances = ledger::compute(config.budget, orders);
+            let base = balances.base_available + balances.base_in_sell_order;
+            let holds = holds_orders || base >= rules.ordermin;
+            let source = match template {
+                Some(_) => format!("copy of manager {}", decoded.template),
+                None => format!("manager {} is gone: closing", decoded.template),
+            };
+            let reason = format!("rebuilt from {} orders of Kraken, {source}", orders.len());
+            (config, holds, reason)
+        }
+        None => {
+            tracing::warn!(
+                manager = id,
+                "the orders of a virtual manager don't say how to sell what it holds: left untouched, its id stays taken"
+            );
+            let manager = ManagerConfig {
+                id,
+                pair: rules.altname.clone(),
+                budget: Decimal::ZERO,
+                buy_below: Decimal::ZERO,
+                sell_above: Decimal::ZERO,
+                mode: ManagerMode::Closing,
+            };
+            (
+                manager,
+                false,
+                "can't be rebuilt from its orders".to_string(),
+            )
+        }
+    };
+
+    storage.add_virtual_manager(&VirtualManager {
+        config: manager.clone(),
+        template_id: decoded.template,
+        created_at: now_ms,
+        reason: reason.clone(),
+    })?;
+    if !holds {
+        storage.delete_virtual_manager(id, now_ms, &format!("{reason}: holds nothing"))?;
+    }
+    storage.record_action(&ActionRecord {
+        manager_id: id,
+        at: now_ms,
+        kind: "virtual_rebuilt".into(),
+        amount: Some(manager.budget),
+        price: None,
+        reason: Some(reason.clone()),
+        dry_run: config.dry_run,
+        txid: None,
+        error: None,
+    })?;
+    tracing::info!(manager = id, holds, pair = %manager.pair, budget = %manager.budget, buy_below = %manager.buy_below, sell_above = %manager.sell_above, %reason, "virtual manager rebuilt");
+    Ok(Some(Rebuilt {
+        config: manager,
+        template_id: decoded.template,
+        holds,
+        reason,
     }))
 }
 
@@ -194,7 +330,7 @@ pub async fn rebuild<E: Exchange>(
     storage: &Storage,
     config: &BotConfig,
     now_ms: i64,
-) -> BotResult<Vec<Rebuilt>> {
+) -> BotResult<RebuildReport> {
     let known: HashSet<i32> = storage.virtual_ids()?.into_iter().collect();
     let open = exchange.open_orders().await?;
     let closed = sync::all_closed(exchange, ClosedOrdersRequest::default()).await?;
@@ -210,115 +346,23 @@ pub async fn rebuild<E: Exchange>(
         }
     }
     if by_id.is_empty() {
-        return Ok(Vec::new());
+        return Ok(RebuildReport::default());
     }
 
     let pairs = exchange.asset_pairs(&[]).await?;
-    let mut rebuilt = Vec::new();
+    let mut report = RebuildReport::default();
     for (id, orders) in by_id {
-        let Some(decoded) = VirtualId::decode(id) else {
-            tracing::warn!(
-                manager = id,
-                "a userref of virtual manager which copies no manager: left untouched"
-            );
-            continue;
-        };
-        let Some((key, pair)) = pairs
-            .iter()
-            .find(|(key, pair)| PairRules::matches(&orders[0].pair, key, pair))
-        else {
-            tracing::warn!(manager = id, pair = %orders[0].pair, "the pair of a virtual manager is unknown: left untouched");
-            continue;
-        };
-        let rules = PairRules::from_asset_pair(key, pair);
-        let fee = exchange
-            .trade_volume(std::slice::from_ref(key))
-            .await?
-            .fees
-            .get(key)
-            .map(|it| it.fee)
-            .ok_or_else(|| BotError::Config(format!("no fee for {key}")))?;
-        let fee_rate = percent(fee);
-
-        // the copied manager, if it still trades the same pair
-        let template = config
-            .managers
-            .iter()
-            .find(|it| it.id == decoded.template && PairRules::matches(&it.pair, key, pair));
-
-        let found = rebuild_one(
-            exchange,
-            id,
-            template,
-            FALLBACK_SELL_ABOVE,
-            &orders,
-            &rules,
-            fee_rate,
-        )
-        .await?;
-        let holds_orders = orders.iter().any(|it| !it.is_final());
-        let (manager, holds, reason) = match found {
-            Some(config) => {
-                let balances = ledger::compute(config.budget, &orders);
-                let base = balances.base_available + balances.base_in_sell_order;
-                let holds = holds_orders || base >= rules.ordermin;
-                let source = match template {
-                    Some(_) => format!("copy of manager {}", decoded.template),
-                    None => format!("manager {} is gone: closing", decoded.template),
-                };
-                let reason = format!("rebuilt from {} orders of Kraken, {source}", orders.len());
-                (config, holds, reason)
+        // one which can't be rebuilt now doesn't stop the others: it's tried again later
+        match rebuild_id(exchange, storage, config, &pairs, id, &orders, now_ms).await {
+            Ok(Some(rebuilt)) => report.rebuilt.push(rebuilt),
+            Ok(None) => {}
+            Err(error) => {
+                tracing::warn!(manager = id, %error, "a virtual manager couldn't be rebuilt: tried again later");
+                report.failed += 1;
             }
-            None => {
-                tracing::warn!(
-                    manager = id,
-                    "the orders of a virtual manager don't say how to sell what it holds: left untouched, its id stays taken"
-                );
-                let manager = ManagerConfig {
-                    id,
-                    pair: rules.altname.clone(),
-                    budget: Decimal::ZERO,
-                    buy_below: Decimal::ZERO,
-                    sell_above: Decimal::ZERO,
-                    mode: ManagerMode::Closing,
-                };
-                (
-                    manager,
-                    false,
-                    "can't be rebuilt from its orders".to_string(),
-                )
-            }
-        };
-
-        storage.add_virtual_manager(&VirtualManager {
-            config: manager.clone(),
-            template_id: decoded.template,
-            created_at: now_ms,
-            reason: reason.clone(),
-        })?;
-        if !holds {
-            storage.delete_virtual_manager(id, now_ms, &format!("{reason}: holds nothing"))?;
         }
-        storage.record_action(&ActionRecord {
-            manager_id: id,
-            at: now_ms,
-            kind: "virtual_rebuilt".into(),
-            amount: Some(manager.budget),
-            price: None,
-            reason: Some(reason.clone()),
-            dry_run: config.dry_run,
-            txid: None,
-            error: None,
-        })?;
-        tracing::info!(manager = id, holds, pair = %manager.pair, budget = %manager.budget, buy_below = %manager.buy_below, sell_above = %manager.sell_above, %reason, "virtual manager rebuilt");
-        rebuilt.push(Rebuilt {
-            config: manager,
-            template_id: decoded.template,
-            holds,
-            reason,
-        });
     }
-    Ok(rebuilt)
+    Ok(report)
 }
 
 #[cfg(test)]
@@ -366,24 +410,42 @@ mod tests {
     }
 
     #[test]
+    fn keeps_the_decimals_of_a_budget_in_a_crypto_quote() {
+        // 0.004 XBT spent by the first buy, its copied manager gone
+        assert_eq!(
+            choose(
+                None,
+                Some(d("0.00400451234")),
+                close_budget,
+                BUDGET_DECIMALS
+            ),
+            Some(d("0.00400451"))
+        );
+        assert_eq!(
+            choose(None, Some(d("1.23456")), close_percent, PERCENT_DECIMALS),
+            Some(d("1.23"))
+        );
+    }
+
+    #[test]
     fn keeps_the_copied_value_the_orders_agree_with() {
         assert_eq!(
-            choose(Some(d("1.5")), Some(d("1.53")), close_percent),
+            choose(Some(d("1.5")), Some(d("1.53")), close_percent, 2),
             Some(d("1.5"))
         );
         assert_eq!(
-            choose(Some(d("3")), Some(d("1.5012")), close_percent),
+            choose(Some(d("3")), Some(d("1.5012")), close_percent, 2),
             Some(d("1.5"))
         );
-        assert_eq!(choose(Some(d("3")), None, close_percent), Some(d("3")));
-        assert_eq!(choose(None, None, close_percent), None);
+        assert_eq!(choose(Some(d("3")), None, close_percent, 2), Some(d("3")));
+        assert_eq!(choose(None, None, close_percent, 2), None);
         assert_eq!(
-            choose(Some(d("30")), Some(d("30.4")), close_budget),
+            choose(Some(d("30")), Some(d("30.4")), close_budget, 8),
             Some(d("30"))
         );
         assert_eq!(
-            choose(Some(d("50")), Some(d("29.999")), close_budget),
-            Some(d("30"))
+            choose(Some(d("50")), Some(d("29.999")), close_budget, 8),
+            Some(d("29.999"))
         );
     }
 }

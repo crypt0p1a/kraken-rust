@@ -100,16 +100,23 @@ impl<E: Exchange> Bot<E> {
         self
     }
 
-    /// The managers of the YAML file, then the virtual managers
+    /// The managers of the YAML file, then the virtual managers. A virtual manager closes with the
+    /// manager it copies, closing or gone from the file: it sells what it holds, then is deleted
     pub fn managers(&self) -> BotResult<Vec<ManagerConfig>> {
         let mut managers = self.config.managers.clone();
         if self.config.virtual_managers {
-            managers.extend(
-                self.storage
-                    .virtual_managers()?
-                    .into_iter()
-                    .map(|it| it.config),
-            );
+            for virtual_manager in self.storage.virtual_managers()? {
+                let mut config = virtual_manager.config;
+                let template = self
+                    .config
+                    .managers
+                    .iter()
+                    .find(|it| it.id == virtual_manager.template_id);
+                if template.is_none_or(|it| it.mode == ManagerMode::Closing) {
+                    config.mode = ManagerMode::Closing;
+                }
+                managers.push(config);
+            }
         }
         Ok(managers)
     }
@@ -265,6 +272,11 @@ impl<E: Exchange> Bot<E> {
         self.exchange
     }
 
+    /// The exchange and the database: to start another bot on them
+    pub fn into_parts(self) -> (E, Storage) {
+        (self.exchange, self.storage)
+    }
+
     pub fn storage(&self) -> &Storage {
         &self.storage
     }
@@ -394,8 +406,13 @@ impl<E: Exchange> Bot<E> {
         let ids = managers.iter().map(|it| it.id).collect();
         let sync =
             sync::synchronize(&self.exchange, &self.storage, &ids, self.exchange.now()).await?;
-        self.notify_order_events(&sync.events, &markets, &managers)
-            .await?;
+        // the orders are synchronized already: a notification failing doesn't stop the managers
+        if let Err(error) = self
+            .notify_order_events(&sync.events, &markets, &managers)
+            .await
+        {
+            tracing::error!(%error, "the changes of the orders couldn't be notified");
+        }
 
         // what the account has, decreased locally when orders are placed
         let mut available: HashMap<String, Decimal> = self
@@ -431,7 +448,10 @@ impl<E: Exchange> Bot<E> {
         }
 
         managers.retain(|it| !matches!(outcomes.get(&it.id), Some(Outcome::Deleted(_))));
-        self.notify_daily_summary(&markets, &managers).await?;
+        // the orders are placed already: the tick is done whatever the summary
+        if let Err(error) = self.notify_daily_summary(&markets, &managers).await {
+            tracing::error!(%error, "the daily summary couldn't be sent");
+        }
         Ok(TickReport { sync, outcomes })
     }
 
@@ -441,17 +461,52 @@ impl<E: Exchange> Bot<E> {
         if !self.config.virtual_managers || self.storage.state(rebuild::REBUILT)?.is_some() {
             return Ok(());
         }
-        let rebuilt =
-            rebuild::rebuild(&self.exchange, &self.storage, &self.config, now_millis()).await?;
-        if !rebuilt.is_empty() {
-            tracing::warn!(
-                rebuilt = rebuilt.len(),
-                holding = rebuilt.iter().filter(|it| it.holds).count(),
-                "virtual managers rebuilt from the orders of Kraken"
-            );
+        let now = self.exchange.now();
+        let retry_at = self
+            .storage
+            .state(rebuild::RETRY_AT)?
+            .and_then(|it| it.parse::<f64>().ok());
+        if retry_at.is_some_and(|it| now < it) {
+            return Ok(());
         }
-        self.storage
-            .set_state(rebuild::REBUILT, &self.exchange.now().to_string())?;
+
+        // a failure doesn't stop the managers: the search is tried again an hour later
+        let failure =
+            match rebuild::rebuild(&self.exchange, &self.storage, &self.config, now_millis()).await
+            {
+                Ok(report) => {
+                    if !report.rebuilt.is_empty() {
+                        tracing::warn!(
+                            rebuilt = report.rebuilt.len(),
+                            holding = report.rebuilt.iter().filter(|it| it.holds).count(),
+                            "virtual managers rebuilt from the orders of Kraken"
+                        );
+                    }
+                    (report.failed > 0).then(|| {
+                        format!(
+                            "{} virtual manager(s) couldn't be rebuilt from the orders of Kraken",
+                            report.failed
+                        )
+                    })
+                }
+                Err(error) => Some(format!(
+                    "the orders of Kraken couldn't be searched: {error}"
+                )),
+            };
+        match failure {
+            None => {
+                self.storage.set_state(rebuild::REBUILT, &now.to_string())?;
+                self.clear_failure("rebuild");
+            }
+            Some(error) => {
+                tracing::warn!(%error, "the rebuild of the virtual managers is tried again in an hour");
+                self.storage.set_state(
+                    rebuild::RETRY_AT,
+                    &(now + rebuild::RETRY_SECONDS).to_string(),
+                )?;
+                self.notify_failure("rebuild", None, &error).await;
+            }
+        }
         Ok(())
     }
 
@@ -512,12 +567,18 @@ impl<E: Exchange> Bot<E> {
             .last_virtual_id()?
             .and_then(VirtualId::decode)
             .map_or(0, |it| it.sequence + 1);
-        let id = VirtualId {
+        // the ids are used up: no more virtual managers, the others go on
+        let Some(id) = (VirtualId {
             sequence,
             template: template.id,
-        }
-        .encode()
-        .ok_or_else(|| BotError::Config("no id left for a virtual manager".into()))?;
+        })
+        .encode() else {
+            tracing::warn!(
+                sequence,
+                "no id left for a virtual manager: none is added anymore"
+            );
+            return Ok(None);
+        };
 
         let (quote, margin) = margin_of(&template);
         let reason = format!(
@@ -588,13 +649,17 @@ impl<E: Exchange> Bot<E> {
             rules: &market.rules,
         });
 
+        // too small to be sold, a virtual manager isn't deleted with it: it's still its own
+        let base = balances.base_available + balances.base_in_sell_order;
         match action {
             Action::Wait => Ok(Outcome::Waited),
-            // closing, with nothing left to sell: a virtual manager is done
+            // closing, with nothing left: a virtual manager is done
             Action::Idle(reason)
-                if self.is_virtual(manager) && manager.mode == ManagerMode::Closing =>
+                if self.is_virtual(manager)
+                    && manager.mode == ManagerMode::Closing
+                    && base.is_zero() =>
             {
-                self.delete_virtual(manager, format!("{reason}, nothing left to sell"))
+                self.delete_virtual(manager, format!("{reason}, nothing left"))
             }
             Action::Idle(reason) => self.idle(manager, reason),
             Action::Sell { amount, price } => {
@@ -614,7 +679,7 @@ impl<E: Exchange> Bot<E> {
                         market.rules.quote_asset,
                         cost.round_dp(8).normalize()
                     );
-                    return self.starve(manager, reason);
+                    return self.starve(manager, reason, base);
                 }
                 let outcome = self
                     .place(manager, market, OrderSide::Buy, amount, price, &balances)
@@ -629,9 +694,18 @@ impl<E: Exchange> Bot<E> {
 
     /// The account can't pay for the buy of the manager, which holds nothing: a virtual manager is
     /// deleted after `STARVED_TICKS` ticks in a row, its money going back to the margin
-    fn starve(&self, manager: &ManagerConfig, reason: String) -> BotResult<Outcome> {
+    fn starve(&self, manager: &ManagerConfig, reason: String, base: Decimal) -> BotResult<Outcome> {
         if !self.is_virtual(manager) {
             return self.idle(manager, reason);
+        }
+        if !base.is_zero() {
+            return self.idle(
+                manager,
+                format!(
+                    "{reason}, keeps {} too small to be sold: not deleted",
+                    base.normalize()
+                ),
+            );
         }
 
         let count = {
