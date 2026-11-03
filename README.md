@@ -22,7 +22,7 @@ build and test.
 | I want to… | Guide |
 |------------|-------|
 | use the crates from Rust, or work on them | [Rust](docs/rust.md) |
-| run the trading bot | [Trading bot](docs/trading-bot.md) |
+| run the trading bot, follow it on its dashboard | [Trading bot](docs/trading-bot.md) |
 | use the library from Kotlin: JVM, Android, iOS, macOS, Linux, Windows | [Kotlin Multiplatform](docs/kotlin-multiplatform.md) |
 | use the library from Swift: iOS, macOS, Linux | [Swift](docs/swift.md) |
 | build the native libraries (`.so`, `.a`, `.dylib`, `.dll`) | [Native libraries](docs/native-libraries.md) |
@@ -49,6 +49,7 @@ crates/
 ├── kraken-api       the endpoints, grouped by domain, and their models   ← kraken-network
 ├── kraken-ffi       UniFFI export: objects with async methods            ← kraken-api, kraken-network
 ├── kraken-trading-bot  the trading bot (executable, Docker)             ← kraken-api, trading-notify
+├── kraken-dashboard the terminal dashboard of the bot (ratatui)         ← its SQLite database
 ├── trading-notify   notifications of a trading bot through ntfy, i18n   ← ntfy
 └── uniffi-bindgen   the generator of the Kotlin and Swift bindings      ← uniffi (cli)
 ```
@@ -60,6 +61,7 @@ crates/
 | `kraken-api`     | `market`, `account`, `trading` (models + calls), `PublicApi` and `PrivateApi` facades     |
 | `kraken-ffi`     | `KrakenPublicApi`, `KrakenPrivateApi`, `KrakenRateLimiter`, `KrakenLogger`                |
 | `kraken-trading-bot` | the managers of [the trading bot](docs/trading-bot.md), port of `cex-trading-bot`     |
+| `kraken-dashboard` | the [dashboard](docs/trading-bot.md#dashboard) of the bot in the terminal: P&L, managers, orders, markets, decisions |
 | `trading-notify` | the [notifications](docs/trading-bot.md#notifications) of the bot: languages, texts, sending through ntfy |
 | `uniffi-bindgen` | `uniffi-bindgen`, `uniffi-bindgen-swift`: the [bindings](docs/native-libraries.md#bindings) of `kraken-ffi` |
 

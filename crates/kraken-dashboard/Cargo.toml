@@ -1,0 +1,23 @@
+[package]
+name = "kraken-dashboard"
+description = "Terminal dashboard of kraken-trading-bot: its managers, their orders and their P&L, live from its database"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "kraken-dashboard"
+path = "src/main.rs"
+
+[dependencies]
+ratatui.workspace = true
+rusqlite.workspace = true
+rust_decimal.workspace = true
+
+[dev-dependencies]
+# the demo database and the tests are written by the storage of the bot itself
+fastrand.workspace = true
+kraken-api.workspace = true
+kraken-trading-bot.workspace = true
+rusqlite.workspace = true
