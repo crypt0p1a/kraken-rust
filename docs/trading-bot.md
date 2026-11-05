@@ -56,10 +56,37 @@ managers:
 | Variable | Default | |
 |----------|---------|-|
 | `KRAKEN_API_KEY`, `KRAKEN_API_SECRET` | | the API key, see the permissions above |
+| `KRAKEN_BOT_ACCOUNTS` | `main` | the [Kraken accounts](#several-accounts) to trade on, separated by commas |
+| `KRAKEN_API_KEY_<NAME>`, `KRAKEN_API_SECRET_<NAME>` | | the API key of each account of the list |
 | `KRAKEN_BOT_CONFIG` | `managers.yaml` | the YAML file |
 | `KRAKEN_BOT_DATABASE` | `kraken-bot.sqlite` | the SQLite database |
 | `KRAKEN_BOT_NTFY_TOPIC`, `KRAKEN_BOT_NTFY_TOKEN` | | the [notifications](#notifications) |
 | `RUST_LOG` | `info` | |
+
+## Several accounts
+
+One bot can trade on several Kraken accounts at once, each with its own key and its own money. They
+all run the managers of the same `managers.yaml`, and each has its own orders, positions and virtual
+managers. In `.env`:
+
+```sh
+KRAKEN_BOT_ACCOUNTS=main,alice
+KRAKEN_API_KEY=...            # main: KRAKEN_API_KEY_MAIN works too
+KRAKEN_API_SECRET=...
+KRAKEN_API_KEY_ALICE=...
+KRAKEN_API_SECRET_ALICE=...
+```
+
+- A name is 1 to 12 of `a-z`, `0-9`, `-` and `_`; `-` becomes `_` in the variables.
+- **One key per account.** Two keys of one Kraken account would run its managers twice with the same
+  ids, mixing their orders. The bot refuses the same key twice, but can't tell two keys of one account
+  apart: that one is on you.
+- The budgets are per account: each needs the money of all the managers of the file.
+- History before several accounts belongs to `main`, so keep that name for the first account.
+- An account taken off the list stops trading: its open orders stay on Kraken, its last values stay in
+  the dashboard, added to the others.
+- The accounts tick at the same time and share a limit of calls to Kraken: the ticks take longer. A
+  refused key fails the ticks of its account only. The notifications start with `[name]`.
 
 ## Virtual managers
 
@@ -145,11 +172,11 @@ cargo run --release -p kraken-dashboard -- kraken-bot.sqlite   # on a copy of th
 | Panel | Content |
 |-------|---------|
 | header | LIVE or DRY RUN (from the last order), TICK ASKED then TICKING once `t` is pressed, the time since the last tick (STALE after 30 min), the UTC clock, the prices of the pairs scrolling |
-| tiles | portfolio: the whole account, what the managers are worth and the money they don't use (equity of the manager when focused on one), target: what the account would be worth once every open buy filled and every position sold for what it cost + `sell_above`%, fees included, P&L (value - budget), realized by the sells, unrealized, win rate, fees and volume, open orders; the other quote currencies apart |
+| tiles | portfolio: the whole account, what the managers are worth and the money they don't use (equity of the manager when focused on one), target: what the account would be worth once every open buy filled and every position sold for what it cost + `sell_above`%, fees included, P&L (value - budget), realized by the sells, unrealized, 1 month, 3 months and 1 year: what the sells earned per day since the first order carried on as it is, without compounding, the gains of a manager not funding others. For fun rather than a forecast: unrealistic on a short history, and a falling market stops the sells. Fees and volume, open orders; the other quote currencies apart |
 | managers | value, P&L, position, entry price and the last price against it, open order, how far the market is from it (`TO FILL`, ▼ the drop a buy waits for, ▲ the rise a sell waits for) and its fill, the trend of the value |
-| charts | two, one above the other (the first one alone in a low terminal), `c` switches the one above, `v` the one below: the P&L over time, the value of the whole account (of the manager when focused on one) with its target and the orders filled, the price of the pair with the entry price and the open orders, the P&L of each sell, what the portfolio would be worth if every price moved at once by -10% to +10%: the buys the move reaches filled at their limit, the sells at their target, what the bot would place next not played. Not a forecast |
-| orders | the blotter: side, price, how far the market is from an open order, volume, fill, cost, fee, status |
-| markets | the last price, 24 hours change, ATR, range and trend of the [indicators](#indicators-of-the-market), the spread |
+| charts | a column on the last third of the screen, three charts one above the other (fewer in a low terminal), `c`, `v` and `b` switch the one at the top, in the middle and at the bottom: the P&L over time, the value of the whole account (of the manager when focused on one) with its target, the buys filled (▲), and each sell (▼) with a flag saying what it earned, the sells too close sharing one (`3× +1.02`), the price of the pair with the entry price and the open orders, the P&L of each sell, what the portfolio would be worth if every price moved at once by -10% to +10%: the buys the move reaches filled at their limit, the sells at their target, what the bot would place next not played. Not a forecast |
+| orders | the blotter, without the cost, the fee and then the volume when narrow: side, price, how far the market is from an open order, volume, fill, cost, fee, status |
+| markets | the last price (the range and the spread left out when narrow), 24 hours change, ATR, range and trend of the [indicators](#indicators-of-the-market), the spread |
 | tape | the decisions: orders placed, refused (✗), trailing, virtual managers; `i` shows the idle ones |
 
 Keys: `tab` the panel the arrows move in, `⏎` focus on the manager of the cursor (tiles, charts,
@@ -166,6 +193,10 @@ the bot:
 cargo run -p kraken-dashboard --example demo -- demo.sqlite
 cargo run -p kraken-dashboard -- demo.sqlite
 ```
+
+With several accounts, `a` goes through them in a circle: all of them added up (the managers named
+`alice·#7`), then each one alone. `t` asks for a tick of what's shown. An account joining makes the
+curve of the portfolio jump, as a deposit does.
 
 ## Notifications
 
@@ -214,6 +245,7 @@ The SQLite database (`/data/kraken-bot.sqlite`) is there to work with what the b
 | `tickers` | the prices of the pairs of the managers, at each tick |
 | `indicators` | the [indicators](#indicators-of-the-market) of the pairs, at each tick |
 | `account_snapshots` | what the whole account is worth at each tick, per quote currency of the managers: the quote, plus the bases of their pairs at the last price |
+| `accounts` | the Kraken accounts, by name. Every table but `tickers` and `indicators` has an `account` column |
 | `commands` | what is asked of the bot from outside: `forced_tick`, `refresh` when the dashboard asks for a tick, `pending` while the bot does it, `idle` once done. The bot looks for it every 10 seconds between two ticks |
 | `sync_state` | where the synchronization of the orders is |
 | `virtual_managers` | the [virtual managers](#virtual-managers), deleted ones included |

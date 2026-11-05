@@ -4,10 +4,11 @@
 //! ```text
 //! ◆ KRAKEN  TRADING DESK  ● LIVE                      TICK 42s AGO │ UTC 2026-11-03 14:32:07
 //!  XBTUSD 76,567.1 ▲ +1.23%  ◆  ETHUSD 2,233.67 ▼ -0.45%  ◆  …
-//! ┌PORTF.──┐┌TARGET──┐┌P&L─────┐┌REALIZED┐┌UNREAL.─┐┌WIN RATE┐┌FEES────┐┌ORDERS──┐
-//! ┌MANAGERS──────────────────────────────┐┌P&L · USD · 24H──────────────┐
-//! ┌ORDERS────────────────────────────────┐┌MARKETS──────────────────────┐
-//!                                         ┌TAPE─────────────────────────┐
+//! ┌PORTF.──┐┌TARGET┐┌P&L───┐┌REALIZ┐┌UNREAL┐┌1 MON.┐┌3 MON.┐┌1 YEAR┐┌FEES──┐┌ORDERS┐
+//! ┌MANAGERS───────────────────────────────────┐┌PORTFOLIO · USD · 24H───┐
+//! │                                           ││                        │
+//! ┌ORDERS──────────────────┐┌MARKETS───────────┐┌IF THE MARKET MOVES─────┐
+//! │                        │┌TAPE──────────────┐┌XBTUSD · #1─────────────┐
 //!  q QUIT  tab PANEL  ↑↓ MOVE  ⏎ FOCUS  c CHART  1-5 RANGE …
 //! ```
 
@@ -18,7 +19,7 @@ use crate::app::{App, Range, now_millis};
 use crate::data::{percent, to_f64};
 use crate::format;
 use crate::stats::Totals;
-use crate::theme::{self, AMBER, BACKGROUND, DIM, DOWN, GOLD, TEXT, UP};
+use crate::theme::{self, AMBER, BACKGROUND, DIM, DOWN, GOLD, TEXT, UP, VIOLET};
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -53,12 +54,11 @@ pub fn render(frame: &mut Frame, app: &App) {
         return;
     }
 
-    let [header, tape, tiles, middle, bottom, footer] = Layout::vertical([
+    let [header, tape, tiles, body, footer] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Length(4),
-        Constraint::Fill(5),
-        Constraint::Fill(4),
+        Constraint::Fill(1),
         Constraint::Length(1),
     ])
     .areas(area);
@@ -67,14 +67,18 @@ pub fn render(frame: &mut Frame, app: &App) {
     render_ticker_tape(frame, app, tape);
     render_tiles(frame, app, tiles);
 
-    let [managers, chart] =
-        Layout::horizontal([Constraint::Percentage(60), Constraint::Percentage(40)]).areas(middle);
+    // the tables on two thirds, the charts in a column on the last one
+    let [tables, chart_column] =
+        Layout::horizontal([Constraint::Percentage(67), Constraint::Percentage(33)]).areas(body);
+    charts::render(frame, app, chart_column);
+
+    let [managers, bottom] =
+        Layout::vertical([Constraint::Fill(5), Constraint::Fill(4)]).areas(tables);
     panels::render_managers(frame, app, managers);
-    charts::render(frame, app, chart);
 
     let markets = app.model.data.markets.len().max(1) as u16 + 3;
     let [orders, right] =
-        Layout::horizontal([Constraint::Percentage(57), Constraint::Percentage(43)]).areas(bottom);
+        Layout::horizontal([Constraint::Percentage(60), Constraint::Percentage(40)]).areas(bottom);
     let [market, actions] =
         Layout::vertical([Constraint::Length(markets), Constraint::Fill(1)]).areas(right);
     panels::render_orders(frame, app, orders);
@@ -134,10 +138,21 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
         Some(false) => Span::styled(" ◌ DRY RUN ", Style::new().fg(Color::Black).bg(GOLD).bold()),
         None => Span::styled(" NO ORDER YET ", theme::dim()),
     });
+    if let Some(name) = app.view_name() {
+        left.push(Span::raw(" "));
+        left.push(Span::styled(
+            format!(" ▣ {name} "),
+            Style::new().fg(Color::Black).bg(VIOLET).bold(),
+        ));
+    }
     if let Some(manager) = app.focus() {
         left.push(Span::raw("  "));
         left.push(Span::styled(
-            format!(" ▸ MANAGER #{} · {} ", manager.id, manager.pair),
+            format!(
+                " ▸ MANAGER {} · {} ",
+                app.manager_name(manager.id),
+                manager.pair
+            ),
             Style::new().fg(Color::Black).bg(theme::CYAN).bold(),
         ));
     }
@@ -275,7 +290,10 @@ fn render_tiles(frame: &mut Frame, app: &App, area: Rect) {
     let pnl = to_f64(totals.pnl());
     let realized = to_f64(totals.realized);
     let unrealized = to_f64(totals.unrealized());
-    let areas: [Rect; 8] = Layout::horizontal([Constraint::Fill(1); 8]).areas(area);
+    // the first tile says the most
+    let mut widths = [Constraint::Fill(2); 10];
+    widths[0] = Constraint::Fill(3);
+    let areas: [Rect; 10] = Layout::horizontal(widths).areas(area);
 
     // the whole account, managers or not, when the bot records it
     let account = app
@@ -393,27 +411,36 @@ fn render_tiles(frame: &mut Frame, app: &App, area: Rect) {
             theme::dim(),
         )),
     );
-    let losses = totals.trades - totals.wins;
-    tile(
-        frame,
-        areas[5],
-        "WIN RATE",
-        match totals.win_rate() {
-            Some(rate) => Span::styled(
-                format!("{rate:.1}%"),
-                theme::bold(if rate >= 50.0 { UP } else { DOWN }),
+    // what the sells earned per day since the first order, carried on as it is
+    let ids = app.charted();
+    let per_day = app.model.realized_per_day(&ids, app.loaded_at);
+    for (place, name, days) in [
+        (5, "1 MONTH", 30.0),
+        (6, "3 MONTHS", 90.0),
+        (7, "1 YEAR", 365.0),
+    ] {
+        let projected = per_day * days;
+        tile(
+            frame,
+            areas[place],
+            name,
+            Span::styled(
+                format::signed(projected),
+                theme::bold(theme::trend(projected)),
             ),
-            None => Span::styled("—", theme::dim()),
-        },
-        Line::from(vec![
-            Span::styled(format!("{}W", totals.wins), Style::new().fg(UP)),
-            Span::styled(" / ", theme::faint()),
-            Span::styled(format!("{losses}L"), Style::new().fg(DOWN)),
-        ]),
-    );
+            Line::from(Span::styled(
+                format!(
+                    "{} {}",
+                    theme::arrow(projected),
+                    format::percent(projected / to_f64(totals.budget).max(1.0) * 100.0)
+                ),
+                Style::new().fg(theme::trend(projected)),
+            )),
+        );
+    }
     tile(
         frame,
-        areas[6],
+        areas[8],
         "FEES",
         Span::styled(format::money(to_f64(totals.fees)), theme::bold(GOLD)),
         Line::from(Span::styled(
@@ -423,7 +450,7 @@ fn render_tiles(frame: &mut Frame, app: &App, area: Rect) {
     );
     tile(
         frame,
-        areas[7],
+        areas[9],
         "OPEN ORDERS",
         Span::styled(totals.open_orders.to_string(), theme::bold(theme::CYAN)),
         Line::from(Span::styled(
@@ -463,8 +490,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         key("tab", "PANEL"),
         key("↑↓", "MOVE"),
         key("⏎", if app.drilled { "ALL" } else { "FOCUS" }),
-        key("c", "CHART"),
-        key("v", "CHART 2"),
+        key("c v b", "CHARTS"),
         key("o", if app.open_only { "ALL ORDERS" } else { "OPEN" }),
         key("i", if app.show_idle { "HIDE IDLE" } else { "IDLE" }),
         key("r", "RELOAD"),
@@ -475,6 +501,9 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
     .into_iter()
     .flatten()
     .collect();
+    if app.several_accounts() {
+        spans.splice(0..0, key("a", "ACCOUNT"));
+    }
     spans.extend(ranges);
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
 
@@ -505,11 +534,14 @@ fn render_help(frame: &mut Frame, area: Rect) {
         ),
         ("esc", "back to all the managers"),
         (
-            "c",
-            "chart above: P&L, portfolio, price with the orders, sells, if the market moves",
+            "c v b",
+            "the chart at the top, in the middle, at the bottom: P&L, portfolio, price, sells, if the market moves",
         ),
-        ("v", "chart below, the same ones"),
         ("1 … 5", "range of the charts: 1H 24H 7D 30D ALL"),
+        (
+            "a",
+            "next account, in a circle: all of them added up, then each one",
+        ),
         ("o", "only the open orders"),
         ("i", "the idle decisions in the tape"),
         ("r", "read the database again"),

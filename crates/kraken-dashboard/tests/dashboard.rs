@@ -320,9 +320,13 @@ fn draws_the_desk() {
         "#1",
         "FILLED",
         "OPEN",
-        "EOrder:Insufficient funds",
-        "WIN RATE",
-        "100.0%",
+        "1 MONTH",
+        "3 MONTHS",
+        "1 YEAR",
+        // 0.1584 earned in the first day: carried on for 30, 90 and 365 days
+        "+4.75",
+        "+14.26",
+        "+57.82",
         "PORTFOLIO",
         "80.06 USD",
         "TARGET",
@@ -336,20 +340,25 @@ fn draws_the_desk() {
     // the price of an open order lined up, whole, in the managers
     let wide = screen(&app, 200, 52);
     assert!(wide.contains("BUY  75,500.0"), "{wide}");
+    // the reason of a refused order, whole, before its amount
+    assert!(wide.contains("✗ EOrder:Insufficient funds"), "{wide}");
+    assert!(text.contains("✗ EOrder:Insufficient"), "{text}");
 
     // every chart, the focus on a manager, the help: drawn without a panic
     for chart in [Chart::Price, Chart::Trades, Chart::Pnl] {
-        app.chart = chart;
+        app.charts[0] = chart;
         screen(&app, 180, 48);
     }
-    app.chart = Chart::Scenarios;
+    app.charts[0] = Chart::Scenarios;
     let scenarios = screen(&app, 180, 48);
     assert!(scenarios.contains("IF THE MARKET MOVES"), "{scenarios}");
     assert!(scenarios.contains("NOW"), "{scenarios}");
     assert!(scenarios.contains("-10%"), "{scenarios}");
-    app.chart = Chart::Portfolio;
+    app.charts[0] = Chart::Portfolio;
     let portfolio = screen(&app, 180, 48);
     assert!(portfolio.contains("PORTFOLIO · USD"), "{portfolio}");
+    assert!(portfolio.contains("▲ 2 BUYS"), "{portfolio}");
+    assert!(portfolio.contains("▼ 1 SELLS +0.16"), "{portfolio}");
     assert!(portfolio.contains("TARGET"), "{portfolio}");
     app.on_key(KeyEvent::from(KeyCode::Enter));
     assert_eq!(app.focus().map(|it| it.id), Some(1));
@@ -474,30 +483,57 @@ fn a_move_up_sells_at_the_target_and_moves_what_no_manager_owns() {
 }
 
 #[test]
-fn always_shows_two_different_charts() {
-    let fixture = path("two-charts");
+fn shows_a_column_of_different_charts() {
+    let fixture = path("column");
     let _storage = write(&fixture.path);
     let (mut app, _database) = app(&fixture.path);
 
     let text = screen(&app, 180, 48);
     assert!(text.contains("PORTFOLIO · USD"), "{text}");
     assert!(text.contains("IF THE MARKET MOVES · USD"), "{text}");
+    assert!(text.contains("XBTUSD · #1"), "{text}");
 
-    // each key its own chart, never the one of the other: back at the start in 4 presses
-    let (chart, second) = (app.chart, app.second_chart);
-    for key in ['c', 'v'] {
-        for _ in 0..4 {
+    // each key its own place, never a chart of another: back at the start in 3 presses
+    let charts = app.charts;
+    for key in ['c', 'v', 'b'] {
+        for _ in 0..3 {
             app.on_key(KeyEvent::from(KeyCode::Char(key)));
-            assert_ne!(app.chart, app.second_chart);
+            let [first, second, third] = app.charts;
+            assert!(first != second && first != third && second != third);
             screen(&app, 180, 48);
         }
-        assert_eq!((app.chart, app.second_chart), (chart, second));
+        assert_eq!(app.charts, charts);
     }
 
-    // too low for two: the first one alone
-    let low = screen(&app, 140, 30);
+    // lower: fewer charts, the first ones
+    let low = screen(&app, 180, 36);
     assert!(low.contains("PORTFOLIO · USD"), "{low}");
-    assert!(!low.contains("IF THE MARKET MOVES · USD"), "{low}");
+    assert!(low.contains("IF THE MARKET MOVES · USD"), "{low}");
+    assert!(!low.contains("XBTUSD · #1"), "{low}");
+    let lower = screen(&app, 140, 28);
+    assert!(lower.contains("PORTFOLIO · USD"), "{lower}");
+    assert!(!lower.contains("IF THE MARKET MOVES · USD"), "{lower}");
+}
+
+#[test]
+fn the_charts_dont_move_between_two_frames() {
+    let fixture = path("still");
+    let _storage = write(&fixture.path);
+    let (mut app, _database) = app(&fixture.path);
+    app.charts = [Chart::Portfolio, Chart::Price, Chart::Trades];
+    // without the header and the prices scrolling
+    let charts = |app: &App| {
+        screen(app, 180, 48)
+            .lines()
+            .skip(2)
+            .map(String::from)
+            .collect::<Vec<_>>()
+    };
+    let first = charts(&app);
+    for _ in 0..20 {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        assert_eq!(charts(&app), first);
+    }
 }
 
 #[test]
@@ -598,7 +634,142 @@ fn demo() {
         Chart::Trades,
         Chart::Scenarios,
     ] {
-        app.chart = chart;
+        app.charts[0] = chart;
         println!("{}", screen(&app, 200, 52));
     }
+}
+
+/// A second account next to the one of `write`, with the same manager ids and its own money
+fn second_account(path: &Path) -> Storage {
+    let storage = Storage::open_account(path, "alice").unwrap();
+    let now = now_millis();
+    let balances = ledger::compute(d("500"), &[]);
+    storage
+        .save_manager(&ManagerState {
+            config: ManagerConfig {
+                budget: d("500"),
+                ..config(1, "XBTUSD")
+            },
+            balances,
+            last_price: d("70000"),
+            at: now - 1_000,
+        })
+        .unwrap();
+    storage
+        .record_account(&AccountRecord {
+            at: now - 1_000,
+            quote: "ZUSD".into(),
+            cash: d("500"),
+            holdings: d("0"),
+        })
+        .unwrap();
+    storage
+}
+
+fn press(app: &mut App, database: &Database, key: char) {
+    if app.on_key(KeyEvent::from(KeyCode::Char(key))) {
+        app.refresh(database, true);
+    }
+}
+
+#[test]
+fn adds_up_the_accounts_and_goes_through_them_in_a_circle() {
+    let fixture = path("accounts");
+    let main = write(&fixture.path);
+    let _alice = second_account(&fixture.path);
+    main.record_account(&AccountRecord {
+        at: now_millis(),
+        quote: "ZUSD".into(),
+        cash: d("100"),
+        holdings: d("20"),
+    })
+    .unwrap();
+    let (mut app, database) = app(&fixture.path);
+
+    // every account together: both managers #1, told apart, and the money of both
+    let main_managers = app
+        .model
+        .data
+        .managers
+        .iter()
+        .filter(|it| kraken_dashboard::data::account_of(it.id) == 1)
+        .count();
+    assert_eq!(app.view, None);
+    assert_eq!(app.model.data.managers.len(), main_managers + 1);
+    assert_eq!(app.model.account("USD").unwrap().value(), d("620"));
+    let text = screen(&app, 200, 50);
+    assert!(text.contains("ALL ACCOUNTS · 2"), "{text}");
+    assert!(text.contains("main·#1"), "{text}");
+    assert!(text.contains("alice·#1"), "{text}");
+
+    // the first account alone
+    press(&mut app, &database, 'a');
+    assert_eq!(app.view, Some(1));
+    assert_eq!(app.model.data.managers.len(), main_managers);
+    assert_eq!(app.model.account("USD").unwrap().value(), d("120"));
+    let text = screen(&app, 200, 50);
+    assert!(text.contains("MAIN · 1/2"), "{text}");
+    assert!(!text.contains("alice·"), "{text}");
+
+    // the second one, its manager with the id it has in the YAML file
+    press(&mut app, &database, 'a');
+    assert_eq!(app.view, Some(2));
+    assert_eq!(app.model.data.managers.len(), 1);
+    assert_eq!(app.model.data.managers[0].number(), 1);
+    assert_eq!(app.model.account("USD").unwrap().value(), d("500"));
+    assert!(app.model.data.orders.is_empty());
+    assert!(screen(&app, 200, 50).contains("ALICE · 2/2"));
+
+    // and back to all of them
+    press(&mut app, &database, 'a');
+    assert_eq!(app.view, None);
+    assert_eq!(app.model.data.managers.len(), main_managers + 1);
+}
+
+#[test]
+fn asks_for_the_tick_of_the_account_shown() {
+    let fixture = path("account-tick");
+    let main = write(&fixture.path);
+    let alice = second_account(&fixture.path);
+    let (mut app, database) = app(&fixture.path);
+
+    press(&mut app, &database, 'a');
+    press(&mut app, &database, 'a');
+    assert_eq!(app.view, Some(2));
+    press(&mut app, &database, 't');
+    app.ask_tick(&database);
+    assert_eq!(
+        alice.command(FORCED_TICK).unwrap(),
+        Some(CommandState::Refresh)
+    );
+    assert_eq!(main.command(FORCED_TICK).unwrap(), Some(CommandState::Idle));
+    alice.start_command(FORCED_TICK, now_millis()).unwrap();
+    alice.end_command(FORCED_TICK, now_millis()).unwrap();
+
+    // all of them together: a tick for each
+    press(&mut app, &database, 'a');
+    assert_eq!(app.view, None);
+    press(&mut app, &database, 't');
+    app.ask_tick(&database);
+    assert_eq!(
+        alice.command(FORCED_TICK).unwrap(),
+        Some(CommandState::Refresh)
+    );
+    assert_eq!(
+        main.command(FORCED_TICK).unwrap(),
+        Some(CommandState::Refresh)
+    );
+}
+
+#[test]
+fn says_nothing_of_the_accounts_with_a_single_one() {
+    let fixture = path("single-account");
+    let _main = write(&fixture.path);
+    let (mut app, database) = app(&fixture.path);
+    let text = screen(&app, 200, 50);
+    assert!(!text.contains("ALL ACCOUNTS"), "{text}");
+    assert!(!text.contains("ACCOUNT "), "{text}");
+    assert!(!text.contains("main·"), "{text}");
+    press(&mut app, &database, 'a');
+    assert_eq!(app.view, None);
 }
