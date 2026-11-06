@@ -321,12 +321,17 @@ jobs:
           code=$?
           echo "$output"
           test "$code" -eq 1 && echo "$output" | grep -q "KRAKEN_API_KEY is required"
-      - name: Checks the example configuration against the pairs of Kraken (public API)
+      # the pairs come first: reaching the fake key means they're valid, and Kraken refusing it that
+      # the private call goes through
+      - name: Checks the example configuration against the pairs of Kraken, then refuses a fake key
         run: |
-          docker run --rm \
+          code=0
+          output=$(docker run --rm \
             -e KRAKEN_API_KEY=not-a-key -e KRAKEN_API_SECRET=bm90LWEtc2VjcmV0 \
             -v "$PWD/managers.example.yaml:/config/managers.yaml:ro" \
-            kraken-trading-bot:ci --check
+            kraken-trading-bot:ci --check 2>&1) || code=$?
+          echo "$output"
+          test "$code" -eq 1 && echo "$output" | grep -q "the key is refused: .*EAPI:Invalid key"
       - name: Image size
         run: docker images kraken-trading-bot:ci --format '{{.Size}}' | tee -a "$GITHUB_STEP_SUMMARY"
 
