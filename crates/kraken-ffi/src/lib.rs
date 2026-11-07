@@ -1,6 +1,6 @@
 //! UniFFI export of the Kraken Spot REST API
 //!
-//! The models and [`KrakenError`](kraken_network::KrakenError) are exported by `kraken-api` and
+//! The models and [`KrakenError`](kraken_network::KrakenError) are exported by `kraken-spot-api` and
 //! `kraken-network` (their `uniffi` feature), the APIs are wrapped here as objects with async
 //! methods. Same shape as the `ffi` module of `cex-spot-trading`.
 

@@ -343,7 +343,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: |
-          for crate in kraken-crypto kraken-network kraken-api; do
+          for crate in kraken-crypto kraken-network kraken-spot-api; do
             cargo test -p "$crate" --locked
             if cargo tree -p "$crate" -e normal | grep -q uniffi; then
               echo "::error::$crate depends on uniffi without its feature"; exit 1
@@ -371,7 +371,7 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
-      - run: cargo nextest run -p kraken-api --locked --profile live --run-ignored only --test live_market
+      - run: cargo nextest run -p kraken-spot-api --locked --profile live --run-ignored only --test live_market
       - name: Test report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -398,7 +398,7 @@ jobs:
         if: env.KRAKEN_API_KEY != ''
         run: >-
           cargo nextest run --locked --profile live --run-ignored only
-          -p kraken-api --test live_account --test live_trading --test live_algo --test live_earn
+          -p kraken-spot-api --test live_account --test live_trading --test live_algo --test live_earn
           --test live_funding
           -p kraken-trading-bot --test live_dry_run
       - name: Test report

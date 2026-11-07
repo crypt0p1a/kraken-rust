@@ -6,9 +6,9 @@
 
 #![allow(dead_code)]
 
-use kraken_api::Decimal;
-use kraken_api::{PrivateApi, PublicApi, RateLimiter, RestOptions};
 use kraken_network::{FundingClient, PrivateClient, PublicClient};
+use kraken_spot_api::Decimal;
+use kraken_spot_api::{PrivateApi, PublicApi, RateLimiter, RestOptions};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::{Arc, LazyLock};
@@ -77,10 +77,13 @@ pub fn private_client() -> PrivateClient {
 }
 
 /// The answer of a call, or None when the API key of the tests lacks its permission
-pub fn unless_denied<T>(context: &str, answer: Result<T, kraken_api::KrakenError>) -> Option<T> {
+pub fn unless_denied<T>(
+    context: &str,
+    answer: Result<T, kraken_spot_api::KrakenError>,
+) -> Option<T> {
     match answer {
         // "Permission denied" on /0/private, an undocumented error body on the funding API
-        Err(kraken_api::KrakenError::Api { body, .. })
+        Err(kraken_spot_api::KrakenError::Api { body, .. })
             if body.to_lowercase().contains("permission") =>
         {
             println!("{context}: skipped, the API key lacks the permission ({body})");

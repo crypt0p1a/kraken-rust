@@ -1319,25 +1319,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kraken-api"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "hmac",
- "kraken-network",
- "rust_decimal",
- "rust_decimal_macros",
- "serde",
- "serde_ignored",
- "serde_json",
- "serde_urlencoded",
- "sha2",
- "tokio",
- "uniffi",
- "wiremock",
-]
-
-[[package]]
 name = "kraken-crypto"
 version = "0.1.0"
 dependencies = [
@@ -1352,7 +1333,7 @@ name = "kraken-dashboard"
 version = "0.1.0"
 dependencies = [
  "fastrand",
- "kraken-api",
+ "kraken-spot-api",
  "kraken-trading-bot",
  "ratatui",
  "rusqlite",
@@ -1363,8 +1344,8 @@ dependencies = [
 name = "kraken-ffi"
 version = "0.1.0"
 dependencies = [
- "kraken-api",
  "kraken-network",
+ "kraken-spot-api",
  "serde_json",
  "tokio",
  "uniffi",
@@ -1390,12 +1371,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "kraken-spot-api"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "hmac",
+ "kraken-network",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde_ignored",
+ "serde_json",
+ "serde_urlencoded",
+ "sha2",
+ "tokio",
+ "uniffi",
+ "wiremock",
+]
+
+[[package]]
 name = "kraken-trading-bot"
 version = "0.1.0"
 dependencies = [
  "fastrand",
  "humantime-serde",
- "kraken-api",
+ "kraken-spot-api",
  "rusqlite",
  "rust_decimal",
  "serde",

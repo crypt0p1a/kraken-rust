@@ -3,7 +3,7 @@
 mod common;
 
 use common::{FormIs, JsonIs, Signed, SignedJson, ok, private_api};
-use kraken_api::earn::{
+use kraken_spot_api::earn::{
     EarnAllocationsRequest, EarnFunds, EarnStrategiesRequest, LockType, LockTypeFilter,
 };
 use serde_json::json;

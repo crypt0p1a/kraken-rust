@@ -1,15 +1,15 @@
 //! Contract of the private trading endpoints, against the real Kraken API. Read only: the orders
 //! are only validated (`validate=true`), never placed.
 //! Credentials: KRAKEN_API_KEY / KRAKEN_API_SECRET, from the environment or `.env`.
-//! `cargo test -p kraken-api --test live_trading -- --ignored --test-threads=1 --nocapture`
+//! `cargo test -p kraken-spot-api --test live_trading -- --ignored --test-threads=1 --nocapture`
 
 mod live;
 mod strict;
 
-use kraken_api::Decimal;
-use kraken_api::KrakenError;
-use kraken_api::market::AssetPair;
-use kraken_api::trading::{
+use kraken_spot_api::Decimal;
+use kraken_spot_api::KrakenError;
+use kraken_spot_api::market::AssetPair;
+use kraken_spot_api::trading::{
     AmendOrder, AmendType, CloseTime, ClosedOrdersRequest, ConsolidatedPosition, EditOrder,
     NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends, OrderFlag, OrderReference,
     OrderSide, OrderStatus, OrderType, Position, QueryTradesRequest, TimeInForce, Trade,

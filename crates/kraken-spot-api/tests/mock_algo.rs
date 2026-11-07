@@ -3,8 +3,8 @@
 mod common;
 
 use common::{FormIs, Signed, ok, private_api};
-use kraken_api::algo::{ClosedStrategiesRequest, NewStrategy, StrategyStatus, StrategyType};
-use kraken_api::trading::{OrderSide, OrderType};
+use kraken_spot_api::algo::{ClosedStrategiesRequest, NewStrategy, StrategyStatus, StrategyType};
+use kraken_spot_api::trading::{OrderSide, OrderType};
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer};

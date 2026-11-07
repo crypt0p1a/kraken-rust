@@ -57,4 +57,4 @@ let balances = try await privateApi.extendedBalance()
 ```
 
 The amounts are `Foundation.Decimal`s (38 digits, read and written with the POSIX locale), see
-[`crates/kraken-api/uniffi.toml`](../crates/kraken-api/uniffi.toml).
+[`crates/kraken-spot-api/uniffi.toml`](../crates/kraken-spot-api/uniffi.toml).

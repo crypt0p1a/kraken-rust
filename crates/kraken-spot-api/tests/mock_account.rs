@@ -4,7 +4,7 @@
 mod common;
 
 use common::{FormIs, Signed, ok, private_api};
-use kraken_api::account::{
+use kraken_spot_api::account::{
     ApiKeyInfoRequest, BalanceRequest, ExportFormat, ExportReport, ExportRequest, ExportStatus,
     LedgerFilter, LedgerType, LedgersRequest, QueryLedgersRequest, RebaseMultiplier,
     RemoveExportType, TradeBalanceRequest, WalletType,

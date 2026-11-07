@@ -4,13 +4,13 @@
 mod common;
 
 use common::{QueryIs, SignedFunding, plain, private_api};
-use kraken_api::funding::{
+use kraken_spot_api::funding::{
     AddressDetails, ClaimedAddressesRequest, DepositsRequest, FundingAsset, FundingDirection,
     FundingFeeRequest, FundingLimitsRequest, FundingMethodsRequest, FundingScope, NewWithdrawal,
     NewWithdrawalAddress, TransferStatus, WithdrawalAddressesRequest, WithdrawalFee,
     WithdrawalStatus, WithdrawalsRequest,
 };
-use kraken_api::market::AssetClass;
+use kraken_spot_api::market::AssetClass;
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer};
@@ -87,7 +87,7 @@ async fn funding_methods() {
     assert!(matches!(
         api.funding_methods(FundingDirection::Deposit, &without_class)
             .await,
-        Err(kraken_api::KrakenError::InvalidArgument { .. })
+        Err(kraken_spot_api::KrakenError::InvalidArgument { .. })
     ));
 }
 
@@ -364,7 +364,7 @@ async fn create_withdrawal_address() {
     address.memo = Some("2".into());
     assert!(matches!(
         api.create_withdrawal_address(&address, None).await,
-        Err(kraken_api::KrakenError::InvalidArgument { .. })
+        Err(kraken_spot_api::KrakenError::InvalidArgument { .. })
     ));
 }
 

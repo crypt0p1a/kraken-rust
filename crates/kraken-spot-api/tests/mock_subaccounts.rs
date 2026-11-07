@@ -3,7 +3,7 @@
 mod common;
 
 use common::{FormIs, Signed, ok, private_api};
-use kraken_api::subaccounts::{AccountTransfer, NewSubaccount};
+use kraken_spot_api::subaccounts::{AccountTransfer, NewSubaccount};
 use serde_json::json;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer};

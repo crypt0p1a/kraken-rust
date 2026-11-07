@@ -20,7 +20,7 @@ plugins {
 }
 
 cargo {
-    // the crate of the library: kraken-ffi, which holds the types of kraken-api and kraken-network
+    // the crate of the library: kraken-ffi, which holds the types of kraken-spot-api and kraken-network
     packageDirectory = layout.projectDirectory.dir("../../crates/kraken-ffi")
 }
 
@@ -29,7 +29,7 @@ tasks.matching { (it.name.contains("Ios") || it.name.contains("Macos")) && !Oper
     .configureEach { enabled = false }
 
 uniffi {
-    // the bindings of kraken-api and kraken-network too, in their own packages (uniffi.kraken_api,
+    // the bindings of kraken-spot-api and kraken-network too, in their own packages (uniffi.kraken_spot_api,
     // uniffi.kraken_network): they are part of the library of kraken-ffi
     generateBindingsForExternalCrates = true
     generateFromLibrary()
@@ -88,7 +88,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            // the exact decimals of every target: the type of kraken_api.Decimal (uniffi.toml)
+            // the exact decimals of every target: the type of kraken_spot_api.Decimal (uniffi.toml)
             api(libs.bignum)
         }
         commonTest.dependencies {

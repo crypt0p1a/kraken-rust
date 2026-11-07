@@ -6,34 +6,36 @@ mod common;
 mod strict;
 
 use common::{private_api, public_api};
-use kraken_api::Decimal;
-use kraken_api::account::{
+use kraken_spot_api::Decimal;
+use kraken_spot_api::account::{
     ApiKeyInfo, CreditLines, Export, ExportReport, ExportRequest, ExtendedBalance, LedgerEntry,
     LedgerType, QueryLedgersRequest, RemoveExportType, TradeBalance, TradeVolume, WalletAccounts,
     WalletStatus,
 };
-use kraken_api::algo::{ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType};
-use kraken_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
-use kraken_api::funding::{
+use kraken_spot_api::algo::{
+    ClosedStrategies, NewStrategy, Strategy, StrategyStatus, StrategyType,
+};
+use kraken_spot_api::earn::{EarnAllocations, EarnFunds, EarnStrategies, LockType};
+use kraken_spot_api::funding::{
     AddressDetails, ClaimedAddresses, CreatedWithdrawal, DepositLimits, Deposits, FundingAsset,
     FundingAssets, FundingDirection, FundingFee, FundingFeeRequest, FundingMethods,
     FundingNetworks, FundingScope, LimitValue, NewWithdrawal, NewWithdrawalAddress, SavedAddress,
     TransferStatus, WithdrawalAddresses, WithdrawalFee, WithdrawalLimits, Withdrawals,
 };
-use kraken_api::market::{
+use kraken_spot_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetStatus, CandleInterval, CandlesRequest,
     GroupedOrderBook, GroupedOrderBookRequest, Level3OrderBook, Level3OrderBookRequest,
     OrderBookRequest, RecentSpreadsRequest, RecentTradesRequest, ServerTime, SystemState,
     SystemStatus, Ticker,
 };
-use kraken_api::subaccounts::{AccountTransfer, NewSubaccount, TransferResult};
-use kraken_api::trading::{
+use kraken_spot_api::subaccounts::{AccountTransfer, NewSubaccount, TransferResult};
+use kraken_spot_api::trading::{
     AmendOrder, AmendType, BatchOrderAnswer, CancelAllAfter, CancelledOrders, ClosedOrdersRequest,
     EditOrder, EditedOrder, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order, OrderAmends,
     OrderAmendsRequest, OrderReference, OrderSide, OrderStatus, OrderType, Position,
     QueryOrdersRequest, QueryTradesRequest, TimeInForce, Trade, WebSocketsToken,
 };
-use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
+use kraken_spot_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use rust_decimal_macros::dec;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -1432,7 +1434,7 @@ async fn deposit_limits_fixture() {
     let served = private_api(&server)
         .deposit_limits(
             &FundingAsset {
-                class: kraken_api::market::AssetClass::Currency,
+                class: kraken_spot_api::market::AssetClass::Currency,
                 name: "USDC".into(),
             },
             &Default::default(),
@@ -1466,7 +1468,7 @@ async fn withdrawal_limits_fixture() {
     let served = private_api(&server)
         .withdrawal_limits(
             &FundingAsset {
-                class: kraken_api::market::AssetClass::Currency,
+                class: kraken_spot_api::market::AssetClass::Currency,
                 name: "USDC".into(),
             },
             &Default::default(),
@@ -1659,7 +1661,7 @@ async fn create_withdrawal_fixture() {
                 },
                 address_id: "ABR6SXP-SF6CY-VJMONY".into(),
                 asset: FundingAsset {
-                    class: kraken_api::market::AssetClass::Currency,
+                    class: kraken_spot_api::market::AssetClass::Currency,
                     name: "USDC".into(),
                 },
                 amount: "5".into(),

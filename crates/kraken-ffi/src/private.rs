@@ -1,16 +1,16 @@
 use super::KrakenRateLimiter;
-use kraken_api::account::{ExtendedBalance, TradeVolume};
-use kraken_api::trading::{
+use kraken_spot_api::account::{ExtendedBalance, TradeVolume};
+use kraken_spot_api::trading::{
     ClosedOrders, ClosedOrdersRequest, NewOrder, NewOrderAnswer, OpenOrdersRequest, Order,
     QueryOrdersRequest,
 };
-use kraken_api::{KrakenError, RestOptions};
+use kraken_spot_api::{KrakenError, RestOptions};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 #[derive(uniffi::Object)]
 pub struct KrakenPrivateApi {
-    inner: kraken_api::PrivateApi,
+    inner: kraken_spot_api::PrivateApi,
 }
 
 #[uniffi::export(async_runtime = "tokio")]
@@ -23,7 +23,7 @@ impl KrakenPrivateApi {
         rate_limiter: Arc<KrakenRateLimiter>,
     ) -> Result<Arc<Self>, KrakenError> {
         Ok(Arc::new(Self {
-            inner: kraken_api::PrivateApi::new(
+            inner: kraken_spot_api::PrivateApi::new(
                 api_key,
                 api_secret,
                 options,

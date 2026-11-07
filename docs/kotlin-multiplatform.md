@@ -9,7 +9,7 @@ It uses the Gradle plugin `ch.ubique.uniffi.plugin` of
 [UbiqueInnovation/uniffi-kotlin-multiplatform-bindings](https://github.com/UbiqueInnovation/uniffi-kotlin-multiplatform-bindings)
 (uniffi 0.32.0, Gradle ≥ 9.6.1): it builds `kraken-ffi` with Cargo for every target and generates
 the bindings of the 3 crates (`generateBindingsForExternalCrates`), in the packages
-`uniffi.kraken_ffi`, `uniffi.kraken_api` and `uniffi.kraken_network`.
+`uniffi.kraken_ffi`, `uniffi.kraken_spot_api` and `uniffi.kraken_network`.
 
 ## Prerequisites
 
@@ -87,7 +87,7 @@ The calls are `suspend` functions, the errors `KrakenException` (`Api`, `Network
 The amounts are the `BigDecimal` of
 [`com.ionspin.kotlin:bignum`](https://github.com/ionspin/kotlin-multiplatform-bignum), available on
 every target: top-level `[custom_types.Decimal]` of
-[`crates/kraken-api/uniffi.toml`](../crates/kraken-api/uniffi.toml), read by this generator only.
+[`crates/kraken-spot-api/uniffi.toml`](../crates/kraken-spot-api/uniffi.toml), read by this generator only.
 On Android, the keep rules of JNA and of the bindings are published with the AAR
 (`consumer-rules.pro`).
 

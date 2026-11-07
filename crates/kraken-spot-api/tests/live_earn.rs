@@ -1,13 +1,13 @@
 //! Contract of the Earn endpoints, against the real Kraken API, read only: no fund is allocated
 //! or deallocated.
 //! Credentials: KRAKEN_API_KEY / KRAKEN_API_SECRET, from the environment or `.env`.
-//! `cargo test -p kraken-api --test live_earn -- --ignored --test-threads=1 --nocapture`
+//! `cargo test -p kraken-spot-api --test live_earn -- --ignored --test-threads=1 --nocapture`
 
 mod live;
 mod strict;
 
-use kraken_api::Decimal;
-use kraken_api::earn::{EarnAllocations, EarnStrategy, LockType};
+use kraken_spot_api::Decimal;
+use kraken_spot_api::earn::{EarnAllocations, EarnStrategy, LockType};
 use live::{Presence, decode_strict, private_api, private_client};
 use serde::Serialize;
 use serde_json::Value;

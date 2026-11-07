@@ -1,17 +1,17 @@
 //! Contract of the private account endpoints, against the real Kraken API, read only.
 //! Credentials: KRAKEN_API_KEY / KRAKEN_API_SECRET, from the environment or `.env`.
-//! `cargo test -p kraken-api --test live_account -- --ignored --test-threads=1 --nocapture`
+//! `cargo test -p kraken-spot-api --test live_account -- --ignored --test-threads=1 --nocapture`
 
 mod live;
 mod strict;
 
-use kraken_api::Decimal;
-use kraken_api::account::{
+use kraken_spot_api::Decimal;
+use kraken_spot_api::account::{
     ApiKeyInfo, Export, ExportReport, ExportStatus, ExtendedBalance, FeeInfo, LedgerEntry,
     LedgerType, QueryLedgersRequest, TradeBalance, TradeVolume, WalletAccounts, WalletType,
 };
-use kraken_api::market::Level3OrderBook;
-use kraken_api::{KrakenError, PrivateApi, RestOptions};
+use kraken_spot_api::market::Level3OrderBook;
+use kraken_spot_api::{KrakenError, PrivateApi, RestOptions};
 use live::{Presence, decode_strict, entries, env, le, private_api, private_client, unless_denied};
 use serde::Serialize;
 use serde_json::Value;

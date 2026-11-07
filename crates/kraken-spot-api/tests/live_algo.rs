@@ -1,16 +1,16 @@
 //! Contract of the algorithmic trading endpoints, against the real Kraken API: no strategy is
 //! created or cancelled, the new ones are only validated (`validate=true`).
 //! Credentials: KRAKEN_API_KEY / KRAKEN_API_SECRET, from the environment or `.env`.
-//! `cargo test -p kraken-api --test live_algo -- --ignored --test-threads=1 --nocapture`
+//! `cargo test -p kraken-spot-api --test live_algo -- --ignored --test-threads=1 --nocapture`
 
 mod live;
 mod strict;
 
-use kraken_api::algo::{
+use kraken_spot_api::algo::{
     ClosedStrategies, ClosedStrategiesRequest, NewStrategy, Strategy, StrategyStatus, StrategyType,
 };
-use kraken_api::trading::{OrderSide, OrderType};
-use kraken_api::{Decimal, KrakenError};
+use kraken_spot_api::trading::{OrderSide, OrderType};
+use kraken_spot_api::{Decimal, KrakenError};
 use live::{decode_strict, entries, private_api, private_client};
 use serde_json::Value;
 
