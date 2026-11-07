@@ -99,7 +99,9 @@ wrapper `./gradlew`, Gradle 9.7.0) and includes `platforms/kotlin-multiplatform`
 [the-inkwell/gradle-tools](https://github.com/the-inkwell/gradle-tools), like the other projects:
 
 - its commit is `GRADLE_EXTENDED_VERSION_USED` in `gradle.properties`
-- its catalog `additionals` (Kotlin, AGP, the UniFFI plugin, SDK levels, test libraries) and its
+- its catalog `additionals` (Kotlin, AGP, SDK levels, test libraries) and its
   `kt-plugins` are downloaded in `gradle/extended`, ignored by git
 - the dependencies missing from that catalog are in `gradle/libs.versions.toml` (`libs`)
+- the UniFFI plugin is in `gradle/rust.versions.toml` (`rust`), alone: the CI caches the generator
+  of the bindings, which the plugin builds from its sources, on the hash of this file
 - the group and the version are in `gradle/versions.gradle` (`GROUP_ID`, `SUFFIX`)

@@ -16,7 +16,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(additionals.plugins.kotlin.multiplatform)
     alias(additionals.plugins.android.kotlin.multiplatform.library)
-    alias(additionals.plugins.ubique.uniffi)
+    alias(rust.plugins.ubique.uniffi)
 }
 
 cargo {
