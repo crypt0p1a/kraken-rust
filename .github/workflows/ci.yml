@@ -214,12 +214,14 @@ jobs:
         with:
           key: kmp-${{ matrix.name }}
       # the generator of the Kotlin bindings, which the uniffi plugin builds from its sources (about
-      # 4 minutes): installed again only when its fingerprint changes, with the plugin version
+      # 4 minutes): installed again only when the version of the plugin changes, in
+      # gradle/rust.versions.toml. Not the other catalogs: gradle/extended is downloaded by Gradle,
+      # after this step
       - name: Cache of the generator of the Kotlin bindings
         uses: actions/cache@v4
         with:
           path: build/uniffi/bindgen
-          key: uniffi-bindgen-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('gradle/**/libs.versions.toml') }}
+          key: uniffi-bindgen-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('gradle/rust.versions.toml') }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

@@ -28,6 +28,10 @@ dependencyResolutionManagement {
         additionals {
             from(files(gradle.extended.files.catalog))
         }
+        // the uniffi plugin, apart: its version alone decides the generator of the bindings
+        rust {
+            from(files("gradle/rust.versions.toml"))
+        }
     }
 }
 
