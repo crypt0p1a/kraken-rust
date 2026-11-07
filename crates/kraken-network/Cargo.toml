@@ -5,6 +5,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+keywords = ["kraken", "exchange", "http", "rate-limit"]
+categories = ["api-bindings", "network-programming"]
+# the tests and their fixtures stay in the repository: only the library is published
+exclude = ["tests/"]
 
 [features]
 # Derives the UniFFI traits of KrakenError and RestOptions

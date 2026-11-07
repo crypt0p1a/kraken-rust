@@ -5,6 +5,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+keywords = ["kraken", "exchange", "trading", "crypto", "api"]
+categories = ["api-bindings", "cryptography::cryptocurrencies"]
+# the tests and their fixtures stay in the repository: only the library is published
+exclude = ["tests/"]
 
 [features]
 # Derives the UniFFI traits of the models

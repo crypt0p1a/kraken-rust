@@ -5,6 +5,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+keywords = ["kraken", "exchange", "signature", "hmac"]
+categories = ["cryptography", "cryptography::cryptocurrencies"]
+# the tests and their fixtures stay in the repository: only the library is published
+exclude = ["tests/"]
 
 [dependencies]
 base64.workspace = true

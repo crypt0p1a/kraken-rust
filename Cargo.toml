@@ -19,9 +19,10 @@ repository = "https://github.com/crypt0p1a/kraken-rust"
 
 [workspace.dependencies]
 # crates of the workspace
-kraken-spot-api = { path = "crates/kraken-spot-api" }
-kraken-crypto = { path = "crates/kraken-crypto" }
-kraken-network = { path = "crates/kraken-network" }
+# published on crates.io: the version of the workspace, written again here for the registry
+kraken-spot-api = { path = "crates/kraken-spot-api", version = "0.1.0" }
+kraken-crypto = { path = "crates/kraken-crypto", version = "0.1.0" }
+kraken-network = { path = "crates/kraken-network", version = "0.1.0" }
 kraken-trading-bot = { path = "crates/kraken-trading-bot" }
 trading-notify = { path = "crates/trading-notify" }
 
