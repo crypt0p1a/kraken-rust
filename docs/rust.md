@@ -109,6 +109,26 @@ Through UniFFI, a `Decimal` crosses as its text and is rebuilt as a `BigDecimal`
 languages. The prices and volumes of the new orders are strings, formatted with the decimals of
 the pair (`AssetPair.pair_decimals`, `lot_decimals`).
 
+## Release
+
+`kraken-crypto`, `kraken-network` and `kraken-spot-api` are published on crates.io together, at
+the version of the workspace, without their tests. The other crates are never published.
+
+1. Raise `version` in `Cargo.toml`: the one of `[workspace.package]` and the three of the published
+   crates in `[workspace.dependencies]`
+2. Write the notes of the version in `changelogs/X.Y.Z.md` (Markdown). The CI checks it exists
+3. Once merged, tag `X.Y.Z` on `main` and push it: the release workflow checks the tag is the
+   version of the code, then makes the GitHub release, its notes being the changelog
+4. Publish the crates from `main` at the tag, after `cargo login`:
+
+   ```sh
+   scripts/check-release.sh X.Y.Z
+   cargo publish --workspace --dry-run
+   cargo publish --workspace
+   ```
+
+A version published on crates.io can't be removed, only yanked.
+
 ## Tests
 
 ```sh
