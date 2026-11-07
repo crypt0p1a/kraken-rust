@@ -3,7 +3,7 @@ resolver = "3"
 members = [
   "crates/kraken-crypto",
   "crates/kraken-network",
-  "crates/kraken-api",
+  "crates/kraken-spot-api",
   "crates/kraken-dashboard",
   "crates/kraken-ffi",
   "crates/kraken-trading-bot",
@@ -19,7 +19,7 @@ repository = "https://github.com/crypt0p1a/kraken-rust"
 
 [workspace.dependencies]
 # crates of the workspace
-kraken-api = { path = "crates/kraken-api" }
+kraken-spot-api = { path = "crates/kraken-spot-api" }
 kraken-crypto = { path = "crates/kraken-crypto" }
 kraken-network = { path = "crates/kraken-network" }
 kraken-trading-bot = { path = "crates/kraken-trading-bot" }

@@ -1,12 +1,12 @@
 use super::KrakenRateLimiter;
-use kraken_api::market::{AssetPair, Candles, CandlesRequest, ServerTime, Ticker};
-use kraken_api::{KrakenError, RestOptions};
+use kraken_spot_api::market::{AssetPair, Candles, CandlesRequest, ServerTime, Ticker};
+use kraken_spot_api::{KrakenError, RestOptions};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 #[derive(uniffi::Object)]
 pub struct KrakenPublicApi {
-    inner: kraken_api::PublicApi,
+    inner: kraken_spot_api::PublicApi,
 }
 
 #[uniffi::export(async_runtime = "tokio")]
@@ -17,7 +17,7 @@ impl KrakenPublicApi {
         rate_limiter: Arc<KrakenRateLimiter>,
     ) -> Result<Arc<Self>, KrakenError> {
         Ok(Arc::new(Self {
-            inner: kraken_api::PublicApi::new(options, rate_limiter.inner.clone())?,
+            inner: kraken_spot_api::PublicApi::new(options, rate_limiter.inner.clone())?,
         }))
     }
 

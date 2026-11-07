@@ -3,13 +3,13 @@
 mod common;
 
 use common::{FormIs, QueryIs, Signed, ok, private_api, public_api};
-use kraken_api::market::{
+use kraken_spot_api::market::{
     AssetClass, AssetStatus, AssetsRequest, CandleInterval, CandlesRequest,
     GroupedOrderBookRequest, Level3OrderBookRequest, OrderBookRequest, RecentSpreadsRequest,
     RecentTradesRequest, SystemState,
 };
-use kraken_api::trading::{OrderSide, OrderType};
-use kraken_api::transparency::PostTradeRequest;
+use kraken_spot_api::trading::{OrderSide, OrderType};
+use kraken_spot_api::transparency::PostTradeRequest;
 use rust_decimal_macros::dec;
 use serde_json::json;
 use wiremock::matchers::{method, path};

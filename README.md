@@ -46,9 +46,9 @@ docker compose up -d --build
 crates/
 ├── kraken-crypto    API secret, API-Sign signature (HMAC-SHA512)         pure, synchronous
 ├── kraken-network   HTTP clients, rate limiter, nonce, answers, errors   ← kraken-crypto
-├── kraken-api       the endpoints, grouped by domain, and their models   ← kraken-network
-├── kraken-ffi       UniFFI export: objects with async methods            ← kraken-api, kraken-network
-├── kraken-trading-bot  the trading bot (executable, Docker)             ← kraken-api, trading-notify
+├── kraken-spot-api       the endpoints, grouped by domain, and their models   ← kraken-network
+├── kraken-ffi       UniFFI export: objects with async methods            ← kraken-spot-api, kraken-network
+├── kraken-trading-bot  the trading bot (executable, Docker)             ← kraken-spot-api, trading-notify
 ├── kraken-dashboard the terminal dashboard of the bot (ratatui)         ← its SQLite database
 ├── trading-notify   notifications of a trading bot through ntfy, i18n   ← ntfy
 └── uniffi-bindgen   the generator of the Kotlin and Swift bindings      ← uniffi (cli)
@@ -58,7 +58,7 @@ crates/
 |------------------|-------------------------------------------------------------------------------------------|
 | `kraken-crypto`  | `ApiSecret`: base64 secret, never printed, `sign(path, nonce, body)`                      |
 | `kraken-network` | `PublicClient` (`GET /0/public`), `PrivateClient` (signed `POST /0/private`), `RateLimiter`, `RestOptions`, `KrakenError`, form encoding helpers |
-| `kraken-api`     | `market`, `account`, `trading` (models + calls), `PublicApi` and `PrivateApi` facades     |
+| `kraken-spot-api`     | `market`, `account`, `trading` (models + calls), `PublicApi` and `PrivateApi` facades     |
 | `kraken-ffi`     | `KrakenPublicApi`, `KrakenPrivateApi`, `KrakenRateLimiter`, `KrakenLogger`                |
 | `kraken-trading-bot` | the managers of [the trading bot](docs/trading-bot.md), port of `cex-trading-bot`     |
 | `kraken-dashboard` | the [dashboard](docs/trading-bot.md#dashboard) of the bot in the terminal: P&L, managers, orders, markets, decisions |
@@ -68,7 +68,7 @@ crates/
 ## Usage
 
 ```rust
-use kraken_api::{PrivateApi, PublicApi, RateLimiter, RestOptions};
+use kraken_spot_api::{PrivateApi, PublicApi, RateLimiter, RestOptions};
 use std::sync::Arc;
 
 // share it: Kraken limits the calls per client

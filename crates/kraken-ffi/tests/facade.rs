@@ -114,7 +114,10 @@ async fn the_private_api_signs_its_calls() {
     .unwrap();
 
     let balances = api.extended_balance().await.unwrap();
-    assert_eq!(balances["ZEUR"].available(), kraken_api::Decimal::from(6));
+    assert_eq!(
+        balances["ZEUR"].available(),
+        kraken_spot_api::Decimal::from(6)
+    );
 }
 
 #[test]
@@ -128,10 +131,10 @@ fn the_private_api_refuses_an_invalid_secret() {
     assert!(matches!(api, Err(KrakenError::InvalidArgument { .. })));
 }
 
-/// Serves the fixtures of kraken-api: the real shapes of the answers
+/// Serves the fixtures of kraken-spot-api: the real shapes of the answers
 async fn serve_fixtures(server: &MockServer) {
     let fixtures =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../kraken-api/tests/fixtures");
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../kraken-spot-api/tests/fixtures");
     for (endpoint, file) in [
         ("/0/public/Time", "time.json"),
         ("/0/public/Ticker", "ticker.json"),
@@ -166,9 +169,9 @@ async fn every_public_method_is_exported() {
         5
     );
     let candles = api
-        .candles(kraken_api::market::CandlesRequest {
+        .candles(kraken_spot_api::market::CandlesRequest {
             pair: "XBTUSD".into(),
-            interval: kraken_api::market::CandleInterval::Res1d,
+            interval: kraken_spot_api::market::CandleInterval::Res1d,
             since: None,
         })
         .await
@@ -178,7 +181,7 @@ async fn every_public_method_is_exported() {
 
 #[tokio::test]
 async fn every_private_method_is_exported() {
-    use kraken_api::trading::{
+    use kraken_spot_api::trading::{
         ClosedOrdersRequest, NewOrder, OpenOrdersRequest, OrderSide, OrderType, QueryOrdersRequest,
     };
 

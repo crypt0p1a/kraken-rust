@@ -23,7 +23,7 @@ let package = Package(
     ],
     targets: [
         ffi,
-        // the Swift sources generated for kraken-network, kraken-api and kraken-ffi
+        // the Swift sources generated for kraken-network, kraken-spot-api and kraken-ffi
         .target(name: "Kraken", dependencies: ["KrakenFFI"], path: "Sources/Kraken"),
         .testTarget(name: "KrakenTests", dependencies: ["Kraken"]),
     ]

@@ -17,7 +17,7 @@ The crates of the workspace, used directly from Rust, and how to work on them.
 ## Usage
 
 ```rust
-use kraken_api::{PrivateApi, PublicApi, RateLimiter, RestOptions};
+use kraken_spot_api::{PrivateApi, PublicApi, RateLimiter, RestOptions};
 use std::sync::Arc;
 
 // share it: Kraken limits the calls per client
@@ -64,7 +64,7 @@ Three clients of `kraken-network` call them: `PublicClient` (`GET /0/public`), `
 RetrieveExport as bytes) and `FundingClient` (the Funding Beta API: signed GET, POST, PUT and
 DELETE, the nonce in the `API-Nonce` header, JSON answers without envelope).
 
-## Layout of kraken-api
+## Layout of kraken-spot-api
 
 ```
 src/
@@ -91,12 +91,12 @@ src/
 A new endpoint goes in its domain (models + `pub(crate) async fn`), then in its facade, then in
 `kraken-ffi`.
 
-`kraken-crypto`, `kraken-network` and `kraken-api` don't depend on UniFFI: their `uniffi` feature,
+`kraken-crypto`, `kraken-network` and `kraken-spot-api` don't depend on UniFFI: their `uniffi` feature,
 enabled by `kraken-ffi` only, derives the UniFFI traits of their models and errors.
 
 ## Models
 
-The amounts, prices, volumes and fees are exact decimals (`kraken_api::Decimal`, from
+The amounts, prices, volumes and fees are exact decimals (`kraken_spot_api::Decimal`, from
 `rust_decimal`: base 10, 28 significant digits), parsed from the strings of Kraken without going
 through a float. A `f64` keeps ~16 significant digits: the volume of a small asset
 (`812345678901.12345678` SHIB) would lose its last ones, and `volume × price` would no longer be
@@ -105,7 +105,7 @@ timestamps stay `f64` (seconds, exact to the microsecond).
 
 Through UniFFI, a `Decimal` crosses as its text and is rebuilt as a `BigDecimal` in Kotlin and a
 `Foundation.Decimal` in Swift, see
-[`crates/kraken-api/uniffi.toml`](../crates/kraken-api/uniffi.toml); a `String` in the other
+[`crates/kraken-spot-api/uniffi.toml`](../crates/kraken-spot-api/uniffi.toml); a `String` in the other
 languages. The prices and volumes of the new orders are strings, formatted with the decimals of
 the pair (`AssetPair.pair_decimals`, `lot_decimals`).
 
@@ -121,10 +121,10 @@ cargo llvm-cov nextest --workspace --open                                 # cove
 |-------|-------|------|
 | unit | `#[cfg(test)]` of each module | every value of the enums, the encoding of every parameter, the arrays of an unexpected size, the required fields missing / null / unreadable, lenient numbers, signature, nonces across threads, rate limiter under concurrency |
 | network | `kraken-network/tests/clients.rs` | the clients against a mocked server ([wiremock](https://docs.rs/wiremock)): GET / POST / PUT / DELETE, form and JSON bodies, files, `API-Sign` recomputed independently, increasing nonces, error mapping |
-| endpoints | `kraken-api/tests/mock_{market,account,trading,algo,earn,subaccounts,funding}.rs` | every call against a mocked Kraken: path, exact parameters, signature, answer decoded |
-| fixtures | `kraken-api/tests/fixtures.rs` | the real shapes of the answers (`tests/fixtures`), decoded **strictly** and served end to end |
+| endpoints | `kraken-spot-api/tests/mock_{market,account,trading,algo,earn,subaccounts,funding}.rs` | every call against a mocked Kraken: path, exact parameters, signature, answer decoded |
+| fixtures | `kraken-spot-api/tests/fixtures.rs` | the real shapes of the answers (`tests/fixtures`), decoded **strictly** and served end to end |
 | facade | `kraken-ffi/tests/facade.rs` | the UniFFI objects, with a foreign logger |
-| live contracts | `kraken-api/tests/live_{market,account,trading,algo,earn,funding}.rs` | the real Kraken API, see below |
+| live contracts | `kraken-spot-api/tests/live_{market,account,trading,algo,earn,funding}.rs` | the real Kraken API, see below |
 
 ### Live contracts
 
@@ -132,13 +132,13 @@ They run against the real Kraken API. The credentials are read from the environm
 a `.env` file at the root of the repository, ignored by git:
 
 ```sh
-cargo test -p kraken-api --test live_market -- --ignored --test-threads=1   # real public API
+cargo test -p kraken-spot-api --test live_market -- --ignored --test-threads=1   # real public API
 cp .env.example .env                                                      # then fill the key and secret
-cargo test -p kraken-api --test live_account -- --ignored --test-threads=1
-cargo test -p kraken-api --test live_trading -- --ignored --test-threads=1
-cargo test -p kraken-api --test live_algo -- --ignored --test-threads=1
-cargo test -p kraken-api --test live_earn -- --ignored --test-threads=1
-cargo test -p kraken-api --test live_funding -- --ignored --test-threads=1
+cargo test -p kraken-spot-api --test live_account -- --ignored --test-threads=1
+cargo test -p kraken-spot-api --test live_trading -- --ignored --test-threads=1
+cargo test -p kraken-spot-api --test live_algo -- --ignored --test-threads=1
+cargo test -p kraken-spot-api --test live_earn -- --ignored --test-threads=1
+cargo test -p kraken-spot-api --test live_funding -- --ignored --test-threads=1
 ```
 
 The key needs the Query Funds, Query Open Orders & Trades, Query Closed Orders & Trades and

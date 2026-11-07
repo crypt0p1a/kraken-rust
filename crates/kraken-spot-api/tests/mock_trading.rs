@@ -3,8 +3,8 @@
 mod common;
 
 use common::{FormIs, JsonIs, Signed, SignedJson, ok, orders_fixture, private_api};
-use kraken_api::KrakenError;
-use kraken_api::trading::{
+use kraken_spot_api::KrakenError;
+use kraken_spot_api::trading::{
     AmendOrder, AmendType, CloseTime, ClosedOrdersRequest, EditOrder, NewOrder, OpenOrdersRequest,
     OpenPositionsRequest, OrderAmendsRequest, OrderFlag, OrderReference, OrderSide, OrderStatus,
     OrderType, QueryOrdersRequest, QueryTradesRequest, TimeInForce, TradesHistoryRequest,

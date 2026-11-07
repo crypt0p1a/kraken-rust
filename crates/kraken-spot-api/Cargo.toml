@@ -1,5 +1,5 @@
 [package]
-name = "kraken-api"
+name = "kraken-spot-api"
 description = "Calls of the Kraken Spot REST API: market data, account and trading"
 version.workspace = true
 edition.workspace = true

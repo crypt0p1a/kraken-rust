@@ -11,7 +11,7 @@ name = "kraken_ffi"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [dependencies]
-kraken-api = { workspace = true, features = ["uniffi"] }
+kraken-spot-api = { workspace = true, features = ["uniffi"] }
 kraken-network = { workspace = true, features = ["uniffi"] }
 uniffi = { workspace = true, features = ["tokio"] }
 

@@ -19,7 +19,7 @@ lower = "NSDecimalNumber(decimal: {}).description(withLocale: Locale(identifier:
 # (scripts/bindings.sh), each crate keeping its own header
 [bindings.swift]
 ffi_module_name = "KrakenFFI"
-ffi_module_filename = "kraken_apiFFI"
+ffi_module_filename = "kraken_spot_apiFFI"
 
 # Kotlin Multiplatform (platforms/kotlin-multiplatform): its generator, the one of
 # UbiqueInnovation/uniffi-kotlin-multiplatform-bindings, reads the top level of the file. The

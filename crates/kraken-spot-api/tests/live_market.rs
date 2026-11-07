@@ -1,5 +1,5 @@
 //! Contract of the public market endpoints, against the real Kraken API:
-//! `cargo test -p kraken-api --test live_market -- --ignored --test-threads=1 --nocapture`
+//! `cargo test -p kraken-spot-api --test live_market -- --ignored --test-threads=1 --nocapture`
 //!
 //! Every answer is decoded strictly (no field ignored by the models, no required field missing),
 //! on every pair and every interval, and its values are checked for consistency.
@@ -7,15 +7,15 @@
 mod live;
 mod strict;
 
-use kraken_api::Decimal;
-use kraken_api::KrakenError;
-use kraken_api::market::{
+use kraken_spot_api::Decimal;
+use kraken_spot_api::KrakenError;
+use kraken_spot_api::market::{
     Asset, AssetClass, AssetPair, AssetPairStatus, AssetsRequest, CandleInterval, CandlesRequest,
     GroupedOrderBook, MaintenanceEvent, OrderBookRequest, RecentSpreadsRequest,
     RecentTradesRequest, ServerTime, SystemState, SystemStatus, Ticker,
 };
-use kraken_api::trading::OrderType;
-use kraken_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
+use kraken_spot_api::trading::OrderType;
+use kraken_spot_api::transparency::{PostTradeData, PostTradeRequest, PreTradeData};
 use live::{Presence, decode_strict, entries, le, now_seconds, public_api, public_client};
 use rust_decimal_macros::dec;
 use serde::Serialize;

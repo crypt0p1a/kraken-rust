@@ -2,17 +2,17 @@
 //! address is claimed, saved or deleted, no fund is withdrawn. Skipped without the "Funds
 //! permissions - Query" permission.
 //! Credentials: KRAKEN_API_KEY / KRAKEN_API_SECRET, from the environment or `.env`.
-//! `cargo test -p kraken-api --test live_funding -- --ignored --test-threads=1 --nocapture`
+//! `cargo test -p kraken-spot-api --test live_funding -- --ignored --test-threads=1 --nocapture`
 
 mod live;
 mod strict;
 
-use kraken_api::funding::{
+use kraken_network::FundingMethod;
+use kraken_spot_api::funding::{
     ClaimedAddresses, DepositLimits, Deposits, FundingAssets, FundingDirection, FundingFee,
     FundingMethods, FundingNetworks, TransferStatus, WithdrawalAddresses, WithdrawalLimits,
     WithdrawalStatus, Withdrawals,
 };
-use kraken_network::FundingMethod;
 use live::{decode_strict, funding_client, private_api, unless_denied};
 use serde_json::Value;
 
@@ -89,7 +89,7 @@ async fn funding_fee_of_a_withdrawal_method() {
     let method = &methods.methods[0];
     let amount = method
         .minimum_amount
-        .unwrap_or(kraken_api::Decimal::ONE)
+        .unwrap_or(kraken_spot_api::Decimal::ONE)
         .to_string();
     let raw: Value = funding_client()
         .call(
@@ -134,7 +134,7 @@ async fn withdrawal_limits_of_usdc() {
         return;
     };
     let limits: WithdrawalLimits = decode_strict("withdrawal limits", &raw);
-    assert!(limits.available_balance.amount >= kraken_api::Decimal::ZERO);
+    assert!(limits.available_balance.amount >= kraken_spot_api::Decimal::ZERO);
     for method in &limits.withdrawal_limits {
         assert!(
             ["balance", "limits"].contains(&method.maximum_reason.as_str()),

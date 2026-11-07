@@ -19,10 +19,10 @@
 //! UniFFI, they are strings, to read as `BigDecimal` / `Decimal` by the foreign languages.
 //!
 //! ```no_run
-//! use kraken_api::{PublicApi, RateLimiter, RestOptions};
+//! use kraken_spot_api::{PublicApi, RateLimiter, RestOptions};
 //! use std::sync::Arc;
 //!
-//! # async fn run() -> Result<(), kraken_api::KrakenError> {
+//! # async fn run() -> Result<(), kraken_spot_api::KrakenError> {
 //! // share it: Kraken limits the calls per client
 //! let limiter = Arc::new(RateLimiter::default());
 //! let api = PublicApi::new(RestOptions::default(), limiter)?;
@@ -32,7 +32,7 @@
 //! ```
 
 #[cfg(feature = "uniffi")]
-uniffi::setup_scaffolding!("kraken_api");
+uniffi::setup_scaffolding!("kraken_spot_api");
 
 // the exact text of the decimal: "0.00058823", never a float
 #[cfg(feature = "uniffi")]
