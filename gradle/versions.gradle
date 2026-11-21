@@ -1,7 +1,7 @@
 /* * * * * * * * * * * * * * * * *
  * Default project info
  * * * * * * * * * * * * * * * * */
-def defaultVersion = "0.1.0"
+def defaultVersion = "0.2.0"
 def defaultGroup = "com.crypt0p1a"
 
 ext {

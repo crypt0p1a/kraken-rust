@@ -1,5 +1,5 @@
 # Kraken Spot Trading Library 👋
-![Version](https://img.shields.io/badge/version-0.1.0-blue.svg?cacheSeconds=2592000)
+![Version](https://img.shields.io/badge/version-0.2.0-blue.svg?cacheSeconds=2592000)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > Kraken Spot REST client in Rust, exported through UniFFI, and a trading bot running on it
