@@ -1320,7 +1320,7 @@ dependencies = [
 
 [[package]]
 name = "kraken-crypto"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "hmac",
@@ -1330,7 +1330,7 @@ dependencies = [
 
 [[package]]
 name = "kraken-dashboard"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "fastrand",
  "kraken-spot-api",
@@ -1342,7 +1342,7 @@ dependencies = [
 
 [[package]]
 name = "kraken-ffi"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kraken-network",
  "kraken-spot-api",
@@ -1354,7 +1354,7 @@ dependencies = [
 
 [[package]]
 name = "kraken-network"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "hmac",
@@ -1372,7 +1372,7 @@ dependencies = [
 
 [[package]]
 name = "kraken-spot-api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "hmac",
@@ -1391,7 +1391,7 @@ dependencies = [
 
 [[package]]
 name = "kraken-trading-bot"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "fastrand",
  "humantime-serde",
@@ -3199,7 +3199,7 @@ dependencies = [
 
 [[package]]
 name = "trading-notify"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ntfy",
  "reqwest",
@@ -3294,7 +3294,7 @@ dependencies = [
 
 [[package]]
 name = "uniffi-bindgen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "uniffi",
 ]
