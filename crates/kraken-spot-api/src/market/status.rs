@@ -75,8 +75,10 @@ pub struct MaintenanceEvent {
     pub expected_start_utc: String,
     /// RFC 3339
     pub expected_end_utc: String,
-    /// Seconds until `expected_start_utc` when the answer was served (it may be cached)
-    pub time_to_start_s: i64,
+    /// Seconds until `expected_start_utc` when the answer was served (it may be cached), missing
+    /// once the maintenance has started. Kraken keeps listing a maintenance for days after its end
+    #[serde(default)]
+    pub time_to_start_s: Option<i64>,
     pub phase: MaintenancePhase,
     /// e.g. "spot_trading", "spot_rest", "spot_ws"
     #[serde(default)]
@@ -208,6 +210,23 @@ mod tests {
     }
 
     #[test]
+    fn decodes_a_started_maintenance() {
+        // answer of Kraken, the maintenance had started 2 days before
+        let event: MaintenanceEvent = serde_json::from_str(
+            r#"{"affected_services":["futures_ws"],"cancel_before_utc":"2026-11-19T10:55:00Z",
+            "event_id":70,"expected_end_utc":"2027-03-01T23:59:00Z",
+            "expected_start_utc":"2026-11-19T11:00:00Z","order_submission":"blocked",
+            "phase":"final_warning_30s","recommended_action":"stop_new_orders",
+            "source_url":"https://stspg.io/38zlyxz4s1g6",
+            "title":"Unified WebSocket API now available for Derivatives"}"#,
+        )
+        .unwrap();
+        assert_eq!(event.time_to_start_s, None);
+        assert_eq!(event.phase, MaintenancePhase::FinalWarning30s);
+        assert_eq!(event.recommended_action, RecommendedAction::StopNewOrders);
+    }
+
+    #[test]
     fn decodes_every_state() {
         for (text, state) in [
             ("online", SystemState::Online),
@@ -247,7 +266,7 @@ mod tests {
         assert_eq!(status.status, SystemState::CancelOnly);
         let maintenance = &status.upcoming_maintenance[0];
         assert_eq!(maintenance.phase, MaintenancePhase::Approaching30m);
-        assert_eq!(maintenance.time_to_start_s, 1740);
+        assert_eq!(maintenance.time_to_start_s, Some(1740));
         assert_eq!(
             maintenance.recommended_action,
             RecommendedAction::ReduceActivity
